@@ -49,11 +49,24 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.15", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.16", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
+// Phones and tablets (a coarse primary pointer) get a calmer HUD: collapsible panels, notifications in a drop-down, no keyboard hints.
+// ?touch=1 or ?touch=0 in the address forces it either way (for testing on a desktop).
+const TOUCH_UI = (() => { try {
+    const q = new URLSearchParams(window.location.search).get("touch");
+    if (q === "1")
+        return true;
+    if (q === "0")
+        return false;
+    return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+}
+catch (e) {
+    return false;
+} })();
 const BUILD_LABEL = "v" + BUILD.version + (BUILD.build ? " \u00b7 " + BUILD.build : ""); // e.g. "v0.13 \u00b7 22 Oct 2026"
 const STAGE_HEIGHT = BUILD.fullscreen ? "100dvh" : "640px"; // the game and the title screen share one stage size
 const BOATS = [
@@ -4316,7 +4329,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiWheelOpen, setUiWheelOpen] = useState(false); // command wheel (Q or the ring button)
     const [uiWheelMenu, setUiWheelMenu] = useState("main"); // which ring is showing: main | tackle | hull | world | view
     const [uiWheelNote, setUiWheelNote] = useState(""); // text in the wheel's hub: hover/tap hints, or why a slice is unavailable
-    const [uiShowSonar, setUiShowSonar] = useState(true);
+    const [uiShowSonar, setUiShowSonar] = useState(!TOUCH_UI); // on phones the sonar starts folded away (the 📡 button in the top bar opens it)
+    const [uiHudOpen, setUiHudOpen] = useState(false); // touch HUD: the top-left status drop-down
+    const [uiReadoutOpen, setUiReadoutOpen] = useState(false); // touch HUD: the bottom-right boat readout, folded to one line until tapped
+    const [uiToastLog, setUiToastLog] = useState([]); // recent notifications, newest first (shown in the touch drop-down)
     const [uiShowDebug, setUiShowDebug] = useState(BUILD.dev);
     const [uiShowHelp, setUiShowHelp] = useState(false);
     const [uiWildlifeOpen, setUiWildlifeOpen] = useState(false); // wildlife log panel
@@ -8489,7 +8505,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 return;
             if (fs.docked) { // ---- cast off
                 if (ashoreMode) {
-                    marineShowToast("Get back on the boat first (L)", "#ffb84d", 3);
+                    marineShowToast(TOUCH_UI ? "Get back on the boat first (menu → To Boat)" : "Get back on the boat first (L)", "#ffb84d", 3);
                     return;
                 }
                 if (fs.mode !== "idle") {
@@ -8590,7 +8606,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 boatHeading = a.toH;
                 if (a.kind === "dock") {
                     fishingState.docked = true;
-                    marineShowToast("⚓ Docked. Press L to step out, or open Marina services", "#7fe6a8", 4);
+                    marineShowToast(TOUCH_UI ? "⚓ Docked. Step out from the menu, or open Marina services" : "⚓ Docked. Press L to step out, or open Marina services", "#7fe6a8", 4);
                 }
                 else
                     dockBerth = null;
@@ -9501,7 +9517,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             if (a.t >= 2.7) {
                 setUiTravel({ show: false, text: a.dest.text || a.dest.name, icon: a.dest.icon });
-                marineShowToast(a.dest.home ? "⚓ Back in the home waters" : "⛵ Arrived at " + a.dest.name + ". Birds circling over the water mark the grounds. Anchor (E), then drop a line (F)", "#7fe6a8", 6);
+                marineShowToast(a.dest.home ? "⚓ Back in the home waters" : "⛵ Arrived at " + a.dest.name + ". Birds circling over the water mark the grounds. " + (TOUCH_UI ? "Anchor from the menu, then drop a line" : "Anchor (E), then drop a line (F)"), "#7fe6a8", 6);
                 travelAnim = null;
             }
         }
@@ -10157,6 +10173,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const marineSightings = {};
         function marineShowToast(text, color, secs) {
             setUiMarineToast({ text, color });
+            setUiToastLog((l) => (l.length && l[0].text === text ? l : [{ text, color }].concat(l).slice(0, 6)));
             marineToastTimer = secs;
             marineToastShown = true;
         }
@@ -12594,9 +12611,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
         stateRef.current.camJoyX = 0;
         stateRef.current.camJoyY = 0;
     }
+    // What the touch HUD folds into its top bar: a short status, whether anything needs attention, and the one thing you can tap right now.
+    const hudStatus = !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY";
+    const hudReadyN = uiQuest ? uiQuest.missions.filter((m) => m.status === "ready").length : 0;
+    const hudCall = (() => { if (!uiQuest)
+        return false; const pend = storyPending(uiQuest); return !!(pend && pend.how === "radio"); })();
+    const hudAttention = hudReadyN > 0 || hudCall || (uiQuest ? progPointsFree(uiQuest) > 0 : false);
+    const tapPrompt = !TOUCH_UI ? "" : uiNearGiver && !uiQuestDialog ? "Tap " + ((QUEST_GIVERS.find((g) => g.id === uiNearGiver) || STORY_CAST[uiNearGiver] || {}).name || "them") + " to talk" + (uiQuest && storyMarkFor(uiQuest, uiNearGiver) ? " ★" : "")
+        : uiNearShop && !uiShopOpen && !uiNearGiver ? "Tap the store to go in" : uiNearDoor ? "Tap the door to " + (uiDoorOpen ? "close" : "open") : uiNearSeat ? "Tap the seat to sit"
+            : uiNearCooler && uiCarriedCount > 0 ? "Tap the cooler to store your catch" : uiSitting ? "🪑 Sitting · move to stand" : "";
     return (React.createElement("div", { style: { position: "relative", width: "100%", height: STAGE_HEIGHT, background: "#08161c", borderRadius: 10, overflow: "hidden", fontFamily: "system-ui, sans-serif" } },
         React.createElement("div", { ref: mountRef, style: { width: "100%", height: "100%" } }),
-        (BUILD.demo || BUILD.dev) && (React.createElement("div", { style: { position: "absolute", top: 6, right: 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
+        (BUILD.demo || BUILD.dev) && (React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 68 : 6, right: TOUCH_UI ? 12 : 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
             BUILD.dev ? "DEV" : "DEMO",
             " ",
             BUILD_LABEL)),
@@ -12628,102 +12654,130 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     transform: `translate(calc(-50% + ${camJoyKnobPos.x}px), calc(-50% + ${camJoyKnobPos.y}px))`,
                     pointerEvents: "none",
                 } })),
-        React.createElement("div", { style: { position: "absolute", top: 14, left: 14, maxWidth: "calc(100vw - 28px)", boxSizing: "border-box", ...panelStyle } },
-            React.createElement("div", { style: { ...labelStyle, color: "#ffb84d" } },
-                BUILD.title,
-                BUILD.dev ? " — Dev" : BUILD.demo ? " — Demo" : ""),
-            React.createElement("div", { style: { fontSize: 17, fontWeight: 600, marginTop: 2 } }, BOATS[uiBoatIndex].name),
-            React.createElement("div", { style: { fontSize: 12, opacity: 0.6 } }, BOATS[uiBoatIndex].tier),
-            uiQuest && (() => {
-                const lvl = questLevelForXp(uiQuest.xp), lo = questXpForLevel(lvl), hi = questXpForLevel(lvl + 1);
-                const pct = Math.max(0, Math.min(100, Math.round(((uiQuest.xp - lo) / (hi - lo)) * 100)));
-                const readyN = uiQuest.missions.filter((m) => m.status === "ready").length;
-                return (React.createElement("div", { style: { marginTop: 6, cursor: "pointer", pointerEvents: "auto" }, onClick: () => setUiProgressOpen(true) },
-                    React.createElement("div", { style: { fontSize: 11, display: "flex", justifyContent: "space-between", gap: 10 } },
-                        React.createElement("span", { style: { color: "#f0c674" } },
-                            "\u2B50 Lv ",
-                            lvl,
-                            " ",
-                            progTitle(lvl)),
-                        React.createElement("span", { style: { color: "#8fd97a" } },
+        React.createElement("div", { style: { position: "absolute", top: 14, left: 14, maxWidth: TOUCH_UI ? "calc(100% - 82px)" : "calc(100vw - 28px)", boxSizing: "border-box", zIndex: TOUCH_UI ? 61 : undefined, ...panelStyle, ...(TOUCH_UI ? { padding: "7px 10px" } : {}) } },
+            TOUCH_UI && (React.createElement("div", null,
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+                    React.createElement("button", { onClick: () => setUiHudOpen((o) => !o), "aria-expanded": uiHudOpen, "aria-label": "Status and notifications", style: { flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, textAlign: "left", cursor: "pointer", padding: 0, border: 0, background: "none", color: "inherit", font: "inherit", fontSize: 12 } },
+                        uiQuest ? React.createElement("span", { style: { color: "#f0c674", whiteSpace: "nowrap" } },
+                            "\u2B50 ",
+                            questLevelForXp(uiQuest.xp)) : null,
+                        uiQuest ? React.createElement("span", { style: { color: "#8fd97a", whiteSpace: "nowrap" } },
                             "\uD83D\uDCB0 $",
-                            uiQuest.money)),
-                    React.createElement("div", { style: { height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)", marginTop: 3, overflow: "hidden" } },
-                        React.createElement("div", { style: { width: pct + "%", height: "100%", background: "#f0c674" } })),
-                    React.createElement("div", { style: { fontSize: 9, opacity: 0.55, marginTop: 1 } }, BUILD.demo && lvl >= BUILD.demoMaxLevel ? "DEMO LEVEL LIMIT · the full game goes to level " + PROG_MAX_LEVEL : lvl >= PROG_MAX_LEVEL ? "MAX LEVEL" : (uiQuest.xp - lo) + " / " + (hi - lo) + " XP to next level"),
-                    progPointsFree(uiQuest) > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 3, color: "#f0c674" } },
-                        "\uD83C\uDFAF ",
-                        progPointsFree(uiQuest),
-                        " perk point",
-                        progPointsFree(uiQuest) === 1 ? "" : "s",
-                        " to spend"),
-                    readyN > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 3, color: "#7fe6a8" } },
-                        "\uD83D\uDCCB ",
-                        readyN,
-                        " mission",
-                        readyN === 1 ? "" : "s",
-                        " ready to turn in")));
-            })(),
-            uiQuest && (() => {
-                const h = storyHud(uiQuest), pend = storyPending(uiQuest), call = pend && pend.how === "radio", todo = h.lines.find((l) => !l.met);
-                return (React.createElement("div", { onClick: () => { if (call)
-                        stateRef.current.questAction = { type: "storyplay" };
-                    else
-                        setUiStoryOpen(true); }, style: { marginTop: 6, cursor: "pointer", pointerEvents: "auto", padding: "5px 7px", borderRadius: 4, background: call ? "rgba(127,230,168,0.1)" : "rgba(255,184,77,0.07)", border: "1px solid " + (call ? "rgba(127,230,168,0.5)" : "rgba(255,184,77,0.3)") } },
-                    React.createElement("div", { style: { fontSize: 9, letterSpacing: 1.2, color: call ? "#7fe6a8" : "#ffb84d" } }, call ? "📻 INCOMING CALL" : h.state === "done" ? "★ STORY" : "★ CHAPTER " + h.chapter),
-                    React.createElement("div", { style: { fontSize: 11, marginTop: 1 } }, call ? "Tap to answer" : h.obj),
-                    !call && h.where && React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, h.where),
-                    !call && todo && h.state === "active" && React.createElement("div", { style: { fontSize: 10, color: "#6fd6e8" } },
-                        todo.text,
-                        " \u00B7 ",
-                        todo.have)));
-            })(),
-            React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: uiAnchored || uiDock === "docked" ? "#8fd97a" : "rgba(234,243,245,0.45)" } }, !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY"),
-            uiWalkMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#6fd6e8" } }, "\uD83D\uDEB6 WALKING ON DECK"),
-            uiFirstPerson && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#f0c674" } }, "\uD83D\uDC41 FIRST-PERSON \u2014 drag to look"),
-            uiNearDoor && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
-                "Press ",
-                React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
-                " to ",
-                uiDoorOpen ? "close" : "open",
-                " door")),
-            uiNearSeat && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
-                "Press ",
-                React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
-                " to sit")),
-            uiAshoreMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#8fd97a" } }, "\uD83C\uDFDD\uFE0F ASHORE"),
-            uiNearGiver && !uiQuestDialog && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
-                "Press ",
-                React.createElement("span", { style: { fontWeight: 700 } }, "E"),
-                " or tap to talk to ",
-                (QUEST_GIVERS.find((g) => g.id === uiNearGiver) || STORY_CAST[uiNearGiver] || {}).name,
-                uiQuest && storyMarkFor(uiQuest, uiNearGiver) ? " ★" : "")),
-            uiNearShop && !uiShopOpen && !uiNearGiver && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
-                "Press ",
-                React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
-                " to enter shop")),
-            uiNearSite && (React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#6fd6e8" } },
-                "\uD83C\uDFD7\uFE0F MARINA SITE \u2014 ",
-                uiNearSite,
-                React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, "Open lot \u00B7 building isn't unlocked yet"))),
-            uiSitting && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#8fd97a" } }, "\uD83E\uDE91 SITTING \u2014 press E or move to stand"),
-            uiWalkMode && !uiSitting && (React.createElement("div", { style: { fontSize: 10, marginTop: 4, opacity: 0.6 } }, uiNetEquipped ? "🥅 Net equipped — SPACE to throw, N to stow" : "Press N for cast net")),
-            uiCarriedCount > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#6fd6e8" } },
-                "\uD83C\uDFA3 Carrying ",
-                uiCarriedCount,
-                " item",
-                uiCarriedCount === 1 ? "" : "s",
-                " \u2014 find a cooler to store"),
-            uiNearCooler && uiCarriedCount > 0 && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
-                "Press ",
-                React.createElement("span", { style: { fontWeight: 700 } }, "E"),
-                " to store ",
-                uiCarriedCount,
-                " item",
-                uiCarriedCount === 1 ? "" : "s",
-                " in cooler")),
-            uiFirstPerson && uiFpDebug && (React.createElement("div", { style: { fontSize: 9, marginTop: 4, color: uiFpDebug.startsWith("ERROR") ? "#ff6b6b" : "rgba(234,243,245,0.6)", fontFamily: "monospace", maxWidth: 240, wordBreak: "break-word" } }, uiFpDebug))),
-        React.createElement("div", { style: { position: "absolute", top: 70, right: 14, ...panelStyle, padding: 8, display: uiShowSonar ? "block" : "none" } },
+                            uiQuest.money) : React.createElement("span", { style: { fontWeight: 600 } }, BOATS[uiBoatIndex].name),
+                        React.createElement("span", { style: { fontSize: 10, color: uiAnchored || uiDock === "docked" ? "#8fd97a" : "rgba(234,243,245,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hudStatus),
+                        hudAttention && !uiHudOpen && React.createElement("span", { "aria-label": "Something needs attention", style: { width: 8, height: 8, borderRadius: 4, background: "#7fe6a8", flex: "0 0 auto" } }),
+                        uiToastLog.length > 0 && !uiHudOpen && React.createElement("span", { "aria-label": "New notifications", style: { fontSize: 11, flex: "0 0 auto" } }, "\uD83D\uDD14"),
+                        React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, opacity: 0.7 } }, uiHudOpen ? "▲" : "▼")),
+                    React.createElement("button", { onClick: () => setUiShowSonar((v) => !v), "aria-pressed": uiShowSonar, "aria-label": "Sonar", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiShowSonar ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiShowSonar ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83D\uDCE1")),
+                tapPrompt && React.createElement("div", { style: { fontSize: 11, marginTop: 5, color: "#ffb84d" } }, tapPrompt))),
+            (!TOUCH_UI || uiHudOpen) && (React.createElement(React.Fragment, null,
+                !TOUCH_UI && React.createElement("div", { style: { ...labelStyle, color: "#ffb84d" } },
+                    BUILD.title,
+                    BUILD.dev ? " — Dev" : BUILD.demo ? " — Demo" : ""),
+                React.createElement("div", { style: { fontSize: 17, fontWeight: 600, marginTop: TOUCH_UI ? 8 : 2 } }, BOATS[uiBoatIndex].name),
+                React.createElement("div", { style: { fontSize: 12, opacity: 0.6 } }, BOATS[uiBoatIndex].tier),
+                uiQuest && (() => {
+                    const lvl = questLevelForXp(uiQuest.xp), lo = questXpForLevel(lvl), hi = questXpForLevel(lvl + 1);
+                    const pct = Math.max(0, Math.min(100, Math.round(((uiQuest.xp - lo) / (hi - lo)) * 100)));
+                    const readyN = uiQuest.missions.filter((m) => m.status === "ready").length;
+                    return (React.createElement("div", { style: { marginTop: 6, cursor: "pointer", pointerEvents: "auto" }, onClick: () => setUiProgressOpen(true) },
+                        React.createElement("div", { style: { fontSize: 11, display: "flex", justifyContent: "space-between", gap: 10 } },
+                            React.createElement("span", { style: { color: "#f0c674" } },
+                                "\u2B50 Lv ",
+                                lvl,
+                                " ",
+                                progTitle(lvl)),
+                            React.createElement("span", { style: { color: "#8fd97a" } },
+                                "\uD83D\uDCB0 $",
+                                uiQuest.money)),
+                        React.createElement("div", { style: { height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)", marginTop: 3, overflow: "hidden" } },
+                            React.createElement("div", { style: { width: pct + "%", height: "100%", background: "#f0c674" } })),
+                        React.createElement("div", { style: { fontSize: 9, opacity: 0.55, marginTop: 1 } }, BUILD.demo && lvl >= BUILD.demoMaxLevel ? "DEMO LEVEL LIMIT · the full game goes to level " + PROG_MAX_LEVEL : lvl >= PROG_MAX_LEVEL ? "MAX LEVEL" : (uiQuest.xp - lo) + " / " + (hi - lo) + " XP to next level"),
+                        progPointsFree(uiQuest) > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 3, color: "#f0c674" } },
+                            "\uD83C\uDFAF ",
+                            progPointsFree(uiQuest),
+                            " perk point",
+                            progPointsFree(uiQuest) === 1 ? "" : "s",
+                            " to spend"),
+                        readyN > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 3, color: "#7fe6a8" } },
+                            "\uD83D\uDCCB ",
+                            readyN,
+                            " mission",
+                            readyN === 1 ? "" : "s",
+                            " ready to turn in")));
+                })(),
+                uiQuest && (() => {
+                    const h = storyHud(uiQuest), pend = storyPending(uiQuest), call = pend && pend.how === "radio", todo = h.lines.find((l) => !l.met);
+                    return (React.createElement("div", { onClick: () => { if (call)
+                            stateRef.current.questAction = { type: "storyplay" };
+                        else
+                            setUiStoryOpen(true); }, style: { marginTop: 6, cursor: "pointer", pointerEvents: "auto", padding: "5px 7px", borderRadius: 4, background: call ? "rgba(127,230,168,0.1)" : "rgba(255,184,77,0.07)", border: "1px solid " + (call ? "rgba(127,230,168,0.5)" : "rgba(255,184,77,0.3)") } },
+                        React.createElement("div", { style: { fontSize: 9, letterSpacing: 1.2, color: call ? "#7fe6a8" : "#ffb84d" } }, call ? "📻 INCOMING CALL" : h.state === "done" ? "★ STORY" : "★ CHAPTER " + h.chapter),
+                        React.createElement("div", { style: { fontSize: 11, marginTop: 1 } }, call ? "Tap to answer" : h.obj),
+                        !call && h.where && React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, h.where),
+                        !call && todo && h.state === "active" && React.createElement("div", { style: { fontSize: 10, color: "#6fd6e8" } },
+                            todo.text,
+                            " \u00B7 ",
+                            todo.have)));
+                })(),
+                !TOUCH_UI && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: uiAnchored || uiDock === "docked" ? "#8fd97a" : "rgba(234,243,245,0.45)" } }, !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY"),
+                uiWalkMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#6fd6e8" } }, "\uD83D\uDEB6 WALKING ON DECK"),
+                uiFirstPerson && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#f0c674" } }, "\uD83D\uDC41 FIRST-PERSON \u2014 drag to look"),
+                !TOUCH_UI && uiNearDoor && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                    "Press ",
+                    React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
+                    " to ",
+                    uiDoorOpen ? "close" : "open",
+                    " door")),
+                !TOUCH_UI && uiNearSeat && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                    "Press ",
+                    React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
+                    " to sit")),
+                uiAshoreMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#8fd97a" } }, "\uD83C\uDFDD\uFE0F ASHORE"),
+                !TOUCH_UI && uiNearGiver && !uiQuestDialog && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                    "Press ",
+                    React.createElement("span", { style: { fontWeight: 700 } }, "E"),
+                    " or tap to talk to ",
+                    (QUEST_GIVERS.find((g) => g.id === uiNearGiver) || STORY_CAST[uiNearGiver] || {}).name,
+                    uiQuest && storyMarkFor(uiQuest, uiNearGiver) ? " ★" : "")),
+                !TOUCH_UI && uiNearShop && !uiShopOpen && !uiNearGiver && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                    "Press ",
+                    React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
+                    " to enter shop")),
+                uiNearSite && (React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#6fd6e8" } },
+                    "\uD83C\uDFD7\uFE0F MARINA SITE \u2014 ",
+                    uiNearSite,
+                    React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, "Open lot \u00B7 building isn't unlocked yet"))),
+                !TOUCH_UI && uiSitting && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#8fd97a" } }, "\uD83E\uDE91 SITTING \u2014 press E or move to stand"),
+                uiWalkMode && !uiSitting && (!TOUCH_UI || uiNetEquipped) && (React.createElement("div", { style: { fontSize: 10, marginTop: 4, opacity: 0.6 } }, TOUCH_UI ? "🥅 Net out — tap Throw Net" : uiNetEquipped ? "🥅 Net equipped — SPACE to throw, N to stow" : "Press N for cast net")),
+                uiCarriedCount > 0 && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#6fd6e8" } },
+                    "\uD83C\uDFA3 Carrying ",
+                    uiCarriedCount,
+                    " item",
+                    uiCarriedCount === 1 ? "" : "s",
+                    " \u2014 find a cooler to store"),
+                !TOUCH_UI && uiNearCooler && uiCarriedCount > 0 && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                    "Press ",
+                    React.createElement("span", { style: { fontWeight: 700 } }, "E"),
+                    " to store ",
+                    uiCarriedCount,
+                    " item",
+                    uiCarriedCount === 1 ? "" : "s",
+                    " in cooler")),
+                uiFirstPerson && uiFpDebug && (React.createElement("div", { style: { fontSize: 9, marginTop: 4, color: uiFpDebug.startsWith("ERROR") ? "#ff6b6b" : "rgba(234,243,245,0.6)", fontFamily: "monospace", maxWidth: 240, wordBreak: "break-word" } }, uiFpDebug)),
+                TOUCH_UI && React.createElement("div", { style: { marginTop: 8 } },
+                    React.createElement("button", { onClick: () => { const v = !uiFx; fxUnlock(); fxSetOn(v); setUiFx(v); if (v)
+                            fxPlay("click"); }, style: { fontSize: 11, padding: "3px 10px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "rgba(234,243,245,0.75)" } }, uiFx ? "🔊 Sound and buzz: on" : "🔇 Sound and buzz: off")),
+                TOUCH_UI && !uiCastOk && !uiAshoreMode && React.createElement("div", { style: { marginTop: 8, fontSize: 11, opacity: 0.75, lineHeight: 1.35 } },
+                    "\uD83D\uDCA1 Find fishing water, then Anchor from the menu. Pull up to the marina dock for a ",
+                    React.createElement("span", { style: { color: "#7fe6a8" } }, "Dock boat"),
+                    " button."),
+                TOUCH_UI && uiToastLog.length > 0 && (React.createElement("div", { style: { marginTop: 8, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.12)" } },
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+                        React.createElement("div", { style: { ...labelStyle, fontSize: 9 } }, "Recent"),
+                        React.createElement("button", { onClick: () => { setUiToastLog([]); setUiMarineToast(null); }, style: { fontSize: 10, padding: "1px 7px", borderRadius: 4, cursor: "pointer", border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(234,243,245,0.65)" } }, "Clear")),
+                    uiToastLog.map((t, i) => React.createElement("div", { key: i, style: { fontSize: 11, marginTop: 4, color: t.color, opacity: i === 0 ? 1 : 0.75, lineHeight: 1.3 } }, t.text))))))),
+        React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 96 : 70, right: 14, ...panelStyle, padding: 8, display: uiShowSonar ? "block" : "none" } },
             React.createElement("div", { style: { ...labelStyle, marginBottom: 5, color: "#8fd97a" } }, sonarSpec.label),
             React.createElement("div", { style: { position: "relative" } },
                 React.createElement("canvas", { ref: sonarCanvasRef, width: sonarSpec.width, height: sonarSpec.height, style: { display: "block", borderRadius: 3 } }),
@@ -12746,16 +12800,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 uiPort.name),
             React.createElement("button", { disabled: uiPort.fast, onClick: () => { stateRef.current.portServicesRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: uiPort.fast ? "default" : "pointer", border: "1px solid " + (uiPort.fast ? "rgba(255,255,255,0.3)" : "#ffb84d"), background: "rgba(14,31,40,0.92)", color: uiPort.fast ? "rgba(255,255,255,0.5)" : "#ffb84d", fontWeight: 600 } }, uiPort.fast ? "Slow down for services" : uiPort.kind === "home" ? (uiQuest && uiQuest.homes && uiQuest.homes.owned[uiPort.id] ? "🏡 Go home" : "🏡 View the house for sale") : "🏪 Harbor services"))),
         !uiAshoreMode && uiDock !== "none" && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
-            uiDock === "docked" && React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } },
+            uiDock === "docked" && React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } }, TOUCH_UI ? "Tied up" : React.createElement(React.Fragment, null,
                 "Tied up \u00B7 ",
                 React.createElement("b", null, "L"),
-                " step out onto the dock"),
+                " step out onto the dock")),
             React.createElement("div", { style: { display: "flex", gap: 8 } },
                 (uiDock === "near" || uiDock === "fast" || uiDock === "docking") && (React.createElement("button", { disabled: uiDock !== "near", onClick: () => { stateRef.current.dockToggleRequested = true; }, style: { fontSize: 14, padding: "10px 20px", borderRadius: 8, cursor: uiDock === "near" ? "pointer" : "default", border: "1px solid " + (uiDock === "near" ? "#7fe6a8" : "rgba(255,255,255,0.3)"), background: uiDock === "near" ? "rgba(40,110,70,0.92)" : "rgba(14,31,40,0.9)", color: uiDock === "near" ? "#eafff2" : "rgba(234,243,245,0.6)", fontWeight: 700 } }, uiDock === "near" ? "⚓ Dock boat" : uiDock === "fast" ? "Slow down to dock" : "Docking…")),
                 (uiDock === "docked" || uiDock === "undocking") && (React.createElement(React.Fragment, null,
                     React.createElement("button", { disabled: uiDock !== "docked", onClick: () => { stateRef.current.dockServicesRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(14,31,40,0.92)", color: "#ffb84d", fontWeight: 600, opacity: uiDock === "docked" ? 1 : 0.5 } }, "\uD83C\uDFEA Marina services"),
                     React.createElement("button", { disabled: uiDock !== "docked", onClick: () => { stateRef.current.dockToggleRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid #8fd9e6", background: "rgba(14,31,40,0.92)", color: "#8fd9e6", fontWeight: 600, opacity: uiDock === "docked" ? 1 : 0.5 } }, uiDock === "docked" ? "⛵ Undock" : "Casting off…")))))),
-        uiMarineToast && (React.createElement("div", { style: { position: "absolute", top: "24%", left: "50%", transform: "translateX(-50%)", maxWidth: "min(420px, 80%)", textAlign: "center", ...panelStyle, padding: "8px 14px", border: `1px solid ${uiMarineToast.color}`, color: uiMarineToast.color, fontSize: 13, fontWeight: 600, zIndex: 70, pointerEvents: "none" } }, uiMarineToast.text)),
+        uiMarineToast && !TOUCH_UI && (React.createElement("div", { style: { position: "absolute", top: "24%", left: "50%", transform: "translateX(-50%)", maxWidth: "min(420px, 80%)", textAlign: "center", ...panelStyle, padding: "8px 14px", border: `1px solid ${uiMarineToast.color}`, color: uiMarineToast.color, fontSize: 13, fontWeight: 600, zIndex: 70, pointerEvents: "none" } }, uiMarineToast.text)),
+        uiMarineToast && TOUCH_UI && !uiHudOpen && (React.createElement("div", { onClick: () => setUiMarineToast(null), style: { position: "absolute", top: 58, left: 14, maxWidth: "calc(100% - 82px)", boxSizing: "border-box", ...panelStyle, padding: "6px 10px", border: `1px solid ${uiMarineToast.color}`, borderTop: `3px solid ${uiMarineToast.color}`, borderRadius: "0 0 6px 6px", color: uiMarineToast.color, fontSize: 11, lineHeight: 1.3, fontWeight: 600, zIndex: 62 } },
+            React.createElement("div", { style: { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, uiMarineToast.text))),
         uiStoryScene && uiQuest && (React.createElement(StoryScene, { key: uiStoryScene.id, scene: uiStoryScene, qs: uiQuest, onDone: (flags, played) => { stateRef.current.questAction = { type: "storydone", flags, played }; } })),
         uiStoryOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 560, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
@@ -12943,7 +12999,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 React.createElement("circle", { r: "12", fill: "none", stroke: "#ffb84d", strokeWidth: "2" }),
                 React.createElement("circle", { r: "3.2", fill: "#ffb84d" }),
                 [0, 1, 2, 3, 4, 5].map((i) => { const [x, y] = wheelPolar(12, i * 60 - 90); const [x2, y2] = wheelPolar(5.5, i * 60 - 90); return React.createElement("line", { key: i, x1: x, y1: y, x2: x2, y2: y2, stroke: "#ffb84d", strokeWidth: "1.6" }); })),
-            React.createElement("div", { style: { position: "absolute", right: -2, bottom: -2, fontSize: 8, background: "#0e1f28", border: "1px solid rgba(255,184,77,0.4)", borderRadius: 3, padding: "0 3px", color: "#ffb84d" } }, "Q")),
+            !TOUCH_UI && React.createElement("div", { style: { position: "absolute", right: -2, bottom: -2, fontSize: 8, background: "#0e1f28", border: "1px solid rgba(255,184,77,0.4)", borderRadius: 3, padding: "0 3px", color: "#ffb84d" } }, "Q")),
         uiWheelOpen && (() => {
             const rq = (flag) => () => { stateRef.current[flag] = true; };
             const menus = {
@@ -12986,7 +13042,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "📋", label: "Missions", enabled: true, run: () => setUiMissionsOpen(true) },
                         { icon: "🗺️", label: "Fishing Spots", enabled: true, run: () => setUiSpotsOpen(true) },
                         { icon: "🐬", label: "Wildlife", enabled: true, run: () => setUiWildlifeOpen(true) },
-                        { icon: "⌨️", label: "Controls", active: uiShowHelp, enabled: true, keepOpen: true, run: () => setUiShowHelp((v) => !v) },
+                        ...(TOUCH_UI ? [] : [{ icon: "⌨️", label: "Controls", active: uiShowHelp, enabled: true, keepOpen: true, run: () => setUiShowHelp((v) => !v) }]),
                         ...(onExit ? [{ icon: "🏠", label: "Main Menu", enabled: !boatLocked, why: "Land the fish first", run: () => onExit() }] : []),
                     ] },
             };
@@ -13032,8 +13088,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         React.createElement("div", { style: { fontSize: 11, letterSpacing: 1.2, color: "#ffb84d", fontWeight: 700 } }, menu.title),
                         React.createElement("div", { style: { fontSize: 9, marginTop: 3, opacity: 0.75, lineHeight: 1.25 } }, uiWheelNote || (uiWheelMenu === "main" ? "tap here to close" : "tap here to go back"))))));
         })(),
-        React.createElement("div", { style: { position: "absolute", bottom: 14, right: 14, ...panelStyle, textAlign: "right" } },
-            React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 } },
+        React.createElement("div", { onClick: TOUCH_UI ? () => setUiReadoutOpen((o) => !o) : undefined, style: { position: "absolute", bottom: 14, right: 14, ...panelStyle, textAlign: "right", ...(TOUCH_UI ? { padding: "6px 10px", cursor: "pointer" } : {}) } },
+            TOUCH_UI && !uiReadoutOpen && React.createElement("div", { style: { ...monoStyle, fontSize: 13, color: "#ffb84d", whiteSpace: "nowrap" } },
+                speedReadout.toFixed(1),
+                " ",
+                React.createElement("span", { style: { fontSize: 9, opacity: 0.6 } }, "KT"),
+                " \u00B7 ",
+                depthReadout.toFixed(0),
+                " ",
+                React.createElement("span", { style: { fontSize: 9, opacity: 0.6 } }, "FT"),
+                " ",
+                React.createElement("span", { style: { fontSize: 9, opacity: 0.6 } }, "\u25B2")),
+            (!TOUCH_UI || uiReadoutOpen) && React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 } },
                 React.createElement("div", null,
                     React.createElement("div", { style: { ...monoStyle, fontSize: 20, color: "#ffb84d" } },
                         speedReadout.toFixed(1),
@@ -13060,14 +13126,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("circle", { cx: "22", cy: "22", r: "18", fill: "none", stroke: "rgba(255,255,255,0.15)", strokeWidth: "2" }),
                     React.createElement("line", { x1: "22", y1: "22", x2: "22", y2: "6", stroke: "#6fd6e8", strokeWidth: "3", strokeLinecap: "round", transform: `rotate(${uiWheel * 80} 22 22)` }),
                     React.createElement("circle", { cx: "22", cy: "22", r: "2.5", fill: "#6fd6e8" }))),
-            uiShowHelp && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S throttle lever \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
-        uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: 300, textAlign: "center" } },
+            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S throttle lever \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
+        uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? 0 : 300, ...(TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? { maxWidth: 150, padding: "8px 10px" } : {}), textAlign: "center" } },
             uiMode === "idle" && (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } },
                     uiAshoreMode ? "Fishing off the dock." : uiDock === "docked" ? "Tied up at the dock." : "Anchored.",
                     " ",
-                    React.createElement("span", { style: { color: "#ffb84d" } }, "Press F"),
-                    " to drop your line.",
+                    TOUCH_UI ? null : React.createElement(React.Fragment, null,
+                        React.createElement("span", { style: { color: "#ffb84d" } }, "Press F"),
+                        " to drop your line."),
                     uiAshoreMode && React.createElement("span", { style: { display: "block", fontSize: 10, opacity: 0.55, marginTop: 3 } }, "Face the water you want. Walk away to reel in.")),
                 React.createElement("button", { onClick: () => { stateRef.current.castRequested = true; }, style: { fontSize: 13, padding: "6px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(255,184,77,0.15)", color: "#ffb84d", fontWeight: 600 } }, "\uD83C\uDFA3 Cast Line"))),
             uiMode === "dropping" && React.createElement("div", { style: { fontSize: 13, opacity: 0.8 } }, "Dropping line..."),
@@ -13141,7 +13208,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         " ft to boat"),
                     React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 4, marginBottom: 8 } },
                         f.blurb ? "This one " + f.blurb + ". " : "",
-                        "Hold SPACE to reel, let go to give line."),
+                        TOUCH_UI ? "Hold the button to reel, let go to give line." : "Hold SPACE to reel, let go to give line."),
                     React.createElement("button", { onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); stateRef.current.reelHeld = true; }, onPointerUp: () => { stateRef.current.reelHeld = false; }, onPointerCancel: () => { stateRef.current.reelHeld = false; }, style: { fontSize: 14, padding: "12px 28px", borderRadius: 6, cursor: "pointer", border: "1px solid #6fd6e8", background: "rgba(111,214,232,0.15)", color: "#6fd6e8", fontWeight: 700, touchAction: "none", userSelect: "none" } }, "HOLD TO REEL")));
             })(),
             uiMode === "result" && (uiResultSuccess && uiCatch ? (React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center", textAlign: "left" } },
@@ -13158,14 +13225,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         " fight \u00B7 +",
                         uiCatch.xp,
                         " XP")))) : (React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: uiResultSuccess ? "#8fd97a" : "#ff5c5c" } }, uiResultText))),
-            React.createElement("div", { style: { marginTop: 8, textAlign: "right" } },
+            !TOUCH_UI && React.createElement("div", { style: { marginTop: 8, textAlign: "right" } },
                 React.createElement("button", { onClick: () => { const v = !uiFx; fxUnlock(); fxSetOn(v); setUiFx(v); if (v)
-                        fxPlay("click"); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 4, cursor: "pointer", border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(234,243,245,0.55)" } }, uiFx ? "Sound and buzz: on" : "Sound and buzz: off")))) : (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, fontSize: 12, opacity: 0.8 } },
+                        fxPlay("click"); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 4, cursor: "pointer", border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(234,243,245,0.55)" } }, uiFx ? "Sound and buzz: on" : "Sound and buzz: off")))) : TOUCH_UI ? null : (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, fontSize: 12, opacity: 0.8 } }, TOUCH_UI ? React.createElement(React.Fragment, null,
+            "Find fishing water, then Anchor from the menu. Pull up to the marina dock for a ",
+            React.createElement("span", { style: { color: "#7fe6a8" } }, "Dock boat"),
+            " button.") : React.createElement(React.Fragment, null,
             "Drive near the reef, wreck, mangrove shoreline, or open water and press ",
             React.createElement("span", { style: { color: "#ffb84d" } }, "E"),
             " to anchor. Pull up to the marina dock for a ",
             React.createElement("span", { style: { color: "#7fe6a8" } }, "Dock boat"),
-            " button.")),
+            " button."))),
         uiJournalOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
                 React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCD6 Fish Journal"),
