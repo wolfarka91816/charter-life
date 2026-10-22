@@ -1,5 +1,47 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Charter Life Demo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#08161c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Charter Life">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  #cl-install { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%); z-index: 99998;
+    display: none; align-items: center; gap: 8px; padding: 9px 10px 9px 16px; border-radius: 999px; background: #ffbe55; color: #1b1206;
+    font: 600 14px system-ui, sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,.45); white-space: nowrap; }
+  #cl-install button { font: inherit; border: 0; background: none; color: inherit; cursor: pointer; padding: 0; }
+  #cl-install .x { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.12); font-size: 13px; }
+</style>
+<script>
+  (function () {
+    if ("serviceWorker" in navigator) window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+    var standalone = window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: fullscreen)").matches || navigator.standalone;
+    if (standalone) return;
+    var deferred = null, bar = null;
+    function hide() { if (bar) bar.style.display = "none"; }
+    function show(label, onTap) {
+      if (!bar) {
+        bar = document.createElement("div"); bar.id = "cl-install";
+        bar.innerHTML = '<button class="go"></button><button class="x" aria-label="Close">✕</button>';
+        document.body.appendChild(bar);
+        bar.querySelector(".x").onclick = function (e) { e.stopPropagation(); hide(); };
+        document.addEventListener("pointerdown", function (e) { if (bar && !bar.contains(e.target)) hide(); }, true);
+      }
+      var go = bar.querySelector(".go"); go.textContent = label; go.onclick = onTap; bar.style.display = "flex";
+    }
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault(); deferred = e;
+      show("📲 Install Charter Life", function () { hide(); deferred.prompt(); deferred = null; });
+    });
+    window.addEventListener("appinstalled", hide);
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (ios) window.addEventListener("load", function () { show("📲 To install: tap Share, then Add to Home Screen", hide); });
+  })();
+</script>
+
 <style>
   :root { color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #08161c; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; touch-action: none; }
