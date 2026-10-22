@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.17", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.18", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -1483,7 +1483,20 @@ function questOpenZones(qs) {
             z.push(t); }); });
     return z;
 }
-function questSpeciesPool(qs, speciesInfo) { const z = questOpenZones(qs); return speciesInfo.filter((sp) => (sp.zones || [sp.zone]).some((x) => z.indexOf(x) >= 0)); }
+function questSpeciesPool(qs, speciesInfo) {
+    const z = questOpenZones(qs), out = [];
+    speciesInfo.forEach((sp) => {
+        if (sp.name === "Blue Marlin" || sp.name === "Sailfish")
+            return; // billfish are for the journal, not for a daily errand
+        if (sp.zone !== "deepSea" && !(sp.zones || [sp.zone]).some((x) => z.indexOf(x) >= 0))
+            return; // (deep-sea fish count as open when a ground the player can reach holds them: see seaReachCap)
+        const cap = seaReachCap(qs, sp.name);
+        if (cap === null)
+            return;
+        out.push(cap >= 0.999 ? sp : Object.assign({}, sp, { hi: sp.lo + (sp.hi - sp.lo) * cap }));
+    });
+    return out;
+}
 const REGION_FISH = { shoals: ["Flounder", "Whiting", "Pompano", "Sheepshead"], jetty: ["Sheepshead", "Rock Bass", "Black Sea Bass", "Tautog"], banks: ["Mahi-Mahi", "King Mackerel", "Amberjack", "Cobia", "Gag Grouper", "Red Grouper", "Mutton Snapper", "Mangrove Snapper", "Yellowtail Snapper"] }; // what lives in each region's grounds (checked against SPECIES in the tests)
 function compassFrom(dx, dz) {
     const a = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
@@ -2255,7 +2268,7 @@ function storyHud(qs) {
 }
 // ---------- end of the story section ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), skiffRule: 1 };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), skiffRule: 1 };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -4023,6 +4036,510 @@ const FIGHT_STYLES = {
     "Tautog": { kind: "Grinder", runLen: 0.8, runInt: 1.0, jumps: 0, shake: 0.8, lunge: 0.3, wind: false, blurb: "a bulldog that digs in for the rocks" },
 };
 const FIGHT_DEFAULT = { kind: "Runner", runLen: 1, runInt: 1, jumps: 0, shake: 0.4, lunge: 0.2, wind: false, blurb: "" };
+// ======================= SEA EXPANSION: grounds, landmarks and sea marks (v18) =======================
+// The home sea now reaches about 7,000 ft from the dock (about ten times the old reach), in four bands:
+//   Harbor waters (to ~400 ft)  : shallow flats, channels and bars; only small fish, level 1
+//   Nearshore    (400-1,500)    : patch reefs, pilings, flats, crab-pot floats; small to medium fish
+//   Offshore     (1,500-3,800)  : ledges, wrecks, a rig, weed lines and rips; the big snappers, groupers, jacks
+//   Blue water   (3,800-7,500)  : canyon edges, seamounts and long rips; tuna, wahoo, sailfish and the odd marlin
+// Positions are written as a compass bearing and a distance from the dock (0 = north, 90 = east; the game's north is +z) so the layout reads
+// naturally; they are turned into x, z once at load. Fish in a ground are drawn from its own `pool` ("Name:weight, ...") and never from the
+// general list, so no ground holds a fish that does not belong there. `size` is the part of the species' weight range the ground can produce
+// (the near grounds only produce the small end), `lv` the level at which the ground opens, `xp` what finding it pays.
+const SEA_ORIGIN = { x: 46, z: -23 }; // the dock root, key-local (0, 0) of the marina
+function seaPoint(b, d) { const a = b * Math.PI / 180; return { x: Math.round(SEA_ORIGIN.x + d * Math.sin(a)), z: Math.round(SEA_ORIGIN.z + d * Math.cos(a)) }; }
+function poolParse(s) { return s.split(",").map((t) => { const p = t.trim().split(":"); return { n: p[0].trim(), w: p.length > 1 ? +p[1] : 1 }; }); }
+function poolPick(pool, rnd) { let tot = 0; pool.forEach((e) => { tot += e.w; }); let r = rnd() * tot; for (let i = 0; i < pool.length; i++) {
+    r -= pool[i].w;
+    if (r <= 0)
+        return pool[i].n;
+} return pool[pool.length - 1].n; }
+const SEA_BANDS = [
+    { id: "harbor", name: "Harbor Waters", from: 0, to: 400 },
+    { id: "near", name: "Nearshore", from: 400, to: 1500 },
+    { id: "offshore", name: "Offshore", from: 1500, to: 3800 },
+    { id: "blue", name: "Blue Water", from: 3800, to: 8000 },
+];
+// What the existing grounds hold now. The four home grounds sit right beside the dock, so they only hold small fish.
+const GROUND_RULES = {
+    "home-dock": { pool: "Pinfish:4,Pigfish:3,Atlantic Croaker:2,Mangrove Snapper:3,Sheepshead:2,Gafftopsail Catfish:1,Ladyfish:1", size: [0, 0.3] },
+    "home-reef": { pool: "Mangrove Snapper:3,Yellowtail Snapper:3,White Grunt:3,Gray Triggerfish:2,Lane Snapper:2,Pinfish:2,Hogfish:1,Red Grouper:1,Sheepshead:2", size: [0, 0.45] },
+    "home-wreck": { pool: "Atlantic Spadefish:3,Gray Triggerfish:3,Mangrove Snapper:3,Sheepshead:3,Lane Snapper:2,Black Sea Bass:1,Blue Runner:2", size: [0, 0.4] },
+    "home-inshore": { pool: "Redfish:3,Snook:2,Spotted Seatrout:4,Ladyfish:2,Black Drum:1,Gafftopsail Catfish:2,Mangrove Snapper:2", size: [0, 0.2] },
+    "home-open": { pool: "Spanish Mackerel:3,Bluefish:3,Blue Runner:3,Ladyfish:2,Little Tunny:1,Pompano:1", size: [0, 0.28] },
+    rockpile: { pool: "Red Grouper:3,Mutton Snapper:3,Gag Grouper:1,Hogfish:2,Lane Snapper:2,Yellowtail Snapper:2,Gray Triggerfish:2,Mangrove Snapper:1", size: [0.1, 0.75], lv: 1, lm: "rubble" },
+    weedline: { pool: "Mahi-Mahi:3,Blue Runner:3,Tripletail:3,Spanish Mackerel:1,Bluefish:1,King Mackerel:1", size: [0.1, 0.75], lv: 2, lm: "weed" },
+    coralledge: { pool: "Yellowtail Snapper:3,Mutton Snapper:3,Hogfish:2,Red Grouper:2,White Grunt:2,Gag Grouper:1,Great Barracuda:1", size: [0.1, 0.75], lv: 2, lm: "rubble" },
+    trawler: { pool: "Amberjack:2,Cobia:2,Gag Grouper:2,Atlantic Spadefish:3,Gray Triggerfish:2,Great Barracuda:1", size: [0.1, 0.8], lv: 4, lm: "mast" },
+    blueedge: { pool: "Mahi-Mahi:3,King Mackerel:3,Little Tunny:2,Blue Runner:2,Bluefish:1", size: [0.1, 0.8], lv: 4, lm: "foam" },
+    snapperbanks: { pool: "Red Snapper:3,Vermilion Snapper:3,Mutton Snapper:2,Gag Grouper:1,Scamp:1,Lane Snapper:2,Gray Triggerfish:1", size: [0.1, 0.75], lv: 5, lm: "whistle" },
+    libertywreck: { pool: "Amberjack:3,Cobia:3,Gag Grouper:2,Red Snapper:1,Great Barracuda:2,Almaco Jack:1", size: [0.15, 0.85], lv: 6, lm: "mast" },
+    currentrip: { pool: "Mahi-Mahi:3,King Mackerel:2,Little Tunny:3,Blackfin Tuna:2", size: [0.1, 0.8], lv: 7, lm: "foam" },
+    mangroveflats: { pool: "Redfish:3,Snook:3,Spotted Seatrout:3,Jack Crevalle:2,Ladyfish:1,Black Drum:2", size: [0.05, 0.6], lv: 1, lm: "stakes" },
+    heronflats: { pool: "Redfish:3,Spotted Seatrout:3,Permit:1,Bonefish:1,Snook:2,Mangrove Snapper:2", size: [0.05, 0.6], lv: 1, lm: "stakes" },
+    driftwoodcreek: { pool: "Snook:3,Tarpon:2,Jack Crevalle:2,Redfish:2,Black Drum:1,Gafftopsail Catfish:2", size: [0.0, 0.4], lv: 8, lm: "daybeacon" },
+};
+// The far regions keep their own species; the permit and the level still decide when they open (REGIONS).
+const REGION_POOLS = {
+    shoals: { pool: "Flounder:3,Whiting:3,Pompano:3,Sheepshead:1,Permit:1,Bonefish:1,Atlantic Croaker:1,Spanish Mackerel:1,Bluefish:1", size: [0.15, 0.85] },
+    jetty: { pool: "Sheepshead:3,Rock Bass:3,Black Sea Bass:3,Tautog:3,Gray Triggerfish:1,Black Drum:1", size: [0.15, 0.85] },
+    banks: { pool: "Mahi-Mahi:3,King Mackerel:2,Amberjack:3,Cobia:2,Gag Grouper:2,Red Grouper:2,Mutton Snapper:2,Mangrove Snapper:1,Yellowtail Snapper:1,Red Snapper:2,Scamp:1,Black Grouper:1,Almaco Jack:1,Yellowfin Tuna:1,Blackfin Tuna:1,Cubera Snapper:1,Great Barracuda:1", size: [0.2, 1.0] },
+};
+// New grounds. type: the kind of ground (missions, labels, fish depth); lm: the landmark that marks it (see SEA_LANDMARKS).
+const SEA_GROUNDS = [
+    // ---- harbor waters ----
+    { id: "channelhole", name: "Channel Marker Hole", type: "inshore", b: 260, d: 350, lv: 1, xp: 10, fish: 4, lm: "spars", size: [0, 0.45], pool: "Atlantic Croaker:3,Gafftopsail Catfish:3,Ladyfish:3,Pigfish:2,Spotted Seatrout:2,Mangrove Snapper:1" },
+    { id: "oysterbar", name: "Oyster Bar", type: "inshore", b: 155, d: 570, lv: 1, xp: 10, fish: 4, lm: "daybeacon", size: [0, 0.4], pool: "Sheepshead:4,Black Drum:3,Redfish:2,Mangrove Snapper:2,Pinfish:2,Gafftopsail Catfish:1" },
+    { id: "polingflats", name: "Poling Flats", type: "inshore", b: 235, d: 540, lv: 1, xp: 10, fish: 4, lm: "stakes", size: [0, 0.4], pool: "Spotted Seatrout:4,Redfish:3,Ladyfish:2,Bonefish:1,Snook:1,Pinfish:2" },
+    { id: "sandyslough", name: "Sandy Slough", type: "inshore", b: 317.5, d: 410, lv: 1, xp: 10, fish: 4, lm: "daybeacon", size: [0, 0.5], pool: "Pompano:2,Whiting:3,Flounder:2,Atlantic Croaker:2,Spotted Seatrout:2,Spanish Mackerel:1" },
+    { id: "baitshallows", name: "Bait Shallows", type: "openWater", b: 37.5, d: 490, lv: 1, xp: 10, fish: 4, lm: "crabfloats", size: [0, 0.5], pool: "Blue Runner:3,Ladyfish:3,Spanish Mackerel:2,Pinfish:3,Bluefish:1" },
+    { id: "turtlegrass", name: "Turtle Grass Meadow", type: "inshore", b: 290, d: 500, lv: 1, xp: 15, fish: 5, lm: "stakes", size: [0, 0.4], pool: "Spotted Seatrout:4,Redfish:2,Pinfish:3,Mangrove Snapper:2,Permit:1,Bonefish:1" },
+    // ---- nearshore ----
+    { id: "cedarrubble", name: "Cedar Rubble Reef", type: "reef", b: 210, d: 570, lv: 1, xp: 30, fish: 5, lm: "rubble", size: [0.05, 0.6], pool: "Mangrove Snapper:3,Lane Snapper:3,White Grunt:3,Gray Triggerfish:2,Hogfish:1,Yellowtail Snapper:2,Sheepshead:2" },
+    { id: "oldpilings", name: "Old Bridge Pilings", type: "inshore", b: 132.5, d: 610, lv: 1, xp: 30, fish: 5, lm: "pilings", size: [0.05, 0.5], pool: "Sheepshead:4,Black Drum:3,Redfish:2,Mangrove Snapper:2,Gafftopsail Catfish:1" },
+    { id: "crabpotline", name: "Crab Pot Line", type: "openWater", b: 362.5, d: 630, lv: 2, xp: 30, fish: 5, lm: "crabfloats", size: [0.05, 0.5], pool: "Tripletail:4,Blue Runner:3,Spanish Mackerel:2,Bluefish:2,Jack Crevalle:1" },
+    { id: "sandbar", name: "Hatteras Sandbar", type: "inshore", b: 195, d: 730, lv: 2, xp: 30, fish: 5, lm: "stakes", size: [0.1, 0.6], pool: "Permit:3,Bonefish:3,Pompano:3,Spotted Seatrout:2,Redfish:2,Flounder:2" },
+    { id: "reefballs", name: "The Reef Ball Field", type: "reef", b: 270, d: 1000, lv: 3, xp: 40, fish: 6, lm: "rubble", size: [0.1, 0.5], pool: "Gag Grouper:2,Mutton Snapper:3,Red Grouper:2,Hogfish:2,Gray Triggerfish:3,White Grunt:3,Lane Snapper:2,Atlantic Spadefish:2" },
+    { id: "hardbottom", name: "Nearshore Hardbottom", type: "reef", b: 320, d: 1100, lv: 4, xp: 40, fish: 6, lm: "whistle", size: [0.1, 0.5], pool: "Red Grouper:3,Gag Grouper:2,Mutton Snapper:2,Lane Snapper:3,Vermilion Snapper:2,Hogfish:2" },
+    { id: "tarponpass", name: "Tarpon Pass", type: "inshore", b: 30, d: 850, lv: 8, xp: 40, fish: 6, lm: "daybeacon", size: [0, 0.25], pool: "Tarpon:3,Snook:3,Jack Crevalle:3,Redfish:2,Ladyfish:2,Spotted Seatrout:1" },
+    { id: "shellbank", name: "Shell Bank", type: "inshore", b: 145, d: 1300, lv: 3, xp: 40, fish: 5, lm: "stakes", size: [0.1, 0.65], pool: "Spotted Seatrout:2,Redfish:2,Black Drum:3,Sheepshead:3,Jack Crevalle:2,Permit:1" },
+    // ---- offshore ----
+    { id: "twelvemile", name: "Twelve-Mile Ledge", type: "reef", b: 235, d: 1700, lv: 6, xp: 60, fish: 7, lm: "whistle", size: [0.15, 0.8], pool: "Vermilion Snapper:4,Red Snapper:3,Scamp:2,Red Grouper:3,Gag Grouper:2,Lane Snapper:2,Gray Triggerfish:2,Hogfish:1" },
+    { id: "tugboat", name: "Tugboat Wreck", type: "wreck", b: 200, d: 1600, lv: 6, xp: 60, fish: 6, lm: "mast", size: [0.15, 0.8], pool: "Amberjack:3,Gag Grouper:2,Red Snapper:2,Atlantic Spadefish:3,Gray Triggerfish:2,Sheepshead:2,Great Barracuda:2,Cobia:1" },
+    { id: "bargepile", name: "Barge Pile", type: "wreck", b: 290, d: 1500, lv: 6, xp: 60, fish: 6, lm: "mast", size: [0.15, 0.8], pool: "Amberjack:2,Atlantic Spadefish:3,Gag Grouper:2,Red Snapper:2,Gray Triggerfish:3,Great Barracuda:2" },
+    { id: "coralshelf", name: "Coral Gardens Shelf", type: "reef", b: 120, d: 1720, lv: 8, xp: 60, fish: 7, lm: "rubble", size: [0.15, 0.85], pool: "Yellowtail Snapper:3,Mutton Snapper:3,Hogfish:2,Red Grouper:2,Black Grouper:1,Gray Triggerfish:2,Lane Snapper:2,Great Barracuda:2" },
+    { id: "pinnacle", name: "Pinnacle Reef", type: "reef", b: 80, d: 1500, lv: 7, xp: 60, fish: 7, lm: "whistle", size: [0.15, 0.85], pool: "Black Grouper:2,Scamp:2,Red Snapper:3,Mutton Snapper:2,Hogfish:2,Almaco Jack:1" },
+    { id: "snapperhump", name: "Snapper Hump", type: "reef", b: 130, d: 2200, lv: 8, xp: 60, fish: 7, lm: "whistle", size: [0.2, 0.9], pool: "Red Snapper:4,Vermilion Snapper:3,Scamp:2,Gag Grouper:2,Mutton Snapper:2,Lane Snapper:2,Almaco Jack:1" },
+    { id: "mariner", name: "Mariner Platform", type: "wreck", b: 330, d: 2100, lv: 8, xp: 60, fish: 8, lm: "platform", size: [0.15, 0.9], pool: "Cobia:3,Amberjack:3,Atlantic Spadefish:3,Red Snapper:3,Almaco Jack:2,Great Barracuda:2,Gray Triggerfish:2,Blue Runner:3,Blackfin Tuna:1,Mahi-Mahi:1" },
+    { id: "sargasso1", name: "Sargasso Weed Line", type: "openWater", b: 15, d: 2300, lv: 7, xp: 60, fish: 7, lm: "weed", size: [0.15, 0.9], pool: "Mahi-Mahi:4,Tripletail:3,Blue Runner:3,Almaco Jack:1,King Mackerel:2,Little Tunny:2" },
+    { id: "whistlerip", name: "Whistle Buoy Rip", type: "openWater", b: 165, d: 1900, lv: 6, xp: 60, fish: 7, lm: "whistle", size: [0.15, 0.85], pool: "King Mackerel:4,Little Tunny:3,Spanish Mackerel:3,Bluefish:2,Mahi-Mahi:2,Blackfin Tuna:2,Cobia:1" },
+    { id: "gatorrock", name: "Gator Rock Ledge", type: "reef", b: 255, d: 2500, lv: 10, xp: 60, fish: 7, lm: "stack", size: [0.2, 0.95], pool: "Black Grouper:2,Gag Grouper:3,Scamp:3,Red Grouper:2,Mutton Snapper:2,Almaco Jack:1" },
+    { id: "tenfathom", name: "Ten Fathom Ledge", type: "reef", b: 55, d: 2400, lv: 10, xp: 60, fish: 7, lm: "whistle", size: [0.2, 0.95], pool: "Scamp:3,Black Grouper:2,Red Snapper:3,Vermilion Snapper:3,Almaco Jack:2,Gray Triggerfish:2" },
+    { id: "southerncut", name: "Southern Cut Rip", type: "openWater", b: 185, d: 2800, lv: 9, xp: 60, fish: 7, lm: "foam", size: [0.2, 0.5], pool: "Blackfin Tuna:3,Little Tunny:3,Mahi-Mahi:3,King Mackerel:2,Yellowfin Tuna:1" },
+    { id: "trawlerfield", name: "Lost Trawler Field", type: "wreck", b: 215, d: 3000, lv: 11, xp: 60, fish: 7, lm: "mast", size: [0.2, 0.95], pool: "Amberjack:3,Cobia:2,Red Snapper:2,Almaco Jack:3,Black Grouper:2,Great Barracuda:2,Atlantic Spadefish:2" },
+    { id: "diamondrig", name: "Diamond Platform", type: "wreck", b: 330, d: 3300, lv: 12, xp: 60, fish: 8, lm: "platform", size: [0.2, 0.5], pool: "Cobia:3,Amberjack:3,Almaco Jack:3,Red Snapper:3,Black Grouper:2,Blackfin Tuna:2,Yellowfin Tuna:1,Great Barracuda:2" },
+    { id: "tower", name: "Skeleton Tower Reef", type: "reef", b: 25, d: 3200, lv: 13, xp: 60, fish: 7, lm: "tower", size: [0.25, 1.0], pool: "Black Grouper:3,Cubera Snapper:1,Red Snapper:3,Scamp:2,Almaco Jack:3,Amberjack:2,Cobia:1" },
+    { id: "cuberahole", name: "Cubera Hole", type: "wreck", b: 270, d: 3300, lv: 14, xp: 60, fish: 6, lm: "mast", size: [0.3, 1.0], pool: "Cubera Snapper:3,Black Grouper:3,Amberjack:3,Cobia:2,Almaco Jack:2,Red Snapper:2" },
+    // ---- blue water ----
+    { id: "theedge", name: "The Edge", type: "openWater", b: 185, d: 4200, lv: 15, xp: 80, fish: 8, lm: "wxbuoy", size: [0.25, 1.0], pool: "Yellowfin Tuna:3,Blackfin Tuna:3,Wahoo:3,Mahi-Mahi:3,Sailfish:1,King Mackerel:1" },
+    { id: "northrip", name: "North Rip", type: "openWater", b: 15, d: 4500, lv: 15, xp: 80, fish: 8, lm: "foam", size: [0.25, 1.0], pool: "Mahi-Mahi:4,Wahoo:3,Yellowfin Tuna:2,Sailfish:1,Blackfin Tuna:2,Little Tunny:2" },
+    { id: "sargasso2", name: "Sargasso Edge", type: "openWater", b: 40, d: 4000, lv: 15, xp: 80, fish: 8, lm: "weed", size: [0.25, 1.0], pool: "Mahi-Mahi:4,Sailfish:2,Wahoo:2,Yellowfin Tuna:2,Blue Runner:3,Almaco Jack:1" },
+    { id: "seamount", name: "Southeast Seamount", type: "reef", b: 145, d: 4500, lv: 16, xp: 80, fish: 8, lm: "fad", size: [0.3, 1.0], pool: "Yellowfin Tuna:3,Blackfin Tuna:3,Wahoo:2,Black Grouper:2,Almaco Jack:2,Cubera Snapper:1,Sailfish:1" },
+    { id: "deeprig", name: "Deepwater Rig", type: "wreck", b: 220, d: 4700, lv: 17, xp: 80, fish: 8, lm: "platform", size: [0.3, 1.0], pool: "Yellowfin Tuna:3,Cobia:2,Amberjack:3,Red Snapper:2,Black Grouper:2,Wahoo:2,Almaco Jack:3,Blackfin Tuna:3" },
+    { id: "bluehole", name: "Blue Hole Canyon", type: "openWater", b: 255, d: 4800, lv: 18, xp: 80, fish: 8, lm: "wxbuoy", size: [0.3, 1.0], pool: "Yellowfin Tuna:3,Wahoo:3,Sailfish:2,Mahi-Mahi:2,Blackfin Tuna:2" },
+    { id: "streamline", name: "Gulf Stream Line", type: "openWater", b: 95, d: 4600, lv: 18, xp: 80, fish: 8, lm: "foam", size: [0.3, 1.0], pool: "Sailfish:3,Wahoo:3,Yellowfin Tuna:3,Mahi-Mahi:3" },
+    { id: "tunahole", name: "Tuna Hole", type: "openWater", b: 160, d: 5400, lv: 20, xp: 80, fish: 8, lm: "fad", size: [0.35, 1.0], pool: "Yellowfin Tuna:4,Blackfin Tuna:3,Wahoo:2,Mahi-Mahi:2,Sailfish:1" },
+    { id: "bigdrop", name: "The Big Drop", type: "openWater", b: 280, d: 5600, lv: 30, xp: 80, fish: 8, lm: "wxbuoy", size: [0.35, 1.0], pool: "Blue Marlin:2,Yellowfin Tuna:3,Sailfish:3,Wahoo:2,Mahi-Mahi:2" },
+    { id: "marlinalley", name: "Marlin Alley", type: "openWater", b: 315, d: 5200, lv: 32, xp: 80, fish: 8, lm: "foam", size: [0.35, 1.0], pool: "Blue Marlin:2,Sailfish:3,Yellowfin Tuna:3,Wahoo:2,Mahi-Mahi:3" },
+    { id: "dolphinrip", name: "Dolphin Rip", type: "openWater", b: 235, d: 6100, lv: 24, xp: 80, fish: 8, lm: "weed", size: [0.35, 1.0], pool: "Mahi-Mahi:4,Yellowfin Tuna:3,Sailfish:2,Wahoo:2" },
+    { id: "lonelybuoy", name: "Lonely Buoy", type: "openWater", b: 340, d: 6200, lv: 24, xp: 80, fish: 8, lm: "wxbuoy", size: [0.4, 1.0], pool: "Yellowfin Tuna:3,Wahoo:2,Sailfish:2,Mahi-Mahi:2" },
+    { id: "marlinbank", name: "Marlin Bank", type: "reef", b: 205, d: 6600, lv: 32, xp: 80, fish: 8, lm: "fad", size: [0.4, 1.0], pool: "Blue Marlin:3,Yellowfin Tuna:3,Sailfish:2,Wahoo:2,Cubera Snapper:1" },
+    { id: "faredge", name: "Far Edge", type: "openWater", b: 60, d: 6800, lv: 34, xp: 80, fish: 8, lm: "foam", size: [0.4, 1.0], pool: "Blue Marlin:3,Yellowfin Tuna:3,Sailfish:3,Wahoo:2" },
+    { id: "blackwater", name: "Black Water", type: "openWater", b: 320, d: 7000, lv: 36, xp: 80, fish: 8, lm: "wxbuoy", size: [0.45, 1.0], pool: "Blue Marlin:4,Yellowfin Tuna:3,Sailfish:3,Wahoo:2,Mahi-Mahi:1" },
+];
+// Marks that are not tied to a ground: lone buoys, rocks and towers that tell a captain where they are on the open sea.
+const SEA_MARKS = [
+    { id: "mk_fairway", name: "Fairway Buoy", lm: "buoyrw", b: 252, d: 780 },
+    { id: "mk_gull", name: "Gull Rock", lm: "stack", b: 340, d: 1250 },
+    { id: "mk_hermit", name: "Hermit Rock", lm: "stack", b: 245, d: 1500 },
+    { id: "mk_north", name: "North Sea Buoy", lm: "buoyrw", b: 5, d: 1100 },
+    { id: "mk_south", name: "South Sea Buoy", lm: "buoyrw", b: 180, d: 1250 },
+    { id: "mk_east", name: "East Light Pole", lm: "tower", b: 125, d: 1050 },
+    { id: "mk_bell", name: "Bell Buoy", lm: "whistle", b: 307.5, d: 1840 },
+    { id: "mk_skeleton", name: "Skeleton Rock", lm: "stack", b: 150, d: 2600 },
+    { id: "mk_wreckmast", name: "Wreck Mast", lm: "mast", b: 330, d: 2900 },
+    { id: "mk_weather1", name: "Weather Buoy 41", lm: "wxbuoy", b: 205, d: 3500 },
+    { id: "mk_halfway", name: "Halfway Buoy", lm: "buoyrw", b: 95, d: 1610 },
+    { id: "mk_lighthouse", name: "Reef Light", lm: "tower", b: 240, d: 2200 },
+    { id: "mk_gulfstream", name: "Stream Marker", lm: "wxbuoy", b: 120, d: 5000 },
+    { id: "mk_sentinel", name: "Sentinel Rock", lm: "stack", b: 20, d: 3700 },
+    { id: "mk_derelict", name: "Derelict Float", lm: "fad", b: 270, d: 4200 },
+    { id: "mk_far", name: "Far Weather Buoy", lm: "wxbuoy", b: 190, d: 6000 },
+];
+const SEA_SPECIES = (() => {
+    // ======================= SEA EXPANSION: new species (v18) =======================
+    // Thirty-one new fish, all from the Gulf of Mexico / south-east Atlantic like the rest of the game. Sizes are the range an angler really sees
+    // (the upper end is a good fish, still well under the world record); the game's own ranges for the older species are unchanged. Every number was
+    // checked against FWC / Florida Museum / NOAA species profiles and charter-guide size tables (see progression-design.md, "Sea expansion").
+    // Each row: n name, hex fish colour, L length in feet of a fish of ~60% of the range, w [lo, hi] lb, zone (the kind of ground the missions use),
+    // pull [a, b] strength, bw strike window, dr tiring (higher = tires sooner), ri run intensity, d0 first-run delay, cd run cooldown, mk markings for
+    // the plain model, fight [kind, runLen, runInt, jumps, shake, lunge, wind, blurb], px sell price per lb, hab / how / desc journal text, look the 3D body.
+    const FP = {
+        pinfish: [[0, 0, 0, 0], [0.04, 0.08, 0.075, 0.045], [0.14, 0.2, 0.18, 0.09], [0.34, 0.26, 0.24, 0.11], [0.55, 0.25, 0.22, 0.105], [0.76, 0.17, 0.15, 0.07], [0.9, 0.08, 0.07, 0.035], [1, 0.06, 0.06, 0.025]],
+        snap: [[0, 0, 0, 0, 0], [0.04, 0.07, 0.06, 0.04], [0.12, 0.165, 0.145, 0.085], [0.3, 0.225, 0.2, 0.105], [0.5, 0.235, 0.205, 0.108], [0.72, 0.17, 0.145, 0.075], [0.88, 0.08, 0.07, 0.04], [1, 0.055, 0.055, 0.03]],
+        stout: [[0, 0, 0, 0, 0], [0.04, 0.07, 0.065, 0.045], [0.12, 0.18, 0.17, 0.11], [0.3, 0.245, 0.235, 0.14], [0.5, 0.25, 0.235, 0.145], [0.72, 0.185, 0.165, 0.105], [0.9, 0.1, 0.095, 0.055], [1, 0.08, 0.078, 0.045]],
+        deep: [[0, 0, 0, 0], [0.04, 0.1, 0.1, 0.04], [0.12, 0.22, 0.23, 0.075], [0.3, 0.3, 0.31, 0.095], [0.5, 0.29, 0.29, 0.09], [0.72, 0.19, 0.18, 0.06], [0.88, 0.08, 0.08, 0.035], [1, 0.05, 0.05, 0.02]],
+        disc: [[0, 0, 0, 0], [0.04, 0.12, 0.12, 0.04], [0.12, 0.3, 0.32, 0.08], [0.3, 0.4, 0.42, 0.1], [0.5, 0.38, 0.4, 0.095], [0.72, 0.24, 0.24, 0.06], [0.88, 0.09, 0.09, 0.03], [1, 0.05, 0.05, 0.02]],
+        trigger: [[0, 0, 0, 0], [0.04, 0.09, 0.08, 0.04], [0.14, 0.26, 0.24, 0.08], [0.32, 0.34, 0.32, 0.1], [0.55, 0.33, 0.31, 0.095], [0.78, 0.2, 0.18, 0.06], [0.92, 0.09, 0.08, 0.03], [1, 0.05, 0.05, 0.02]],
+        hump: [[0, 0, 0, 0], [0.04, 0.08, 0.07, 0.04], [0.12, 0.21, 0.17, 0.09], [0.28, 0.31, 0.26, 0.115], [0.48, 0.3, 0.25, 0.115], [0.72, 0.2, 0.16, 0.075], [0.9, 0.09, 0.08, 0.04], [1, 0.06, 0.06, 0.03]],
+        cat: [[0, 0, 0, 0], [0.04, 0.08, 0.06, 0.08], [0.14, 0.17, 0.11, 0.14], [0.3, 0.2, 0.15, 0.145], [0.5, 0.18, 0.14, 0.12], [0.72, 0.12, 0.1, 0.07], [0.9, 0.06, 0.055, 0.035], [1, 0.045, 0.045, 0.02]],
+        hog: [[0, 0, 0, 0], [0.07, 0.05, 0.04, 0.03], [0.18, 0.17, 0.14, 0.07], [0.35, 0.27, 0.22, 0.1], [0.55, 0.28, 0.22, 0.1], [0.75, 0.19, 0.15, 0.07], [0.9, 0.09, 0.07, 0.035], [1, 0.06, 0.06, 0.025]],
+        trout: [[0, 0, 0, 0], [0.05, 0.05, 0.045, 0.03], [0.13, 0.11, 0.095, 0.06], [0.32, 0.15, 0.13, 0.08], [0.52, 0.155, 0.13, 0.082], [0.75, 0.11, 0.09, 0.055], [0.9, 0.05, 0.045, 0.028], [1, 0.035, 0.035, 0.02]],
+        bone: [[0, 0, 0, 0], [0.05, 0.05, 0.045, 0.03], [0.14, 0.1, 0.09, 0.06], [0.34, 0.15, 0.13, 0.08], [0.55, 0.15, 0.13, 0.08], [0.78, 0.1, 0.09, 0.05], [0.92, 0.05, 0.045, 0.025], [1, 0.035, 0.035, 0.018]],
+        jack: [[0, 0, 0, 0], [0.04, 0.07, 0.06, 0.04], [0.12, 0.16, 0.13, 0.08], [0.3, 0.23, 0.19, 0.105], [0.5, 0.235, 0.2, 0.105], [0.72, 0.16, 0.13, 0.07], [0.88, 0.06, 0.055, 0.03], [1, 0.045, 0.045, 0.025]],
+        slender: [[0, 0, 0, 0], [0.05, 0.03, 0.028, 0.02], [0.14, 0.075, 0.07, 0.045], [0.3, 0.095, 0.09, 0.055], [0.55, 0.1, 0.095, 0.058], [0.78, 0.075, 0.07, 0.04], [0.92, 0.04, 0.04, 0.022], [1, 0.03, 0.03, 0.016]],
+        mack: [[0, 0, 0, 0], [0.04, 0.06, 0.055, 0.035], [0.12, 0.11, 0.1, 0.06], [0.3, 0.14, 0.13, 0.075], [0.5, 0.15, 0.14, 0.078], [0.72, 0.11, 0.1, 0.055], [0.9, 0.042, 0.042, 0.025], [1, 0.03, 0.03, 0.02]],
+        tuna: [[0, 0, 0, 0], [0.04, 0.07, 0.065, 0.045], [0.12, 0.15, 0.14, 0.095], [0.3, 0.2, 0.19, 0.12], [0.5, 0.21, 0.2, 0.125], [0.72, 0.15, 0.14, 0.08], [0.88, 0.06, 0.055, 0.03], [1, 0.03, 0.03, 0.018]],
+        bill: [[0, 0, 0, 0], [0.1, 0.004, 0.004, 0.004], [0.2, 0.014, 0.012, 0.01], [0.24, 0.04, 0.035, 0.025], [0.32, 0.105, 0.09, 0.06], [0.5, 0.13, 0.115, 0.07], [0.72, 0.1, 0.09, 0.055], [0.9, 0.045, 0.04, 0.025], [1, 0.03, 0.03, 0.018]],
+    };
+    const fn = {
+        dor: (t0, t1, h, shape, color, edge) => Object.assign({ kind: "dorsal", t0, t1, h, shape, color }, edge !== undefined ? { edge } : {}),
+        ana: (t0, t1, h, shape, color, edge) => Object.assign({ kind: "anal", t0, t1, h, shape, color }, edge !== undefined ? { edge } : {}),
+        pec: (t, len, out, drop, color, base) => Object.assign({ kind: "pec", t, len, out, drop, color }, base ? { base } : {}),
+        pel: (t, len, out, drop, color) => ({ kind: "pelvic", t, len, out, drop, color }),
+        tail: (style, lobe, span, notch, color, edge, upper) => Object.assign({ kind: "tail", style, lobe, span, color, edge }, notch !== undefined ? { notch } : {}, upper ? { upper } : {}),
+        lets: (where, t0, t1, n, h, color) => ({ kind: "finlets", where, t0, t1, n, h, color }),
+        fil: (t, len, color) => ({ kind: "filament", t, len, color }),
+        bars: (at, w, tilt, color, a, cmin) => ({ type: "bars", at, w, tilt, color, a, cmin }),
+        band: (c0, hw, t0, t1, color, a) => ({ type: "stripe", c0, hw, t0, t1, color, a }),
+        dots: (n, r, t0, t1, c0, c1, color, a) => ({ type: "spots", n, r, t0, t1, c0, c1, color, a }),
+        spot: (list, color, a) => ({ type: "spots", list, color, a }),
+        scl: (a) => ({ type: "scales", a }),
+        head: (t1, color, a) => ({ type: "head", t1, color, a }),
+    };
+    const SEA_LIST = [
+        // ---- the dock, the seawall and the grass flats: small fish ----
+        { n: "Pinfish", hex: 0x9aa06a, L: 0.6, w: [0.1, 0.6], zone: "inshore", pull: [3, 5], bw: 1.1, dr: 1.7, ri: 0.7, d0: 2.0, cd: [2.0, 3.4], mk: [{ type: "verticalBars", color: 0x6a6a40 }],
+            fight: ["Runner", 0.4, 0.8, 0, 0.5, 0.05, false, "a quick wiggle, over almost at once"], px: 0.3,
+            hab: "Seagrass beds, dock pilings, seawalls and rocky shoreline in shallow water, in huge numbers.",
+            how: "A tiny hook and a scrap of shrimp. It nibbles everything, which makes it the classic first fish, and the best live bait around.",
+            desc: "A small, deep-bodied, silvery-olive fish with faint bars and a dark spot behind the gill cover. A pest to casual anglers and a meal to nearly everything bigger.",
+            look: { len: 2.6, seed: 101, prof: FP.pinfish, pal: { back: 0x6f7a55, flank: 0xbfb56a, belly: 0xe8e4c8 },
+                pat: [fn.bars([0.3, 0.42, 0.54, 0.66], 0.02, 0.0, 0x6a6a40, 0.35, -0.2), fn.spot([[0.2, 0.2, 0.025]], 0x2a2a20, 0.8), fn.scl(0.04)],
+                fins: [fn.dor(0.27, 0.7, 0.1, "spiny", 0x8a8a55, 0xc9a838), fn.ana(0.62, 0.74, 0.07, "soft", 0xb0a860), fn.pec(0.2, 0.12, 0.05, 0.06, 0xc0b070), fn.pel(0.27, 0.08, 0.03, 0.07, 0xd0c07a), fn.tail("fork", 0.13, 0.12, 0.6, 0x8a8a55, 0x5a5a38)],
+                eye: { t: 0.09, c: 0.15, r: 0.03, iris: 0xd6a050 }, mouth: { end: 0.07 } } },
+        { n: "Pigfish", hex: 0x7fa0b0, L: 0.85, w: [0.2, 1.2], zone: "inshore", pull: [4, 7], bw: 1.0, dr: 1.6, ri: 0.8, d0: 1.8, cd: [2.0, 3.2], mk: [{ type: "stripe", color: 0xe8c850, thickness: 0.07, opacity: 0.7 }],
+            fight: ["Diver", 0.5, 0.9, 0, 0.5, 0.1, false, "short, grunting tugs"], px: 0.9,
+            hab: "Grass flats, sandy channels, docks and the edges of reefs in shallow water, often right beside the pilings.",
+            how: "Shrimp or a small piece of squid on the bottom. It grunts audibly when handled, hence the name, and bites all day.",
+            desc: "A silvery fish washed with blue and yellow lines along the sides, with a bright mouth. Small, plentiful and a regular on any dock.",
+            look: { len: 2.9, seed: 102, prof: FP.snap, pal: { back: 0x6f93a8, flank: 0xc7c9bc, belly: 0xf0ead8 },
+                pat: [fn.band(0.3, 0.07, 0.12, 0.95, 0xe8c850, 0.55), fn.band(0.08, 0.07, 0.12, 0.95, 0x6aa5c9, 0.5), fn.band(-0.15, 0.07, 0.12, 0.95, 0xe8c850, 0.45), fn.scl(0.04)],
+                fins: [fn.dor(0.27, 0.6, 0.11, "spiny", 0x9a9a78, 0xe0c050), fn.dor(0.61, 0.76, 0.08, "soft", 0xb8b290), fn.ana(0.62, 0.76, 0.07, "soft", 0xc0b890), fn.pec(0.2, 0.12, 0.05, 0.06, 0xd8c878), fn.pel(0.27, 0.09, 0.04, 0.07, 0xd0c070), fn.tail("fork", 0.15, 0.13, 0.6, 0xb8b080, 0x7a7458)],
+                eye: { t: 0.09, c: 0.12, r: 0.027, iris: 0xe0a860 }, mouth: { end: 0.08 } } },
+        { n: "Atlantic Croaker", hex: 0xa89a7c, L: 1.0, w: [0.3, 2.5], zone: "inshore", pull: [5, 9], bw: 1.0, dr: 1.5, ri: 0.8, d0: 1.6, cd: [2.0, 3.2], mk: [{ type: "stripe", color: 0x5a5040, thickness: 0.05, opacity: 0.4 }],
+            fight: ["Grinder", 0.5, 0.85, 0, 0.4, 0.1, false, "a steady, thumping pull"], px: 0.8,
+            hab: "Sandy and muddy bottom in bays, channels and tidal creeks, moving into deeper water in the cold.",
+            how: "Shrimp or cut bait on the bottom. It makes a drumming croak when pulled from the water; fish the deeper channel edges.",
+            desc: "A silvery fish with a brassy back, rows of dark dots along the sides and a low, underslung mouth. Common in every channel.",
+            look: { len: 3.3, seed: 103, prof: FP.snap, pal: { back: 0x7f7660, flank: 0xbfb29a, belly: 0xf0eadc },
+                pat: [fn.dots(32, 0.011, 0.15, 0.92, 0.1, 0.9, 0x5a5040, 0.4), fn.scl(0.04)],
+                fins: [fn.dor(0.26, 0.45, 0.1, "spiny", 0x8a7e66, 0x4a4030), fn.dor(0.47, 0.76, 0.07, "soft", 0x9a8e76), fn.ana(0.63, 0.76, 0.05, "soft", 0xb0a68e), fn.pec(0.2, 0.11, 0.05, 0.05, 0xb8aa90), fn.pel(0.27, 0.08, 0.03, 0.06, 0xc8bca0), fn.tail("trunc", 0.13, 0.1, undefined, 0x8a7e66, 0x4a4030)],
+                eye: { t: 0.085, c: 0.12, r: 0.025, iris: 0xc89850 }, mouth: { end: 0.07, c: -0.35 } } },
+        { n: "Gafftopsail Catfish", hex: 0x6a7c88, L: 1.6, w: [1, 5], zone: "inshore", pull: [8, 14], bw: 0.9, dr: 1.2, ri: 1.0, d0: 1.0, cd: [2.0, 3.4], mk: [],
+            fight: ["Grinder", 0.8, 1.0, 0, 1.0, 0.3, false, "dogged and head-shaking; mind the spines"], px: 0.5,
+            hab: "Muddy and sandy bottom in bays, channels, passes and around docks, in shallow to moderate water.",
+            how: "Cut bait or shrimp on the bottom. Handle it carefully: the dorsal and pectoral spines carry a mild venom.",
+            desc: "A slate-blue sea catfish with a smooth scaleless skin, long whiskers and two tall sail-like fins, the 'gaff topsails', that give it its name.",
+            look: { len: 3.8, seed: 104, prof: FP.cat, pal: { back: 0x4a5c68, flank: 0x8b9aa3, belly: 0xe6e8e4 },
+                pat: [fn.head(0.2, 0x3a4a56, 0.4)],
+                fins: [fn.dor(0.22, 0.3, 0.22, "spiny", 0x56687a, 0x2a3844), fn.dor(0.6, 0.64, 0.05, "low", 0x56687a), fn.ana(0.58, 0.76, 0.07, "low", 0x7a8a94), fn.pec(0.17, 0.24, 0.1, 0.05, 0x56687a), fn.pel(0.4, 0.07, 0.04, 0.05, 0x8a98a2), fn.tail("deep", 0.2, 0.2, 0.45, 0x56687a, 0x2a3844)],
+                eye: { t: 0.07, c: 0.28, r: 0.02, iris: 0x303840 }, mouth: { end: 0.13, c: -0.1 } } },
+        { n: "Ladyfish", hex: 0xc7d6da, L: 1.7, w: [0.5, 3], zone: "inshore", pull: [9, 14], bw: 0.8, dr: 1.3, ri: 1.4, d0: 0.5, cd: [1.4, 2.6], mk: [{ type: "stripe", color: 0x9fb5bd, thickness: 0.06, opacity: 0.4 }],
+            fight: ["Jumper", 0.9, 1.0, 1.4, 0.6, 0.2, false, "jumps again and again, the poor man's tarpon"], px: 0.4,
+            hab: "Bays, passes, grass flats and the edges of mangroves in schools, often chasing bait near the surface.",
+            how: "A small jig or shrimp under a float, cast to a school. It leaps repeatedly but is bony and rarely eaten.",
+            desc: "A long, slender, bright silver fish with a big eye and a forked tail. Looks like a miniature tarpon and fights like one, in a smaller way.",
+            look: { len: 3.4, seed: 105, prof: FP.slender, pal: { back: 0x7e9aa8, flank: 0xd9e2e4, belly: 0xf6f8f8 },
+                pat: [fn.scl(0.07), fn.band(0.4, 0.1, 0.1, 0.95, 0x9fb5c0, 0.3)],
+                fins: [fn.dor(0.42, 0.52, 0.07, "soft", 0x8fa5b0), fn.ana(0.7, 0.78, 0.04, "soft", 0xb0c0c6), fn.pec(0.2, 0.1, 0.04, 0.05, 0xbfcdd2), fn.pel(0.42, 0.06, 0.03, 0.05, 0xc8d4d8), fn.tail("lunate", 0.17, 0.17, 0.3, 0x8fa5b0, 0x4a606c)],
+                eye: { t: 0.07, c: 0.12, r: 0.03, iris: 0xe0d8c0 }, mouth: { end: 0.1, c: -0.1 } } },
+        { n: "Spotted Seatrout", hex: 0xa9b3a3, L: 1.9, w: [1, 6], zone: "inshore", pull: [8, 14], bw: 0.7, dr: 1.3, ri: 1.1, d0: 0.8, cd: [1.8, 3.0], mk: [{ type: "tailSpot", color: 0x2e302c }],
+            fight: ["Runner", 0.8, 0.95, 0.3, 0.9, 0.15, false, "head-shaking runs; a soft mouth, so do not horse it"], px: 2.4,
+            hab: "Seagrass flats, sandy potholes and channel edges in shallow bays, moving to deeper pockets when the water cools.",
+            how: "Live shrimp under a popping cork or a soft jig over grass. A fish of about 3 to 4 lb is typical; 8 lb or better is a trophy.",
+            desc: "A silvery, olive-backed fish dotted with black spots across the back, dorsal fin and tail, with two canine teeth at the front of its jaw.",
+            look: { len: 3.5, seed: 106, prof: FP.trout, pal: { back: 0x6f7d73, flank: 0xb9bfb2, belly: 0xeeeee4 },
+                pat: [fn.dots(36, 0.014, 0.15, 0.9, 0.1, 0.95, 0x2e302c, 0.75), fn.scl(0.04)],
+                fins: [fn.dor(0.28, 0.45, 0.09, "spiny", 0x7a8478, 0x3a3e38), fn.dor(0.52, 0.74, 0.07, "soft", 0x8a9486), fn.ana(0.62, 0.76, 0.05, "soft", 0xc8c8b8), fn.pec(0.2, 0.11, 0.05, 0.05, 0xd0cfa8), fn.pel(0.27, 0.08, 0.03, 0.06, 0xdcd8b8), fn.tail("trunc", 0.13, 0.13, undefined, 0x8a9486, 0x3a3e38)],
+                eye: { t: 0.085, c: 0.15, r: 0.026, iris: 0xd8c860 }, mouth: { end: 0.13, c: -0.15 } } },
+        { n: "Black Drum", hex: 0x6a6a66, L: 2.4, w: [3, 35], zone: "inshore", pull: [12, 24], bw: 1.1, dr: 0.9, ri: 1.1, d0: 1.0, cd: [2.2, 3.8], mk: [{ type: "verticalBars", color: 0x25252a }],
+            fight: ["Grinder", 0.9, 0.95, 0, 0.6, 0.3, false, "slow, heavy bulldog pulls on the bottom"], px: 1.0,
+            hab: "Oyster bars, pilings, bridge footings and muddy channels; small fish in the shallows, big ones in deeper holes.",
+            how: "Crab, clam or shrimp on the bottom. Juveniles carry bold vertical bars; the big 'bull' drum fade to plain dark grey.",
+            desc: "A high-backed, dark grey fish with a row of chin barbels, and a deep croaking drum it makes by vibrating its swim bladder.",
+            look: { len: 3.7, seed: 107, prof: FP.hump, pal: { back: 0x4a4a46, flank: 0x78766f, belly: 0xcfcbc0 },
+                pat: [fn.bars([0.22, 0.34, 0.46, 0.58], 0.035, 0.0, 0x25252a, 0.45, -0.3), fn.scl(0.05)],
+                fins: [fn.dor(0.24, 0.5, 0.12, "spiny", 0x55534e, 0x25252a), fn.dor(0.51, 0.72, 0.07, "soft", 0x66645e), fn.ana(0.62, 0.74, 0.07, "soft", 0x66645e), fn.pec(0.2, 0.13, 0.06, 0.06, 0x6a6862), fn.pel(0.27, 0.09, 0.04, 0.07, 0x7a7870), fn.tail("round", 0.14, 0.14, undefined, 0x55534e, 0x25252a)],
+                eye: { t: 0.085, c: 0.15, r: 0.022, iris: 0x806040 }, mouth: { end: 0.09, c: -0.3 } } },
+        { n: "Bonefish", hex: 0xdbe3e1, L: 1.9, w: [2, 9], zone: "inshore", pull: [14, 22], bw: 0.6, dr: 1.2, ri: 1.7, d0: 0.2, cd: [1.4, 2.4], mk: [{ type: "stripe", color: 0x5a6a6c, thickness: 0.05, opacity: 0.3, y: 0.15 }],
+            fight: ["Runner", 1.8, 1.1, 0, 0.3, 0.1, false, "the fastest run for its size, far into the line"], px: 0.5,
+            hab: "Sand and turtle-grass flats in a foot or two of clear water, tailing as it roots for crabs and shrimp.",
+            how: "Sight-cast a small crab or shrimp to a cruising fish and let it settle. It spooks easily, then runs for the horizon when hooked.",
+            desc: "A sleek, mirror-silver fish with a pointed snout, an underslung mouth and a forked tail. The 'grey ghost' of the flats.",
+            look: { len: 3.6, seed: 108, prof: FP.bone, pal: { back: 0x7a8f94, flank: 0xdfe6e4, belly: 0xf6f8f6 },
+                pat: [fn.scl(0.07), fn.band(0.38, 0.1, 0.1, 0.92, 0x5a6a6c, 0.3)],
+                fins: [fn.dor(0.4, 0.52, 0.09, "soft", 0x8a9ca2, 0x4a5a5c), fn.ana(0.7, 0.76, 0.04, "soft", 0xb8c4c4), fn.pec(0.2, 0.11, 0.04, 0.05, 0xc8d4d2), fn.pel(0.4, 0.07, 0.03, 0.05, 0xd0dcda), fn.tail("deep", 0.17, 0.17, 0.35, 0x8a9ca2, 0x2a3a3c)],
+                eye: { t: 0.075, c: 0.12, r: 0.03, iris: 0xd8d8c8 }, mouth: { end: 0.07, c: -0.4 } } },
+        { n: "Permit", hex: 0xc7d0d0, L: 2.6, w: [5, 35], zone: "inshore", pull: [18, 28], bw: 0.7, dr: 0.9, ri: 1.5, d0: 0.4, cd: [1.6, 2.8], mk: [{ type: "stripe", color: 0x86a3ac, thickness: 0.06, opacity: 0.4, y: 0.15 }],
+            fight: ["Runner", 1.2, 1.15, 0.2, 0.6, 0.35, true, "powerful, circling, and a second wind at the boat"], px: 2.6,
+            hab: "Sandy flats, channels and the edges of reefs, jetties and wrecks; big schools sit over deeper structure.",
+            how: "A live crab on a light leader is the classic bait. It is cautious and hard to fool, and very strong for its size.",
+            desc: "A deep, flat-sided, silvery fish with a steeply sloped forehead and a tall, sickle-shaped dorsal fin. The prize of the flats.",
+            look: { len: 3.7, seed: 109, prof: FP.deep, pal: { back: 0x5a7378, flank: 0xc7d0d0, belly: 0xf0e8c0 },
+                pat: [fn.band(0.35, 0.14, 0.12, 0.88, 0x86a3ac, 0.35), fn.scl(0.06)],
+                fins: [fn.dor(0.28, 0.6, 0.11, "lobe", 0x55707a, 0x2e4048), fn.ana(0.45, 0.72, 0.09, "lobe", 0x6a838c, 0x2e4048), fn.pec(0.2, 0.12, 0.05, 0.05, 0xc8c88a), fn.pel(0.3, 0.08, 0.03, 0.07, 0xe0d070), fn.tail("deep", 0.2, 0.18, 0.5, 0x55707a, 0x2a3e46)],
+                eye: { t: 0.1, c: 0.1, r: 0.027, iris: 0xd0d6c0 }, mouth: { end: 0.08, c: -0.2 } } },
+        // ---- nearshore: the open water over the shelf, bait schools and floating weed ----
+        { n: "Bluefish", hex: 0x5a8a96, L: 1.9, w: [1, 10], zone: "openWater", pull: [14, 24], bw: 0.7, dr: 1.1, ri: 1.4, d0: 0.4, cd: [1.4, 2.4], mk: [{ type: "stripe", color: 0x8fb3be, thickness: 0.06, opacity: 0.4 }],
+            fight: ["Runner", 1.2, 1.05, 0.3, 1.2, 0.2, false, "slashes, thrashes and shakes hard"], px: 0.9,
+            hab: "Open water, inlets and surf, in aggressive schools that tear into bait fish near the surface.",
+            how: "Cast a metal spoon or cut bait into a feeding school and expect bite-offs: a wire leader helps. It fights hard and fast.",
+            desc: "A blue-green, silver-sided fish with a big mouth full of razor teeth. It feeds so ferociously that it will often leave a trail of torn bait.",
+            look: { len: 3.5, seed: 110, prof: FP.mack, pal: { back: 0x3f6f7a, flank: 0xa9bfc4, belly: 0xf0f4f2 },
+                pat: [fn.scl(0.05)],
+                fins: [fn.dor(0.28, 0.4, 0.07, "spiny", 0x4a6e78, 0x2a4048), fn.dor(0.5, 0.7, 0.08, "soft", 0x5a808a), fn.ana(0.55, 0.72, 0.08, "soft", 0x9ab0b6), fn.pec(0.2, 0.1, 0.04, 0.05, 0x4a6e78), fn.pel(0.28, 0.07, 0.03, 0.06, 0xb8c8cc), fn.tail("deep", 0.17, 0.2, 0.4, 0x405a60, 0x24363a)],
+                eye: { t: 0.085, c: 0.12, r: 0.022, iris: 0xd8d8c0 }, mouth: { end: 0.14, c: -0.15 } } },
+        { n: "Spanish Mackerel", hex: 0x8db3bd, L: 1.8, w: [1, 5], zone: "openWater", pull: [10, 16], bw: 0.7, dr: 1.3, ri: 1.3, d0: 0.5, cd: [1.4, 2.4], mk: [{ type: "stripe", color: 0xe0b02c, thickness: 0.05, opacity: 0.5 }],
+            fight: ["Runner", 1.4, 1.0, 0.4, 0.5, 0.1, false, "a fast, line-stripping first run"], px: 1.6,
+            hab: "Open water just off the beach and over the shelf, in fast schools that follow bait up the coast.",
+            how: "A small spoon or jig retrieved fast, or live bait on light wire. It strikes so hard that fast reels are a help.",
+            desc: "A slim, silver mackerel with golden-yellow spots along the sides and a dark front to its dorsal fin; smaller cousin of the king.",
+            look: { len: 3.4, seed: 111, prof: FP.mack, pal: { back: 0x3f7d90, flank: 0xc4d8dc, belly: 0xf6f9f8 },
+                pat: [fn.dots(20, 0.016, 0.3, 0.85, -0.15, 0.4, 0xe0b02c, 0.8), fn.scl(0.04)],
+                fins: [fn.dor(0.32, 0.5, 0.085, "spiny", 0x2e4048, 0x1a2830), fn.dor(0.6, 0.68, 0.06, "soft", 0x44606d), fn.lets("dorsal", 0.69, 0.88, 7, 0.03, 0x52707e), fn.ana(0.62, 0.7, 0.05, "soft", 0x9bb0b8), fn.lets("anal", 0.71, 0.88, 7, 0.03, 0x9bb0b8), fn.pec(0.19, 0.1, 0.04, 0.05, 0x5d7684), fn.pel(0.26, 0.07, 0.03, 0.06, 0x9bb0b8), fn.tail("lunate", 0.14, 0.17, 0.3, 0x44606d, 0x25363f)],
+                eye: { t: 0.08, c: 0.1, r: 0.015, iris: 0xd8d8d0 }, mouth: { end: 0.13, c: -0.2 } } },
+        { n: "Blue Runner", hex: 0x6f9aa8, L: 1.3, w: [0.5, 4], zone: "openWater", pull: [7, 12], bw: 0.8, dr: 1.4, ri: 1.0, d0: 1.0, cd: [1.8, 3.0], mk: [{ type: "gillSpot", color: 0x1a1a1a }],
+            fight: ["Runner", 1.0, 0.95, 0.1, 0.8, 0.1, false, "fast and sideways for its size"], px: 0.9,
+            hab: "Open water, reefs, wrecks and weed lines, in schools from just under the surface to mid-depth.",
+            how: "Small jigs or cut bait. A school bites at once, and a live one is the best bait for the big fish that feed on them.",
+            desc: "A small, torpedo-shaped jack with a blue-green back, a silvery body and a dark spot on the gill cover. Common and spirited.",
+            look: { len: 3.0, seed: 112, prof: FP.jack, pal: { back: 0x4a7a8f, flank: 0xb8cdd0, belly: 0xeff5f3 },
+                pat: [fn.spot([[0.1, 0.15, 0.02]], 0x1a1a1a, 0.9), fn.band(-0.05, 0.08, 0.15, 0.95, 0xd8c860, 0.3), fn.scl(0.05)],
+                fins: [fn.dor(0.3, 0.4, 0.08, "spiny", 0x4a7a8a), fn.dor(0.46, 0.74, 0.09, "lobe", 0x5a8a98), fn.ana(0.56, 0.74, 0.07, "lobe", 0xb2b87c), fn.pec(0.23, 0.14, 0.05, 0.06, 0xc2c88c), fn.pel(0.3, 0.07, 0.03, 0.07, 0xd5d8a4), fn.tail("deep", 0.2, 0.2, 0.4, 0xc9c470, 0x6a7a50)],
+                eye: { t: 0.09, c: 0.15, r: 0.027, iris: 0xe0c070 }, mouth: { end: 0.13, c: -0.1 } } },
+        { n: "Tripletail", hex: 0x8a7a50, L: 2.0, w: [3, 20], zone: "openWater", pull: [11, 18], bw: 0.9, dr: 1.1, ri: 1.0, d0: 0.8, cd: [2.0, 3.4], mk: [{ type: "blotches", color: 0x3a3020 }],
+            fight: ["Grinder", 0.8, 0.9, 0.2, 0.6, 0.2, false, "surprisingly strong; rolls and shakes"], px: 4.0,
+            hab: "Floats on its side beside buoys, crab-trap floats, weed lines and drifting debris, often looking like a dead leaf.",
+            how: "Sight-cast a live shrimp or small crab to a fish lying near a float. It will look at a bait for a long time before taking it.",
+            desc: "A mottled brown and gold, deep-bodied fish whose rounded dorsal and anal fins sit with the tail so it seems to have three. Excellent eating.",
+            look: { len: 3.2, seed: 113, prof: FP.deep, pal: { back: 0x4a3f2c, flank: 0x8a7a50, belly: 0xc8b890 },
+                pat: [fn.dots(22, 0.04, 0.2, 0.85, -0.5, 0.8, 0x3a3020, 0.35), fn.dots(14, 0.02, 0.2, 0.85, -0.5, 0.8, 0xc8b078, 0.3), fn.scl(0.04)],
+                fins: [fn.dor(0.32, 0.78, 0.14, "lobe", 0x6a5a38, 0x2e2616), fn.ana(0.55, 0.78, 0.13, "lobe", 0x6a5a38, 0x2e2616), fn.pec(0.2, 0.12, 0.05, 0.05, 0x8a7a50), fn.pel(0.3, 0.08, 0.03, 0.07, 0x7a6a44), fn.tail("round", 0.15, 0.17, undefined, 0x5a4a2c, 0x2e2616)],
+                eye: { t: 0.1, c: 0.15, r: 0.025, iris: 0x806040 }, mouth: { end: 0.09, c: -0.1 } } },
+        { n: "Little Tunny", hex: 0x4a6a7a, L: 2.3, w: [4, 18], zone: "openWater", pull: [16, 24], bw: 0.8, dr: 1.0, ri: 1.5, d0: 0.3, cd: [1.4, 2.4], mk: [{ type: "stripe", color: 0x1b2f3a, thickness: 0.05, opacity: 0.5, y: 0.2 }],
+            fight: ["Runner", 1.5, 1.1, 0.5, 0.6, 0.2, false, "hot runs, boiling on the surface"], px: 0.8,
+            hab: "Open water and the edges of the shelf, in fast schools that crash baitfish at the surface.",
+            how: "Cast a small silver jig into the boil and retrieve it fast. It is a very hard fighter, but dark-fleshed and little eaten.",
+            desc: "A compact little tuna, steel-blue above with wavy dark lines on the back and a few dark spots under the pectoral fin. Also called false albacore.",
+            look: { len: 3.5, seed: 114, prof: FP.tuna, pal: { back: 0x2b4a5a, flank: 0xb5c5c8, belly: 0xf0f2f0 },
+                pat: [fn.bars([0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7], 0.01, 0.05, 0x1b2f3a, 0.5, 0.25), fn.spot([[0.28, -0.2, 0.012], [0.32, -0.25, 0.012], [0.36, -0.18, 0.012]], 0x24323a, 0.8), fn.scl(0.04)],
+                fins: [fn.dor(0.3, 0.46, 0.085, "spiny", 0x2c4654, 0x15222a), fn.dor(0.56, 0.62, 0.06, "soft", 0x3a5666), fn.lets("dorsal", 0.63, 0.86, 8, 0.03, 0x4a6676), fn.ana(0.6, 0.66, 0.05, "soft", 0x9aaab0), fn.lets("anal", 0.67, 0.86, 7, 0.03, 0x9aaab0), fn.pec(0.2, 0.11, 0.04, 0.05, 0x3a5666), fn.pel(0.27, 0.07, 0.03, 0.06, 0xb0c0c4), fn.tail("lunate", 0.15, 0.2, 0.28, 0x34505e, 0x1a2c36)],
+                eye: { t: 0.08, c: 0.1, r: 0.018, iris: 0xd8d8d0 }, mouth: { end: 0.1, c: -0.15 } } },
+        // ---- reefs, ledges, wrecks and rigs ----
+        { n: "White Grunt", hex: 0xa6b4b8, L: 1.1, w: [0.5, 2.5], zone: "reef", pull: [5, 9], bw: 1.0, dr: 1.5, ri: 0.8, d0: 1.6, cd: [2.0, 3.4], mk: [{ type: "stripe", color: 0x6aa5c9, thickness: 0.06, opacity: 0.6 }],
+            fight: ["Diver", 0.5, 0.85, 0, 0.4, 0.1, false, "short dives and grunting"], px: 1.8,
+            hab: "Reefs, ledges, wrecks and rubble in schools, resting in the shade of structure by day.",
+            how: "Shrimp or squid on the bottom beside structure. It is a common bycatch that also makes good bait.",
+            desc: "A silvery, yellow-and-blue striped grunt with a bright orange-red lining to its mouth, which it shows when it grunts.",
+            look: { len: 2.9, seed: 115, prof: FP.snap, pal: { back: 0x74879a, flank: 0xcdd3d0, belly: 0xeef0ea },
+                pat: [fn.band(0.35, 0.06, 0.1, 0.95, 0x6aa5c9, 0.6), fn.band(0.12, 0.06, 0.1, 0.95, 0xe8d060, 0.6), fn.band(-0.12, 0.06, 0.1, 0.95, 0x6aa5c9, 0.5), fn.scl(0.04)],
+                fins: [fn.dor(0.27, 0.62, 0.1, "soft", 0xc8c070, 0x7a8a8a), fn.ana(0.62, 0.75, 0.07, "soft", 0xd0c878), fn.pec(0.2, 0.11, 0.05, 0.05, 0xd0cc90), fn.pel(0.27, 0.08, 0.04, 0.07, 0xdad090), fn.tail("fork", 0.14, 0.13, 0.6, 0xc4bc68, 0x8a8a50)],
+                eye: { t: 0.09, c: 0.12, r: 0.027, iris: 0xe0a860 }, mouth: { end: 0.09 } } },
+        { n: "Lane Snapper", hex: 0xe8a898, L: 1.2, w: [0.5, 3], zone: "reef", pull: [6, 10], bw: 0.8, dr: 1.5, ri: 0.9, d0: 1.5, cd: [1.8, 3.0], mk: [{ type: "stripe", color: 0xe8c840, thickness: 0.06, opacity: 0.6 }],
+            fight: ["Runner", 0.7, 0.9, 0, 0.4, 0.1, false, "quick, darting runs"], px: 2.9,
+            hab: "Patch reefs, rubble and sandy bottom near coral in shallow to mid-depth water.",
+            how: "Small pieces of shrimp or squid on a light leader. It is one of the best-eating little snappers.",
+            desc: "A pink-red snapper with yellow stripes along the sides and a dark spot below the dorsal fin, the shape of a small, neat snapper.",
+            look: { len: 2.8, seed: 116, prof: FP.snap, pal: { back: 0xcf8d78, flank: 0xe9b9a4, belly: 0xf7ece4 },
+                pat: [fn.band(0.35, 0.05, 0.1, 0.9, 0xe8c840, 0.6), fn.band(0.15, 0.05, 0.1, 0.9, 0xe8c840, 0.55), fn.band(-0.05, 0.05, 0.1, 0.9, 0xe8c840, 0.5), fn.spot([[0.58, 0.4, 0.03]], 0x30241c, 0.7), fn.scl(0.03)],
+                fins: [fn.dor(0.27, 0.58, 0.11, "spiny", 0xd8a090, 0xe8c840), fn.dor(0.59, 0.74, 0.09, "soft", 0xe0b0a0), fn.ana(0.6, 0.74, 0.075, "soft", 0xe8b8a8), fn.pec(0.2, 0.12, 0.05, 0.06, 0xefc8b8), fn.pel(0.27, 0.09, 0.04, 0.08, 0xf0c0b0), fn.tail("fork", 0.15, 0.14, 0.6, 0xe09888, 0x8a5848)],
+                eye: { t: 0.09, c: 0.12, r: 0.026, iris: 0xd06a40 }, mouth: { end: 0.09 } } },
+        { n: "Gray Triggerfish", hex: 0x7a8480, L: 1.4, w: [1, 5], zone: "reef", pull: [7, 12], bw: 0.8, dr: 1.3, ri: 0.9, d0: 1.2, cd: [2.0, 3.4], mk: [{ type: "blotches", color: 0x4a524e }],
+            fight: ["Grinder", 0.6, 0.9, 0, 0.5, 0.15, false, "flat-sided and stubborn, pulls like a plate"], px: 2.2,
+            hab: "Reefs, wrecks, rubble and rigs, hunting close to the bottom for crabs, shrimp and urchins.",
+            how: "Small hooks with shrimp or squid fished tight to structure; its strong beak strips bait quickly, so keep the hook small.",
+            desc: "A tall, flat-sided, grey-mottled fish with a leathery skin, a small beak-like mouth and a locking first dorsal spine it uses to wedge into the reef.",
+            look: { len: 2.6, seed: 117, prof: FP.trigger, pal: { back: 0x5a6260, flank: 0x8c9490, belly: 0xc8ccc8 },
+                pat: [fn.dots(16, 0.04, 0.15, 0.85, -0.4, 0.8, 0x4a524e, 0.35), fn.dots(12, 0.02, 0.15, 0.85, -0.4, 0.8, 0xb5bcb8, 0.35)],
+                fins: [fn.dor(0.22, 0.27, 0.13, "spiny", 0x5a6260, 0x2a2e2c), fn.dor(0.4, 0.8, 0.09, "soft", 0x7a8480, 0x4a524e), fn.ana(0.46, 0.8, 0.09, "soft", 0x7a8480, 0x4a524e), fn.pec(0.22, 0.08, 0.03, 0.03, 0x8c9490), fn.pel(0.28, 0.05, 0.02, 0.04, 0x6a726e), fn.tail("trunc", 0.12, 0.17, undefined, 0x6a726e, 0x3a403e)],
+                eye: { t: 0.11, c: 0.5, r: 0.022, iris: 0xd8b860 }, mouth: { end: 0.06, c: -0.25 } } },
+        { n: "Hogfish", hex: 0xc88a76, L: 2.0, w: [1, 12], zone: "reef", pull: [9, 15], bw: 0.8, dr: 1.2, ri: 1.0, d0: 1.0, cd: [2.0, 3.4], mk: [{ type: "blotches", color: 0x3a2a28 }],
+            fight: ["Diver", 0.6, 1.0, 0, 0.4, 0.2, false, "dives to the reef and sulks"], px: 4.6,
+            hab: "Reefs and rocky bottom, hard sand with gorgonians and patch reefs, in roughly 10 to 100 ft; big fish live on the main reef.",
+            how: "Live shrimp or crab on the bottom near structure. It roots out crabs and clams with its long snout and is prized at the table.",
+            desc: "A reddish, long-snouted wrasse with a dark patch on the rear of the dorsal fin and three long streamers on the front. It changes sex with age.",
+            look: { len: 3.3, seed: 118, prof: FP.hog, pal: { back: 0x9a5a48, flank: 0xc88a76, belly: 0xf0e0d0 },
+                pat: [fn.head(0.22, 0x8a4a3a, 0.5), fn.spot([[0.62, 0.55, 0.07]], 0x3a2a28, 0.6), fn.scl(0.05)],
+                fins: [fn.dor(0.28, 0.72, 0.1, "spiny", 0xa86a58, 0x3a2a28), fn.fil(0.3, 0.14, 0x6a3a30), fn.ana(0.58, 0.72, 0.07, "soft", 0xc89a88), fn.pec(0.2, 0.1, 0.04, 0.05, 0xd0a090), fn.pel(0.27, 0.08, 0.03, 0.07, 0xc88878), fn.tail("fork", 0.16, 0.14, 0.5, 0xa86a58, 0x4a2a24)],
+                eye: { t: 0.1, c: 0.18, r: 0.022, iris: 0xc87040 }, mouth: { end: 0.1, c: -0.05 } } },
+        { n: "Great Barracuda", hex: 0x7f908a, L: 3.6, w: [5, 30], zone: "reef", pull: [18, 28], bw: 0.6, dr: 1.0, ri: 1.6, d0: 0.3, cd: [1.3, 2.4], mk: [{ type: "verticalBars", color: 0x2a302e }],
+            fight: ["Runner", 1.1, 1.1, 1.0, 1.2, 0.4, false, "an explosive strike, leaps, then shakes its jaws"], px: 0.7,
+            hab: "Reefs, wrecks, grass flats and open water, hanging motionless near structure or following divers and boats.",
+            how: "A fast-moving lure or live bait on a wire leader. Its teeth cut line, and a rapid retrieve triggers it. Handle with care.",
+            desc: "A long, silver-green predator with an underslung jaw full of fangs, dark blotches along the lower sides and a forked tail. It lies still, then strikes in a blur.",
+            look: { len: 5.0, seed: 119, prof: FP.slender, pal: { back: 0x4f5f5a, flank: 0xaebbb8, belly: 0xeef2ee },
+                pat: [fn.bars([0.35, 0.42, 0.49, 0.56, 0.63], 0.014, 0.1, 0x2a302e, 0.5, -0.1), fn.dots(14, 0.012, 0.3, 0.8, -0.35, 0.1, 0x2a302e, 0.6), fn.scl(0.05)],
+                fins: [fn.dor(0.4, 0.47, 0.05, "spiny", 0x4a5652, 0x2a302e), fn.dor(0.68, 0.76, 0.05, "soft", 0x4a5652), fn.ana(0.68, 0.76, 0.05, "soft", 0x9aa8a4), fn.pec(0.22, 0.08, 0.03, 0.04, 0x8a9894), fn.pel(0.45, 0.05, 0.02, 0.04, 0x9aa8a4), fn.tail("lunate", 0.12, 0.15, 0.45, 0x3a4642, 0xd8dcd8)],
+                eye: { t: 0.1, c: 0.2, r: 0.014, iris: 0xd8c060 }, mouth: { end: 0.2, c: -0.3 } } },
+        { n: "Atlantic Spadefish", hex: 0xa7b3b3, L: 1.5, w: [1, 8], zone: "wreck", pull: [8, 14], bw: 0.8, dr: 1.2, ri: 1.0, d0: 1.0, cd: [2.0, 3.4], mk: [{ type: "verticalBars", color: 0x2a3236 }],
+            fight: ["Runner", 0.8, 1.0, 0, 0.4, 0.15, false, "flat-sided, uses its whole body as a sail"], px: 1.8,
+            hab: "Wrecks, rigs, jetties and reefs, in schools that hang over the structure and feed on small crabs and jellies.",
+            how: "Small pieces of clam, shrimp or small jellyfish near wrecks. It is a strong fighter for its size because of its flat body.",
+            desc: "A tall, silver, disc-shaped fish with several dark vertical bars and the long, trailing dorsal and anal tips that give it its name.",
+            look: { len: 2.7, seed: 120, prof: FP.disc, pal: { back: 0x808c90, flank: 0xc8d0d0, belly: 0xeef0ee },
+                pat: [fn.bars([0.16, 0.32, 0.5, 0.66], 0.04, 0.0, 0x2a3236, 0.75, -0.9), fn.scl(0.04)],
+                fins: [fn.dor(0.2, 0.6, 0.2, "sail", 0x5a666a, 0x2a3236), fn.ana(0.5, 0.76, 0.2, "sail", 0x5a666a, 0x2a3236), fn.pec(0.2, 0.1, 0.04, 0.04, 0x8a9498), fn.pel(0.28, 0.12, 0.03, 0.08, 0x2a3236), fn.tail("trunc", 0.12, 0.14, undefined, 0x6a767a, 0x2a3236)],
+                eye: { t: 0.09, c: 0.15, r: 0.026, iris: 0x808878 }, mouth: { end: 0.06, c: -0.2 } } },
+        // ---- the offshore ledges and wrecks: big snappers, groupers and jacks ----
+        { n: "Vermilion Snapper", hex: 0xd9806c, L: 1.3, w: [0.5, 3], zone: "deepSea", pull: [7, 11], bw: 0.8, dr: 1.5, ri: 0.9, d0: 1.4, cd: [1.8, 3.0], mk: [{ type: "stripe", color: 0xe8b070, thickness: 0.05, opacity: 0.4 }],
+            fight: ["Runner", 0.7, 0.95, 0, 0.4, 0.1, false, "quick runs and a lot of weight in the water"], px: 2.8,
+            hab: "Live-bottom ledges and low-relief reefs offshore in 60 to 300 ft, in dense schools.",
+            how: "Small cut baits or a bank of small hooks near the bottom on a ledge. A good fish for a first run offshore.",
+            desc: "A slim red snapper with a bright vermilion back, a silvery pink belly and red eyes; often called a beeliner.",
+            look: { len: 2.9, seed: 121, prof: FP.snap, pal: { back: 0xc2604a, flank: 0xe9a090, belly: 0xf6e8e0 },
+                pat: [fn.band(0.3, 0.06, 0.1, 0.9, 0xe8b070, 0.35), fn.band(0.08, 0.06, 0.1, 0.9, 0xe8b070, 0.3), fn.scl(0.04)],
+                fins: [fn.dor(0.27, 0.58, 0.1, "spiny", 0xc86a52, 0xe8b070), fn.dor(0.59, 0.74, 0.09, "soft", 0xd07a62), fn.ana(0.6, 0.74, 0.075, "soft", 0xe08a78), fn.pec(0.2, 0.12, 0.05, 0.06, 0xe89a88), fn.pel(0.27, 0.09, 0.04, 0.08, 0xe88a78), fn.tail("fork", 0.15, 0.14, 0.6, 0xc4604a, 0x8a3a2a)],
+                eye: { t: 0.09, c: 0.12, r: 0.027, iris: 0xd03a2a }, mouth: { end: 0.09 } } },
+        { n: "Red Snapper", hex: 0xd66a58, L: 2.2, w: [3, 25], zone: "deepSea", pull: [15, 24], bw: 0.9, dr: 1.0, ri: 1.2, d0: 0.8, cd: [2.0, 3.4], mk: [{ type: "stripe", color: 0xe88a78, thickness: 0.06, opacity: 0.4 }],
+            fight: ["Diver", 1.0, 1.1, 0, 0.5, 0.4, false, "a strong dive, then dead weight"], px: 3.8,
+            hab: "Reefs, wrecks and rigs in about 60 to 300 ft; small fish on low-relief bottom, the big ones on tall structure.",
+            how: "Live or cut bait dropped straight to the structure. Big fish stay near the bottom and need a firm lift to keep them out of the rocks.",
+            desc: "A deep-bodied, brilliant red fish with a pinkish belly, a sloped forehead and bright red eyes. The most sought-after snapper of the Gulf.",
+            look: { len: 3.4, seed: 122, prof: FP.snap, pal: { back: 0xb04a3a, flank: 0xd66a58, belly: 0xf2d8cc },
+                pat: [fn.head(0.25, 0xc85a4a, 0.4), fn.scl(0.05)],
+                fins: [fn.dor(0.24, 0.72, 0.11, "spiny", 0xc85a4a, 0xe88a78), fn.ana(0.6, 0.74, 0.09, "soft", 0xd87a68), fn.pec(0.2, 0.14, 0.06, 0.07, 0xe08a78), fn.pel(0.27, 0.1, 0.05, 0.09, 0xd86a58), fn.tail("round", 0.15, 0.15, undefined, 0xc04a3a, 0x7a2a20)],
+                eye: { t: 0.1, c: 0.14, r: 0.026, iris: 0xd02a20 }, mouth: { end: 0.11 } } },
+        { n: "Scamp", hex: 0x8a6f50, L: 2.2, w: [2, 12], zone: "deepSea", pull: [14, 22], bw: 0.9, dr: 1.0, ri: 1.4, d0: 0.4, cd: [2.2, 3.8], mk: [{ type: "blotches", color: 0x5a4228 }],
+            fight: ["Diver", 0.7, 1.15, 0, 0.3, 0.4, false, "explodes for the ledge the moment it is hooked"], px: 4.2,
+            hab: "Rocky ledges and rubble in 100 to 300 ft; a tough, shy grouper found in the same places as gag and red grouper.",
+            how: "Live bait or a jig worked right on a ledge. It dives for the rock as soon as it feels the hook, so lift hard and early.",
+            desc: "A slender brown-bronze grouper with a covering of golden-brown spots and a flared, scalloped tail with extended tips.",
+            look: { len: 3.3, seed: 123, prof: FP.stout, pal: { back: 0x7a5f40, flank: 0xa88a64, belly: 0xd8c8a8 },
+                pat: [fn.dots(26, 0.017, 0.15, 0.9, -0.15, 0.9, 0xc89048, 0.5), fn.dots(10, 0.045, 0.25, 0.85, 0.1, 0.9, 0x5a4228, 0.35), fn.scl(0.03)],
+                fins: [fn.dor(0.22, 0.52, 0.1, "spiny", 0x6a5236, 0x2a1e12), fn.dor(0.53, 0.8, 0.11, "soft", 0x74583a, 0x2a1e12), fn.ana(0.64, 0.8, 0.085, "lobe", 0x6e5436, 0x2a1e12), fn.pec(0.2, 0.15, 0.07, 0.07, 0x84683f), fn.pel(0.28, 0.1, 0.05, 0.08, 0x6e5436), fn.tail("trunc", 0.16, 0.16, undefined, 0x5a4228, 0x241a10, 1.2)],
+                eye: { t: 0.11, c: 0.2, r: 0.022, iris: 0xc8a050 }, mouth: { end: 0.2, c: -0.1 } } },
+        { n: "Black Grouper", hex: 0x6b6a58, L: 3.6, w: [10, 60], zone: "deepSea", pull: [22, 34], bw: 1.1, dr: 0.8, ri: 1.7, d0: 0.2, cd: [2.4, 4.2], mk: [{ type: "blotches", color: 0x2a2c26 }],
+            fight: ["Diver", 0.8, 1.25, 0, 0.3, 0.5, false, "a freight train for the rocks"], px: 3.6,
+            hab: "Rocky reefs, ledges and wrecks from 60 to 400 ft, near caves and overhangs it can back into.",
+            how: "Heavy live bait or a big jig on stout tackle, lifted off the bottom as soon as it eats. The first ten feet decide the fight.",
+            desc: "A big, olive-brown grouper with dark rectangular blotches, pale bronze spots and a squared-off tail with a pale margin.",
+            look: { len: 4.6, seed: 124, prof: FP.stout, pal: { back: 0x3f423c, flank: 0x6b6a58, belly: 0xc0bda8 },
+                pat: [fn.dots(9, 0.06, 0.25, 0.85, 0.1, 0.9, 0x2a2c26, 0.55), fn.dots(26, 0.02, 0.15, 0.9, -0.15, 0.9, 0x8a7050, 0.45), fn.scl(0.025)],
+                fins: [fn.dor(0.22, 0.52, 0.1, "spiny", 0x4a4c44, 0x1c1c18), fn.dor(0.53, 0.8, 0.11, "soft", 0x50524a, 0x1c1c18), fn.ana(0.64, 0.8, 0.085, "lobe", 0x4a4c44, 0x1c1c18), fn.pec(0.2, 0.17, 0.08, 0.08, 0x5a5a4c, 0x2a2a22), fn.pel(0.28, 0.11, 0.05, 0.08, 0x4a4c44), fn.tail("trunc", 0.16, 0.16, undefined, 0x3f423c, 0xb8b49c)],
+                eye: { t: 0.11, c: 0.2, r: 0.02, iris: 0xc8a050 }, mouth: { end: 0.22, c: -0.1 } } },
+        { n: "Almaco Jack", hex: 0x84939a, L: 2.8, w: [5, 30], zone: "deepSea", pull: [20, 30], bw: 1.1, dr: 0.8, ri: 1.2, d0: 0.5, cd: [1.6, 3.0], mk: [{ type: "diagonalEyeStripe", color: 0x1f2a2f }],
+            fight: ["Grinder", 1.0, 1.05, 0, 1.0, 0.4, true, "won't quit; wears you down"], px: 1.8,
+            hab: "Reefs, wrecks and rigs offshore in about 60 to 300 ft, often with amberjack, around bait schools.",
+            how: "Heavy jigs or live bait worked near structure. It is a relentless fighter, often mistaken for a small amberjack.",
+            desc: "A dark, slate-brown jack with a steeply sloped head, a tall second dorsal fin and a dark band through the eye.",
+            look: { len: 4.0, seed: 125, prof: FP.jack, pal: { back: 0x3d4a50, flank: 0x84939a, belly: 0xcdd2d0 },
+                pat: [fn.bars([0.095], 0.03, -0.1, 0x1f2a2f, 0.9, -0.2), fn.scl(0.05)],
+                fins: [fn.dor(0.3, 0.4, 0.07, "spiny", 0x3a464c), fn.dor(0.5, 0.74, 0.13, "lobe", 0x3a464c, 0x1c262c), fn.ana(0.58, 0.74, 0.09, "lobe", 0x56646a), fn.pec(0.22, 0.12, 0.05, 0.06, 0x56646a), fn.pel(0.3, 0.08, 0.04, 0.07, 0x6a787e), fn.tail("deep", 0.2, 0.22, 0.4, 0x3a464c, 0x1c262c)],
+                eye: { t: 0.09, c: 0.15, r: 0.02, iris: 0xc8b078 }, mouth: { end: 0.13, c: -0.1 } } },
+        { n: "Cubera Snapper", hex: 0x7a7060, L: 3.7, w: [20, 80], zone: "deepSea", pull: [26, 38], bw: 1.2, dr: 0.7, ri: 1.8, d0: 0.2, cd: [2.4, 4.2], mk: [{ type: "stripe", color: 0x5a554a, thickness: 0.06, opacity: 0.4 }],
+            fight: ["Diver", 0.9, 1.3, 0, 0.3, 0.5, false, "a bank vault of a fish: one huge dive"], px: 1.6,
+            hab: "Deep wrecks, ledges, rigs and rocky drop-offs offshore, a solitary giant that lies close to heavy structure.",
+            how: "A large live bait on heavy tackle, fished right in the structure, and a lot of luck. The biggest snapper in the Atlantic.",
+            desc: "The giant of the snappers: a deep, dark, brassy-grey fish with massive canine teeth and big scales, living near the biggest wrecks.",
+            look: { len: 5.0, seed: 126, prof: FP.snap, pal: { back: 0x5a554a, flank: 0x8b8274, belly: 0xcdc4b4 },
+                pat: [fn.scl(0.07), fn.head(0.24, 0x4a463c, 0.4)],
+                fins: [fn.dor(0.24, 0.72, 0.12, "spiny", 0x5a5448, 0x2a261e), fn.ana(0.6, 0.74, 0.09, "soft", 0x6a6454), fn.pec(0.2, 0.14, 0.06, 0.07, 0x7a7262), fn.pel(0.27, 0.1, 0.05, 0.09, 0x6a6454), fn.tail("trunc", 0.16, 0.16, undefined, 0x5a5448, 0x2a261e)],
+                eye: { t: 0.1, c: 0.14, r: 0.02, iris: 0xa87040 }, mouth: { end: 0.14 } } },
+        // ---- blue water ----
+        { n: "Wahoo", hex: 0x4a86a8, L: 5.0, w: [15, 70], zone: "deepSea", pull: [28, 40], bw: 0.6, dr: 0.9, ri: 1.9, d0: 0.1, cd: [1.2, 2.2], mk: [{ type: "verticalBars", color: 0x3d8aaa }],
+            fight: ["Runner", 1.8, 1.2, 0.5, 0.6, 0.2, false, "a blistering run: one of the fastest fish in the sea"], px: 2.4,
+            hab: "Warm blue water near drop-offs, weed lines and floating objects, usually single or in small loose groups, and near the surface.",
+            how: "A fast-trolled lure or a rigged bait on wire. It takes with a hard run and slashes through line with its razor teeth.",
+            desc: "A long, bright blue and silver predator with a row of vertical 'tiger' stripes, a pointed snout and a mouth full of blade-like teeth.",
+            look: { len: 7.0, seed: 127, prof: FP.slender, pal: { back: 0x1f5a7a, flank: 0xa6c4cc, belly: 0xf2f6f6 },
+                pat: [fn.bars([0.28, 0.34, 0.4, 0.46, 0.52, 0.58, 0.64, 0.7, 0.76], 0.012, 0.0, 0x3d8aaa, 0.55, -0.25), fn.scl(0.04)],
+                fins: [fn.dor(0.2, 0.7, 0.05, "low", 0x2a6a8a, 0x15384a), fn.lets("dorsal", 0.71, 0.88, 7, 0.03, 0x2a6a8a), fn.ana(0.68, 0.74, 0.04, "soft", 0x9ab8c0), fn.lets("anal", 0.75, 0.88, 6, 0.03, 0x9ab8c0), fn.pec(0.2, 0.08, 0.03, 0.04, 0x3a7a98), fn.pel(0.3, 0.05, 0.02, 0.04, 0x9ab8c0), fn.tail("lunate", 0.1, 0.13, 0.35, 0x2a6a8a, 0x15384a)],
+                eye: { t: 0.08, c: 0.15, r: 0.012, iris: 0xd0d0c0 }, mouth: { end: 0.16, c: -0.2 } } },
+        { n: "Yellowfin Tuna", hex: 0x4a6a80, L: 4.5, w: [25, 150], zone: "deepSea", pull: [30, 44], bw: 1.0, dr: 0.7, ri: 1.7, d0: 0.2, cd: [1.8, 3.2], mk: [{ type: "stripe", color: 0xe8d040, thickness: 0.05, opacity: 0.6, y: 0.0 }],
+            fight: ["Grinder", 1.3, 1.2, 0, 0.5, 0.3, true, "a deep, circling grind, then a second wind at the boat"], px: 3.4,
+            hab: "Warm blue water above and below the thermocline, around drop-offs, rigs, weed lines and schools of dolphin and bait.",
+            how: "Chunking with cut bait, live bait or a trolled lure. It fights deep and stubbornly, circling under the boat, so tackle must be stout.",
+            desc: "A powerful, torpedo-shaped tuna, deep blue above with a golden stripe, yellow finlets and long sickle-shaped dorsal and anal fins.",
+            look: { len: 6.0, seed: 128, prof: FP.tuna, pal: { back: 0x1c3a55, flank: 0xb0c4cc, belly: 0xeef2f0 },
+                pat: [fn.band(0.1, 0.08, 0.15, 0.9, 0xe8d040, 0.55), fn.scl(0.04)],
+                fins: [fn.dor(0.3, 0.44, 0.09, "spiny", 0x2a4a68, 0xe8d040), fn.dor(0.5, 0.58, 0.16, "sail", 0xe8d040, 0xb89818), fn.lets("dorsal", 0.6, 0.86, 9, 0.035, 0xe8d040), fn.ana(0.56, 0.64, 0.14, "sail", 0xe8d848, 0xb89818), fn.lets("anal", 0.66, 0.86, 8, 0.035, 0xe8d040), fn.pec(0.2, 0.15, 0.04, 0.05, 0x3a5a78), fn.pel(0.27, 0.07, 0.03, 0.06, 0xb0c4cc), fn.tail("lunate", 0.15, 0.2, 0.28, 0x2a4a68, 0x14283a)],
+                eye: { t: 0.08, c: 0.1, r: 0.017, iris: 0xd8d8d0 }, mouth: { end: 0.1, c: -0.15 } } },
+        { n: "Blackfin Tuna", hex: 0x3a5a6a, L: 2.5, w: [4, 25], zone: "deepSea", pull: [14, 22], bw: 0.9, dr: 0.9, ri: 1.4, d0: 0.4, cd: [1.6, 2.8], mk: [{ type: "stripe", color: 0xd2b848, thickness: 0.05, opacity: 0.3 }],
+            fight: ["Runner", 1.1, 1.05, 0.2, 0.5, 0.2, false, "hard, fast and deep"], px: 2.4,
+            hab: "Warm blue water over drop-offs and around rigs, in schools that feed on small fish and squid.",
+            how: "Small live baits or jigs near a rig or a bait school. The smallest of the true tunas, and one of the best to eat.",
+            desc: "A compact, dark-backed tuna with a faint gold stripe on the flanks, dark finlets and a very dark upper body.",
+            look: { len: 3.6, seed: 129, prof: FP.tuna, pal: { back: 0x1a2f3f, flank: 0xb8c5c7, belly: 0xf0f2f0 },
+                pat: [fn.band(0.05, 0.06, 0.15, 0.9, 0xd2b848, 0.25), fn.scl(0.04)],
+                fins: [fn.dor(0.3, 0.46, 0.085, "spiny", 0x1e3444, 0x0e1a24), fn.dor(0.54, 0.6, 0.07, "soft", 0x2a4a5c), fn.lets("dorsal", 0.61, 0.86, 8, 0.03, 0x2a4a5c), fn.ana(0.58, 0.64, 0.06, "soft", 0x9aaab0), fn.lets("anal", 0.65, 0.86, 7, 0.03, 0x9aaab0), fn.pec(0.2, 0.1, 0.04, 0.05, 0x2a4a5c), fn.pel(0.27, 0.07, 0.03, 0.06, 0xb0c0c4), fn.tail("lunate", 0.15, 0.2, 0.28, 0x1e3444, 0x0e1a24)],
+                eye: { t: 0.08, c: 0.1, r: 0.018, iris: 0xd8d8d0 }, mouth: { end: 0.1, c: -0.15 } } },
+        { n: "Sailfish", hex: 0x4a6e90, L: 7.0, w: [30, 90], zone: "deepSea", pull: [28, 40], bw: 1.3, dr: 0.6, ri: 1.9, d0: 0.2, cd: [1.4, 2.6], mk: [{ type: "stripe", color: 0x7fb0d8, thickness: 0.05, opacity: 0.5 }],
+            fight: ["Jumper", 1.3, 1.1, 2.0, 0.7, 0.4, false, "greyhounds across the surface in long tail-walks"], px: 0.5,
+            hab: "Warm blue water near the surface along drop-offs, edges and current lines, often in groups herding schools of bait.",
+            how: "A live or rigged bait fished near the surface, dropped back to a fish that has 'lit up' behind the boat. Let it eat, then strike.",
+            desc: "A slender blue-black billfish with a spectacular tall sail that it raises when feeding, a long spear and a silver belly. Catch and release is the rule.",
+            look: { len: 9.0, seed: 130, prof: FP.bill, pal: { back: 0x1a3a5c, flank: 0x7a99b0, belly: 0xe8eef0 },
+                pat: [fn.bars([0.35, 0.42, 0.49, 0.56, 0.63, 0.7], 0.01, 0.0, 0x7fb0d8, 0.4, -0.2), fn.scl(0.03)],
+                fins: [fn.dor(0.3, 0.82, 0.24, "sail", 0x2a5a8c, 0x15304a), fn.ana(0.62, 0.72, 0.07, "soft", 0x8aa0b4), fn.pec(0.28, 0.14, 0.04, 0.04, 0x3a6a96), fn.pel(0.33, 0.22, 0.02, 0.08, 0x2a5a8c), fn.tail("lunate", 0.12, 0.18, 0.32, 0x2a4a6c, 0x14283a)],
+                eye: { t: 0.27, c: 0.08, r: 0.012, iris: 0x1a2a3a }, mouth: { end: 0.26, c: -0.05 } } },
+        { n: "Blue Marlin", hex: 0x2c5688, L: 11, w: [150, 650], zone: "deepSea", pull: [46, 60], bw: 1.5, dr: 0.5, ri: 2.0, d0: 0.1, cd: [2.0, 3.6], mk: [{ type: "stripe", color: 0x6aa0d8, thickness: 0.05, opacity: 0.5 }],
+            fight: ["Jumper", 1.6, 1.3, 1.8, 0.8, 0.5, true, "jumps, long runs, a fight of a lifetime"], px: 0.4,
+            hab: "The deep blue open ocean over drop-offs and canyons, in the upper layer of the water, following tuna and dolphin.",
+            how: "A big trolled lure or a large rigged bait on very heavy tackle, in the right current at the right time. Hook-ups are rare, wins are rarer.",
+            desc: "The great billfish of the open ocean: deep cobalt blue above with pale vertical stripes, a rounded spear and a tall pointed dorsal fin. Fish over 400 lb are caught each year, and more than 1,400 lb is the world record.",
+            look: { len: 13.0, seed: 131, prof: FP.bill, pal: { back: 0x143a66, flank: 0x6a88a8, belly: 0xdfe8ee },
+                pat: [fn.bars([0.33, 0.4, 0.47, 0.54, 0.61, 0.68], 0.012, 0.0, 0x6aa0d8, 0.5, -0.2), fn.scl(0.03)],
+                fins: [fn.dor(0.28, 0.58, 0.11, "spiny", 0x1c3a60, 0x0e1c30), fn.dor(0.7, 0.76, 0.04, "soft", 0x1c3a60), fn.ana(0.66, 0.72, 0.06, "soft", 0x8aa0b4), fn.pec(0.28, 0.1, 0.03, 0.04, 0x2a4a74), fn.pel(0.33, 0.1, 0.02, 0.06, 0x2a4a74), fn.tail("lunate", 0.14, 0.22, 0.3, 0x1c3a60, 0x0e1c30)],
+                eye: { t: 0.26, c: 0.08, r: 0.011, iris: 0x1a2a3a }, mouth: { end: 0.26, c: -0.05 } } },
+    ];
+    return SEA_LIST;
+})();
+// Hook the new species and grounds into the game's tables (all of this runs once, at load).
+SEA_SPECIES.forEach((q) => {
+    SPECIES_INFO.push({ name: q.n, color: "#" + q.hex.toString(16).padStart(6, "0"), description: q.desc, habitat: q.hab, howToCatch: q.how });
+    FISH_LOOKS[q.n] = q.look;
+    FIGHT_STYLES[q.n] = { kind: q.fight[0], runLen: q.fight[1], runInt: q.fight[2], jumps: q.fight[3], shake: q.fight[4], lunge: q.fight[5], wind: q.fight[6], blurb: q.fight[7] };
+    PROG_SELL_PRICE[q.n] = q.px;
+});
+function seaSpeciesEntry(q) {
+    return { name: q.n, color: q.hex, scale: q.L / q.look.len, weightRange: q.w, zone: q.zone, biteWindow: q.bw, basePullMin: q.pull[0], basePullMax: q.pull[1], staminaDrainMult: q.dr,
+        runIntensityMult: q.ri, initialRunDelay: q.d0, runCooldownMin: q.cd[0], runCooldownMax: q.cd[1], markings: q.mk, habitat: q.hab, howToCatch: q.how, description: q.desc };
+}
+const SEA_GROUND_BY_ID = {};
+SEA_GROUNDS.forEach((g) => {
+    const p = seaPoint(g.b, g.d);
+    g.x = p.x;
+    g.z = p.z;
+    SEA_GROUND_BY_ID[g.id] = g;
+    REMOTE_SPOT_DATA.push({ id: g.id, name: g.name, type: g.type, x: g.x, z: g.z, fish: g.fish });
+});
+SEA_MARKS.forEach((m) => { const p = seaPoint(m.b, m.d); m.x = p.x; m.z = p.z; });
+Object.keys(REGION_POOLS).forEach((k) => { const seen = {}; REGION_FISH[k] = poolParse(REGION_POOLS[k].pool).map((e) => e.n).filter((n) => !seen[n] && (seen[n] = 1)); });
+function seaRuleFor(id, region) {
+    return Object.assign({}, region ? REGION_POOLS[region] : {}, GROUND_RULES[id] || {}, SEA_GROUND_BY_ID[id] || {});
+}
+function seaReachCap(qs, name) {
+    const lvl = questLevelForXp(qs.xp);
+    let cap = -1;
+    const look = (pool, size, lv) => { if (lv > lvl || !size)
+        return; if (poolParse(pool).some((e) => e.n === name))
+        cap = Math.max(cap, size[1]); };
+    Object.keys(GROUND_RULES).forEach((k) => look(GROUND_RULES[k].pool, GROUND_RULES[k].size, GROUND_RULES[k].lv || 0));
+    SEA_GROUNDS.forEach((g) => look(g.pool, g.size, g.lv));
+    Object.keys(REGION_POOLS).forEach((k) => { if (travelOpen(qs, k))
+        look(REGION_POOLS[k].pool, REGION_POOLS[k].size, 0); });
+    return cap < 0 ? null : cap;
+}
+// Landmarks: every ground with a `lm` and every sea mark gets a landmark a short way off its centre (the fish are around the mark, not under it).
+const SEA_LM_SOLID = { stack: 7, mast: 4.5, platform: 17, tower: 6, pilings: 8, rubble: 9 }; // radius of the hull-blocking disc (feet); the rest float or are too small to hit
+const SEA_LM_NAMES = { spars: "Channel Spars", daybeacon: "Day Beacon", stakes: "Fish Stakes", crabfloats: "Crab-Pot Floats", rubble: "Rubble Mound", pilings: "Old Pilings", whistle: "Whistle Buoy", mast: "Wreck Mast", platform: "Oil Platform", stack: "Sea Stack", tower: "Skeleton Tower", weed: "Weed Line", foam: "Tide Rip", fad: "FAD Buoy", wxbuoy: "Weather Buoy", buoyrw: "Fairway Buoy" };
+function seaHash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+} return (h >>> 0) / 4294967296; }
+const SEA_LM_AT = { heronflats: [34, 22], driftwoodcreek: [38, -14] }; // grounds that sit by an island: the mark goes on the open-water side
+const SEA_LANDMARKS = [];
+REMOTE_SPOT_DATA.forEach((sp) => {
+    const kind = seaRuleFor(sp.id).lm;
+    if (!kind)
+        return;
+    const a = seaHash(sp.id) * Math.PI * 2, off = 26 + seaHash(sp.id + "r") * 14, at = SEA_LM_AT[sp.id] || [Math.cos(a) * off, Math.sin(a) * off];
+    SEA_LANDMARKS.push({ id: "lm_" + sp.id, spot: sp.id, name: sp.name, kind, x: Math.round(sp.x + at[0]), z: Math.round(sp.z + at[1]), r: SEA_LM_SOLID[kind] || 0 });
+});
+SEA_MARKS.forEach((m) => { SEA_LANDMARKS.push({ id: m.id, spot: null, name: m.name, kind: m.lm, x: m.x, z: m.z, r: SEA_LM_SOLID[m.lm] || 0 }); });
+const SEA_FAST_PROBES = [[90, 0], [180, 0], [300, 0], [200, 0.35], [200, -0.35], [120, 0.6], [120, -0.6]]; // [feet ahead, radians off the bow]: what fast sail looks at for land
+// ===== end of the sea expansion data =====
 const FIGHT_JUMP_TIME = 0.95;
 const FIGHT_TUNE = { grace: 0.45, slipFrom: 90, slipRate: 0.7, telegraph: 0.5, lowDrain: 0.45 }; // grace: seconds in the red before the line parts; lowDrain: how fast a fish tires when the load is light
 function fightStyle(sp) { return FIGHT_STYLES[sp.name] || FIGHT_DEFAULT; }
@@ -4263,6 +4780,438 @@ function fxPlay(name) { if (!fx.on)
     }
     catch (e) { /* audio can fail on some devices; the game goes on */ }
 } }
+// ===== sea chart (begin) =====
+// The captain's chart and the corner mini-map. Both draw with seaChartDraw (north up; east is +x, north is +z). d is the data to draw:
+//   land {canvas, x0, z0, x1, z1} | spots [{id, name, type, x, z, found, lv}] | marks [{id, name, kind, x, z, seen, spot}] | regions [{id, name, cx, cz, open}]
+//   boat {x, z, h} | wp {x, z, name} | home {x, z}
+const SEA_TYPE_COLOR = { reef: "#f0a840", wreck: "#e8605a", inshore: "#7fd48a", openWater: "#6fd3e6", sand: "#ead9a0", rocks: "#b8a898" };
+const SEA_SHADES = [{ r: 9000, c: "#0a2736" }, { r: 3800, c: "#0c3043" }, { r: 1500, c: "#0f3b50" }, { r: 400, c: "#14506a" }]; // deeper, bluer water the further out
+function seaBearingText(dx, dz) { const a = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360; return compassFrom(dx, dz) + " " + String(Math.round(a)).padStart(3, "0") + "°"; }
+function seaDistText(ft) { return ft >= 1000 ? (ft / 1000).toFixed(1) + "k ft" : Math.round(ft / 10) * 10 + " ft"; }
+function seaChartDraw(ctx, W, H, cam, d, o) {
+    const s = cam.s, sx = (x) => W / 2 + (x - cam.x) * s, sy = (z) => H / 2 - (z - cam.z) * s;
+    const big = !!o.labels;
+    ctx.save();
+    ctx.fillStyle = SEA_SHADES[0].c;
+    ctx.fillRect(0, 0, W, H);
+    const hx = d.home ? d.home.x : 46, hz = d.home ? d.home.z : -23;
+    for (let i = 0; i < SEA_SHADES.length; i++) {
+        ctx.fillStyle = SEA_SHADES[i].c;
+        ctx.beginPath();
+        ctx.arc(sx(hx), sy(hz), SEA_SHADES[i].r * s, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    if (big) { // the band rings and their names
+        ctx.strokeStyle = "rgba(190,230,240,0.2)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.fillStyle = "rgba(190,230,240,0.5)";
+        ctx.font = "600 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        [1500, 3800].forEach((r) => { ctx.beginPath(); ctx.arc(sx(hx), sy(hz), r * s, 0, Math.PI * 2); ctx.stroke(); });
+        ctx.setLineDash([]);
+        [["HARBOR", 230], ["NEARSHORE", 950], ["OFFSHORE", 2650], ["BLUE WATER", 5400]].forEach(([t, r]) => { const a = 3.75, x = sx(hx + Math.sin(a) * r), y = sy(hz + Math.cos(a) * r); if (x > 30 && x < W - 30 && y > 12 && y < H - 4)
+            ctx.fillText(t, x, y); }); // (along the south-west diagonal, clear of the far regions)
+    }
+    if (d.land && d.land.canvas) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "low";
+        ctx.drawImage(d.land.canvas, sx(d.land.x0), sy(d.land.z1), (d.land.x1 - d.land.x0) * s, (d.land.z1 - d.land.z0) * s);
+    }
+    // the far regions: a dashed circle and a name
+    (d.regions || []).forEach((r) => {
+        const x = sx(r.cx), y = sy(r.cz);
+        ctx.strokeStyle = r.open ? "rgba(255,214,120,0.55)" : "rgba(190,200,205,0.28)";
+        ctx.setLineDash([6, 6]);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(x, y, 900 * s, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (big) {
+            ctx.fillStyle = r.open ? "rgba(255,214,120,0.85)" : "rgba(190,200,205,0.5)";
+            ctx.font = "600 11px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText((r.open ? "" : "🔒 ") + r.name, x, y + 4);
+        }
+    });
+    // the marina
+    {
+        const x = sx(hx), y = sy(hz);
+        ctx.fillStyle = "#ffd36b";
+        ctx.beginPath();
+        ctx.arc(x, y, big ? 5 : 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        if (big && s > 0.02) {
+            ctx.fillStyle = "#ffd36b";
+            ctx.font = "700 11px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText("⚓ Marina", x + 8, y - 6);
+        }
+    }
+    // landmarks the captain has seen but whose ground is not found yet: a small "?"
+    const foundSpot = {};
+    (d.spots || []).forEach((sp) => { if (sp.found)
+        foundSpot[sp.id] = true; });
+    (d.marks || []).forEach((m) => {
+        if (!m.seen)
+            return;
+        const x = sx(m.x), y = sy(m.z);
+        if (x < -20 || y < -20 || x > W + 20 || y > H + 20)
+            return;
+        if (m.spot) {
+            if (foundSpot[m.spot])
+                return;
+            ctx.fillStyle = "rgba(255,255,255,0.8)";
+            ctx.font = "700 " + (big ? 12 : 9) + "px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("?", x, y + 4);
+            return;
+        }
+        ctx.fillStyle = "#e6eef2";
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 5);
+        ctx.lineTo(x + 4, y);
+        ctx.lineTo(x, y + 5);
+        ctx.lineTo(x - 4, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (big && s > 0.035) {
+            ctx.fillStyle = "rgba(230,238,242,0.9)";
+            ctx.font = "500 10px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(m.name, x + 7, y + 3);
+        }
+    });
+    // the fishing grounds that have been found
+    (d.spots || []).forEach((sp) => {
+        if (!sp.found)
+            return;
+        const x = sx(sp.x), y = sy(sp.z);
+        if (x < -20 || y < -20 || x > W + 20 || y > H + 20)
+            return;
+        ctx.fillStyle = SEA_TYPE_COLOR[sp.type] || "#fff";
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, big ? 4.5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (big && s > 0.05) {
+            ctx.fillStyle = "rgba(240,246,248,0.95)";
+            ctx.font = "500 10px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(sp.name, x + 8, y + 3);
+        }
+    });
+    // the course
+    if (d.wp && d.boat) {
+        const bx = sx(d.boat.x), by = sy(d.boat.z), wx = sx(d.wp.x), wy = sy(d.wp.z);
+        ctx.strokeStyle = "rgba(255,214,120,0.8)";
+        ctx.setLineDash([6, 5]);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(wx, wy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#ffd36b";
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(wx, wy, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(wx, wy, 9, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,214,120,0.7)";
+        ctx.stroke();
+    }
+    // the boat
+    if (d.boat) {
+        ctx.save();
+        ctx.translate(sx(d.boat.x), sy(d.boat.z));
+        ctx.rotate(d.boat.h);
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(0, big ? -9 : -7);
+        ctx.lineTo(5, big ? 7 : 5);
+        ctx.lineTo(0, big ? 3 : 2);
+        ctx.lineTo(-5, big ? 7 : 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+    ctx.restore();
+}
+// The land: one pixel per cell of the ground the game itself calls land (isTerrainAt), painted once.
+function seaLandBitmap(isLand, x0, z0, x1, z1, cell) {
+    if (typeof document === "undefined")
+        return null;
+    const w = Math.ceil((x1 - x0) / cell), h = Math.ceil((z1 - z0) / cell), zt = z0 + h * cell, c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d");
+    if (!g)
+        return null;
+    const img = g.createImageData(w, h), px = img.data;
+    for (let j = 0; j < h; j++)
+        for (let i = 0; i < w; i++) {
+            const wx = x0 + (i + 0.5) * cell, wz = zt - (j + 0.5) * cell, k = (j * w + i) * 4;
+            if (isLand(wx, wz)) {
+                px[k] = 112;
+                px[k + 1] = 148;
+                px[k + 2] = 96;
+                px[k + 3] = 255;
+            }
+        }
+    g.putImageData(img, 0, 0);
+    return { canvas: c, x0, z0, x1: x0 + w * cell, z1: zt };
+}
+function SeaMini({ getData, size, range, onOpen, onRange }) {
+    const ref = useRef(null), [txt, setTxt] = useState("");
+    useEffect(() => {
+        let alive = true;
+        const draw = () => {
+            const cv = ref.current;
+            if (!cv || !alive)
+                return;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            if (cv.width !== size * dpr) {
+                cv.width = size * dpr;
+                cv.height = size * dpr;
+            }
+            const ctx = cv.getContext("2d");
+            if (!ctx)
+                return;
+            const d = getData();
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+            ctx.clip();
+            seaChartDraw(ctx, size, size, { x: d.boat ? d.boat.x : 46, z: d.boat ? d.boat.z : -23, s: (size / 2) / range }, d, { labels: false });
+            ctx.restore();
+            ctx.strokeStyle = "rgba(255,255,255,0.35)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = "#ffd36b";
+            ctx.font = "700 10px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("N", size / 2, 12);
+            if (d.wp && d.boat) {
+                const dx = d.wp.x - d.boat.x, dz = d.wp.z - d.boat.z, dist = Math.hypot(dx, dz);
+                if (dist * (size / 2 / range) > size / 2 - 6) {
+                    const a = Math.atan2(dx, dz), r = size / 2 - 7;
+                    ctx.save();
+                    ctx.translate(size / 2 + Math.sin(a) * r, size / 2 - Math.cos(a) * r);
+                    ctx.rotate(a);
+                    ctx.fillStyle = "#ffd36b";
+                    ctx.beginPath();
+                    ctx.moveTo(0, -5);
+                    ctx.lineTo(4.5, 4);
+                    ctx.lineTo(-4.5, 4);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                } // (an arrow on the rim when the course point is off the map)
+                setTxt("➤ " + d.wp.name + " · " + seaDistText(dist) + " · " + seaBearingText(dx, dz));
+            }
+            else
+                setTxt("");
+        };
+        draw();
+        const id = setInterval(draw, 250);
+        return () => { alive = false; clearInterval(id); };
+    }, [getData, size, range]);
+    return (React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: size + 28 } },
+        React.createElement("canvas", { ref: ref, onClick: onOpen, "aria-label": "Mini-map. Tap for the chart", style: { width: size, height: size, borderRadius: "50%", display: "block", cursor: "pointer", pointerEvents: "auto", boxShadow: "0 2px 10px rgba(0,0,0,0.5)" } }),
+        React.createElement("button", { onClick: onRange, "aria-label": "Mini-map range", style: { pointerEvents: "auto", cursor: "pointer", fontSize: 9, padding: "1px 7px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(14,31,40,0.85)", color: "#eaf3f5" } },
+            range,
+            " ft"),
+        txt && React.createElement("div", { style: { fontSize: 9, color: "#ffd36b", background: "rgba(6,20,28,0.85)", padding: "2px 6px", borderRadius: 4, maxWidth: size + 28, textAlign: "center", lineHeight: 1.25 } }, txt)));
+}
+function SeaChart({ getData, onClose, onWaypoint, fastSail, onFastSail, fastOk, topSpeed, touch }) {
+    const wrap = useRef(null), cv = useRef(null), cam = useRef({ x: 46, z: -23, s: 0.04 }), ptrs = useRef({}), tap = useRef(null);
+    const [, bump] = useState(0), [sel, setSel] = useState(null);
+    useEffect(() => { const id = setInterval(() => bump((n) => n + 1), 500); return () => clearInterval(id); }, []); // (the course read-out follows the boat)
+    const fit = (W, H) => Math.min(W, H) / 15600;
+    const size = () => { const r = wrap.current ? wrap.current.getBoundingClientRect() : { width: 360, height: 640 }; return { W: Math.max(1, Math.round(r.width)), H: Math.max(1, Math.round(r.height)) }; };
+    useEffect(() => {
+        const { W, H } = size();
+        const d = getData();
+        cam.current = { x: d.boat ? d.boat.x : 46, z: d.boat ? d.boat.z : -23, s: Math.max(fit(W, H), 0.045) };
+        bump((n) => n + 1);
+        // eslint-disable-next-line
+    }, []);
+    useEffect(() => {
+        let alive = true;
+        const draw = () => {
+            const c = cv.current;
+            if (!c || !alive)
+                return;
+            const { W, H } = size();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            if (c.width !== W * dpr || c.height !== H * dpr) {
+                c.width = W * dpr;
+                c.height = H * dpr;
+            }
+            const ctx = c.getContext("2d");
+            if (!ctx)
+                return;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const d = getData();
+            seaChartDraw(ctx, W, H, cam.current, d, { labels: true });
+            // scale bar
+            const s = cam.current.s, nice = [100, 200, 500, 1000, 2000, 5000].find((v) => v * s >= 60) || 5000;
+            ctx.strokeStyle = "#e6eef2";
+            ctx.fillStyle = "#e6eef2";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(14, H - 16);
+            ctx.lineTo(14 + nice * s, H - 16);
+            ctx.moveTo(14, H - 20);
+            ctx.lineTo(14, H - 12);
+            ctx.moveTo(14 + nice * s, H - 20);
+            ctx.lineTo(14 + nice * s, H - 12);
+            ctx.stroke();
+            ctx.font = "600 10px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(nice >= 1000 ? nice / 1000 + " k ft" : nice + " ft", 14, H - 24);
+            // compass rose
+            ctx.save();
+            ctx.translate(W - 30, H - 40);
+            ctx.strokeStyle = "rgba(230,238,242,0.8)";
+            ctx.fillStyle = "rgba(230,238,242,0.9)";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, -14);
+            ctx.lineTo(4, 0);
+            ctx.lineTo(-4, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.font = "700 9px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("N", 0, -19);
+            ctx.restore();
+        };
+        draw();
+        const id = setInterval(draw, 120);
+        return () => { alive = false; clearInterval(id); };
+    }, [getData]);
+    const toWorld = (px, py) => { const { W, H } = size(), c = cam.current; return { x: c.x + (px - W / 2) / c.s, z: c.z - (py - H / 2) / c.s }; };
+    const pick = (px, py) => {
+        const d = getData(), c = cam.current, { W, H } = size();
+        let best = null, bd = 22;
+        const found = {};
+        (d.spots || []).forEach((sp) => { if (sp.found)
+            found[sp.id] = true; });
+        (d.spots || []).forEach((sp) => { if (!sp.found)
+            return; const dd = Math.hypot(W / 2 + (sp.x - c.x) * c.s - px, H / 2 - (sp.z - c.z) * c.s - py); if (dd < bd) {
+            bd = dd;
+            best = { x: sp.x, z: sp.z, name: sp.name, sub: (sp.lv ? "Level " + sp.lv + " ground" : "Fishing ground") };
+        } });
+        (d.marks || []).forEach((m) => { if (!m.seen || m.spot)
+            return; const dd = Math.hypot(W / 2 + (m.x - c.x) * c.s - px, H / 2 - (m.z - c.z) * c.s - py); if (dd < bd) {
+            bd = dd;
+            best = { x: m.x, z: m.z, name: m.name, sub: "Sea mark" };
+        } });
+        (d.regions || []).forEach((r) => { if (!r.open)
+            return; const dd = Math.hypot(W / 2 + (r.cx - c.x) * c.s - px, H / 2 - (r.cz - c.z) * c.s - py); if (dd < bd + 8) {
+            bd = dd;
+            best = { x: r.cx, z: r.cz, name: r.name, sub: "Far waters (use Travel to arrive)" };
+        } });
+        if (best)
+            return best;
+        const w = toWorld(px, py);
+        return { x: Math.round(w.x), z: Math.round(w.z), name: "Course point", sub: "" };
+    };
+    const zoomAt = (px, py, f) => { const c = cam.current, w = toWorld(px, py), { W, H } = size(); const ns = Math.max(0.012, Math.min(1.2, c.s * f)); cam.current = { x: w.x - (px - W / 2) / ns, z: w.z + (py - H / 2) / ns, s: ns }; };
+    const onDown = (e) => { const r = wrap.current.getBoundingClientRect(); ptrs.current[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top }; tap.current = Object.keys(ptrs.current).length === 1 ? { x: e.clientX - r.left, y: e.clientY - r.top, t: Date.now(), moved: false } : null; try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    catch (err) { /* fine */ } };
+    const onMove = (e) => {
+        const p = ptrs.current[e.pointerId];
+        if (!p)
+            return;
+        const r = wrap.current.getBoundingClientRect(), nx = e.clientX - r.left, ny = e.clientY - r.top, ids = Object.keys(ptrs.current);
+        if (ids.length === 1) {
+            const c = cam.current;
+            cam.current = { x: c.x - (nx - p.x) / c.s, z: c.z + (ny - p.y) / c.s, s: c.s };
+            if (tap.current && Math.hypot(nx - tap.current.x, ny - tap.current.y) > 7)
+                tap.current.moved = true;
+        }
+        else if (ids.length === 2) {
+            const o = ptrs.current[ids.find((k) => +k !== e.pointerId)], d0 = Math.hypot(p.x - o.x, p.y - o.y), d1 = Math.hypot(nx - o.x, ny - o.y);
+            if (d0 > 8)
+                zoomAt((nx + o.x) / 2, (ny + o.y) / 2, d1 / d0);
+            tap.current = null;
+        }
+        p.x = nx;
+        p.y = ny;
+    };
+    const onUp = (e) => { const t = tap.current; delete ptrs.current[e.pointerId]; if (t && !t.moved && Date.now() - t.t < 450) {
+        const w = pick(t.x, t.y);
+        setSel(w);
+        onWaypoint(w);
+    } tap.current = null; };
+    const onWheel = (e) => { const r = wrap.current.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.25 : 0.8); };
+    const d = getData(), wp = d.wp, boat = d.boat;
+    const wpInfo = wp && boat ? (() => { const dx = wp.x - boat.x, dz = wp.z - boat.z, dist = Math.hypot(dx, dz); return { dist, brg: seaBearingText(dx, dz), mins: topSpeed ? dist / (topSpeed * (fastSail ? 3.2 : 1) * 0.8) / 60 : 0 }; })() : null;
+    const btn = { cursor: "pointer", padding: "7px 11px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(14,31,40,0.92)", color: "#eaf3f5", font: "600 12px system-ui, sans-serif" };
+    return (React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 420, background: "#06141c", color: "#eaf3f5", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", touchAction: "none", userSelect: "none" } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", paddingTop: "max(10px, env(safe-area-inset-top, 0px))", background: "rgba(14,31,40,0.96)", borderBottom: "1px solid rgba(255,255,255,0.12)" } },
+            React.createElement("div", { style: { fontWeight: 700, fontSize: 15, color: "#7fe6a8" } }, "\uD83E\uDDED Chart"),
+            React.createElement("div", { style: { fontSize: 10, opacity: 0.6, flex: 1, minWidth: 0, lineHeight: 1.25 } }, touch ? "Drag · pinch to zoom · tap to set a course" : "Drag · wheel to zoom · click to set a course"),
+            React.createElement("button", { onClick: onClose, "aria-label": "Close chart", style: btn }, "\u2715 Close")),
+        React.createElement("div", { ref: wrap, onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onUp, onWheel: onWheel, style: { position: "relative", flex: 1, minHeight: 0, cursor: "grab", touchAction: "none" } },
+            React.createElement("canvas", { ref: cv, style: { position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" } }),
+            React.createElement("div", { style: { position: "absolute", left: 8, top: 8, right: 8, display: "flex", flexWrap: "wrap", gap: "2px 10px", pointerEvents: "none", fontSize: 10, color: "rgba(230,238,242,0.9)", background: "rgba(6,20,28,0.6)", padding: "4px 8px", borderRadius: 6, width: "fit-content", maxWidth: "calc(100% - 16px)" } },
+                [["reef", "Reef"], ["wreck", "Wreck"], ["inshore", "Flats"], ["openWater", "Open water"]].map(([k, t]) => React.createElement("span", { key: k },
+                    React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: 4, background: SEA_TYPE_COLOR[k], marginRight: 4 } }),
+                    t)),
+                React.createElement("span", null,
+                    React.createElement("span", { style: { display: "inline-block", width: 6, height: 6, background: "#e6eef2", transform: "rotate(45deg)", marginRight: 5 } }),
+                    "Mark"),
+                React.createElement("span", null,
+                    React.createElement("b", { style: { marginRight: 4 } }, "?"),
+                    "seen, not found"))),
+        React.createElement("div", { style: { padding: "8px 12px", paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))", background: "rgba(14,31,40,0.96)", borderTop: "1px solid rgba(255,255,255,0.12)", display: "flex", flexDirection: "column", gap: 8 } },
+            wp && wpInfo ? (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 } },
+                React.createElement("span", { style: { color: "#ffd36b", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } },
+                    "\u27A4 ",
+                    wp.name,
+                    wp.sub ? React.createElement("span", { style: { fontWeight: 400, opacity: 0.7 } },
+                        " \u00B7 ",
+                        wp.sub) : null),
+                React.createElement("span", { style: { opacity: 0.85, whiteSpace: "nowrap" } },
+                    seaDistText(wpInfo.dist),
+                    " \u00B7 ",
+                    wpInfo.brg,
+                    wpInfo.mins >= 0.5 ? " · ~" + Math.round(wpInfo.mins) + " min" : ""),
+                React.createElement("button", { onClick: () => { onWaypoint(null); setSel(null); }, style: { ...btn, marginLeft: "auto", padding: "5px 9px" } }, "Clear"))) : React.createElement("div", { style: { fontSize: 12, opacity: 0.7 } }, sel ? "" : "Tap a ground, a mark or open water to set a course. The mini-map and the arrow follow it."),
+            React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                React.createElement("button", { onClick: () => { const dd = getData(); cam.current = { x: dd.boat ? dd.boat.x : 46, z: dd.boat ? dd.boat.z : -23, s: 0.2 }; bump((n) => n + 1); }, style: btn }, "\u2316 My boat"),
+                React.createElement("button", { onClick: () => { const { W, H } = size(); cam.current = { x: 46, z: -23, s: Math.max(fit(W, H), 0.012) }; bump((n) => n + 1); }, style: btn }, "\uD83C\uDF0A Whole sea"),
+                React.createElement("button", { onClick: onFastSail, "aria-pressed": fastSail, style: { ...btn, borderColor: fastSail ? "#8fd97a" : "rgba(255,255,255,0.25)", background: fastSail ? "rgba(143,217,122,0.2)" : btn.background } }, fastSail ? "⏩ Fast sail ON" : "⏩ Fast sail")),
+            fastSail && React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, fastOk ? "Fast sailing: about three times your speed in open water. It eases off near land, rocks, marks and fishing grounds, and when you hook a fish." : "Fast sail is on but easing off here (land, a mark, a ground or a fish is close)."))));
+}
+// ===== sea chart (end) =====
 function DeepWaterPrototype({ onExit, newLook }) {
     const mountRef = useRef(null);
     const sonarCanvasRef = useRef(null);
@@ -4337,9 +5286,31 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiShowHelp, setUiShowHelp] = useState(false);
     const [uiWildlifeOpen, setUiWildlifeOpen] = useState(false); // wildlife log panel
     const [uiSpotsOpen, setUiSpotsOpen] = useState(false); // fishing spots panel
+    const [uiMarksSeen, setUiMarksSeen] = useState({}); // sea landmark id -> seen (the chart shows the ones the captain has passed)
+    const [uiChartOpen, setUiChartOpen] = useState(false); // the full chart
+    const [uiMiniOn, setUiMiniOn] = useState(true); // the corner mini-map
+    const [uiMiniRange, setUiMiniRange] = useState(800); // feet from the boat to the rim of the mini-map
+    const [uiWaypoint, setUiWaypoint] = useState(null); // the course point set on the chart: { x, z, name }
+    const [uiFastSail, setUiFastSail] = useState(false); // fast sail switched on
+    const [uiFastOk, setUiFastOk] = useState(false); // ...and the way is clear for it right now
     const [uiSpotsFound, setUiSpotsFound] = useState({ "home-reef": true, "home-wreck": true, "home-inshore": true, "home-open": true }); // spot id -> discovered
     const [uiBoatXZ, setUiBoatXZ] = useState({ x: 0, z: 0 }); // boat position, refreshed 4x a second, for the spots panel
     const [uiQuest, setUiQuest] = useState(null); // copy of the saved quest state (xp, money, today's missions, stats) for the HUD and panels
+    const seaUiRef = useRef({});
+    seaUiRef.current = { spotsFound: uiSpotsFound, marksSeen: uiMarksSeen, quest: uiQuest };
+    const [getSeaData] = useState(() => () => {
+        const u = seaUiRef.current, st = stateRef.current;
+        return {
+            land: st.seaLand || null,
+            spots: (st.fishSpots || []).map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, found: !!(u.spotsFound && u.spotsFound[sp.id]), lv: sp.lv })),
+            marks: SEA_LANDMARKS.map((l) => ({ id: l.id, name: l.name, kind: l.kind, x: l.x, z: l.z, seen: !!(u.marksSeen && u.marksSeen[l.id]), spot: l.spot })),
+            regions: REGIONS.filter((r) => !r.home).map((r) => ({ id: r.id, name: r.name, cx: r.cx, cz: r.cz, open: !!(u.quest && travelOpen(u.quest, r.id)) })),
+            boat: st.nav || null, wp: st.wp || null, home: { x: 46, z: -23 },
+        };
+    });
+    const seaSetWaypoint = (w) => { stateRef.current.wp = w; setUiWaypoint(w); };
+    const seaToggleFast = () => { const v = !stateRef.current.fastSailWanted; stateRef.current.fastSailWanted = v; setUiFastSail(v); if (!v)
+        setUiFastOk(false); };
     const [uiQuestDialog, setUiQuestDialog] = useState(null); // id of the quest giver being talked to, or null
     const [uiNearGiver, setUiNearGiver] = useState(null); // id of a quest giver within talking range, or null
     const [uiProgressOpen, setUiProgressOpen] = useState(false); // level / perks screen
@@ -9236,6 +10207,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 description: "A thick-lipped, mottled bulldog with a white chin. Strong for its size, and it knows exactly where the nearest crevice is.",
             },
         ];
+        SEA_SPECIES.forEach((q) => { SPECIES.push(seaSpeciesEntry(q)); });
         SPECIES.forEach((s) => { s.mat = new THREE.MeshPhongMaterial({ color: s.color, flatShading: true }); });
         function randomSpecies() { return SPECIES[Math.floor(Math.random() * SPECIES.length)]; }
         const openWaterCenter = new THREE.Vector3(-20, 0, -80); // away from all structures — true open water for pelagics
@@ -9262,16 +10234,35 @@ function DeepWaterPrototype({ onExit, newLook }) {
             { id: "home-dock", name: "Marina Dock", type: "inshore", x: dockX - 6, z: dockStartZ + 24, cap: 3, home: true, spread: 7, hookY: -5, depth: [-7, -4], only: ["Mangrove Snapper", "Yellowtail Snapper", "Sheepshead", "Pompano", "Black Sea Bass"] }, // the water beside the dock: where the first catches are made on foot
         ].concat(REMOTE_SPOT_DATA.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, cap: sp.fish, home: false })))
             .concat(REGION_SPOTS.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, cap: sp.fish, home: false, region: sp.region })));
-        FISH_SPOTS.forEach((sp) => { sp.center = new THREE.Vector3(sp.x, 0, sp.z); sp.active = false; sp.respawnT = 0; sp.n = 0; sp.found = sp.home; });
-        stateRef.current.fishSpots = FISH_SPOTS.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, home: sp.home, region: sp.region || "marina" }));
+        FISH_SPOTS.forEach((sp) => {
+            sp.center = new THREE.Vector3(sp.x, 0, sp.z);
+            sp.active = false;
+            sp.respawnT = 0;
+            sp.n = 0;
+            sp.found = sp.home;
+            const rule = seaRuleFor(sp.id, sp.region); // what the ground holds (pool), how big (size window), the level it opens at, and what finding it pays
+            sp.pool = rule.pool ? poolParse(rule.pool) : null;
+            sp.size = rule.size || null;
+            sp.lv = rule.lv || 0;
+            sp.xp = rule.xp || PROG_SPOT_XP;
+            sp.lm = rule.lm || null;
+            sp.warned = false;
+        });
+        stateRef.current.fishSpots = FISH_SPOTS.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, home: sp.home, region: sp.region || "marina", lv: sp.lv }));
         const SPOT_ON = 300, SPOT_OFF = 380, SPOT_FOUND = 60;
         function spawnGamefish(spot) {
-            let species = spot.only ? (() => { const l = SPECIES.filter((sp) => spot.only.indexOf(sp.name) >= 0); return l.length ? l[Math.floor(Math.random() * l.length)] : randomSpeciesForZone(spot.type); })() : randomSpeciesForZone(spot.type);
-            if (!spot.home) {
+            let species = null;
+            if (spot.pool) {
+                const nm = poolPick(spot.pool, Math.random);
+                species = SPECIES.find((sp) => sp.name === nm) || null;
+            } // a ground holds only its own fish
+            if (!species)
+                species = spot.only ? (() => { const l = SPECIES.filter((sp) => spot.only.indexOf(sp.name) >= 0); return l.length ? l[Math.floor(Math.random() * l.length)] : randomSpeciesForZone(spot.type); })() : randomSpeciesForZone(spot.type);
+            if (!spot.home && !spot.pool) {
                 const alt = randomSpeciesForZone(spot.type);
                 if (alt.weightRange[1] > species.weightRange[1])
                     species = alt;
-            } // remote spots lean to the bigger species
+            } // (grounds without a pool lean to the bigger species)
             let mesh = buildSpeciesFish(species);
             if (mesh)
                 mesh.scale.setScalar(species.scale);
@@ -9310,7 +10301,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 heading: h0, pitch: 0, cruise: 0.55 + Math.random() * 0.5, pack: packIdx, orbA: Math.random() * Math.PI * 2, orbDir: Math.random() < 0.5 ? -1 : 1,
                 orbR: 2 + Math.random() * 4.5, yD: y0, depthGoal: y0, depthT: 2 + Math.random() * 6, dartT: 4 + Math.random() * 10, dart: 0, speedNow: 0.6,
                 wanderT: Math.random() * 100, hooked: false, species, spot,
-                weightRoll: spot.home ? Math.random() * 0.7 : Math.max(Math.random(), Math.random()), // 0..1 position inside the species' weight range
+                weightRoll: (() => { const u = spot.home ? Math.random() * 0.7 : Math.max(Math.random(), Math.random()); return spot.size ? spot.size[0] + (spot.size[1] - spot.size[0]) * u : u; })(), // 0..1 position inside the species' weight range (a ground's size window narrows it)
+                wcap: spot.size ? spot.size[1] : 1,
                 homeCenter: spot.center, depthMin: zc.depthMin, depthMax: zc.depthMax,
             };
         }
@@ -9567,7 +10559,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
             for (let i = 0; i < FISH_SPOTS.length; i++) {
                 const sp = FISH_SPOTS[i];
                 const d = Math.hypot(boatPos.x - sp.x, boatPos.z - sp.z);
-                if (!sp.active) {
+                const locked = sp.lv > 0 && questLevelForXp(quest.xp) < sp.lv;
+                if (locked && d >= SPOT_OFF)
+                    sp.warned = false;
+                if (!sp.active && locked) {
+                    if (d < SPOT_FOUND * 2 && !sp.warned) {
+                        sp.warned = true;
+                        marineShowToast("🔒 " + sp.name + ": the fish here are beyond you until Level " + sp.lv, "#ffb84d", 4);
+                    }
+                }
+                else if (!sp.active) {
                     if (d < SPOT_ON) {
                         sp.active = true;
                         sp.respawnT = sp.home ? 20 : 40 + Math.random() * 50;
@@ -9594,12 +10595,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         sp.respawnT = sp.home ? 20 : 40 + Math.random() * 50;
                     }
                 }
-                if (!sp.found && d < SPOT_FOUND * gearNow.discoverR) {
+                if (!sp.found && !locked && d < SPOT_FOUND * gearNow.discoverR) {
                     sp.found = true;
                     spotsFound[sp.id] = true;
                     setUiSpotsFound({ ...spotsFound });
                     quest.stats.spotsFound[sp.id] = true;
-                    const xpRes = sp.home ? null : awardXp(PROG_SPOT_XP); // the home grounds are known from the start; only remote ones pay
+                    const xpRes = sp.home ? null : awardXp(sp.xp); // the home grounds are known from the start; only remote ones pay
                     questSave(quest);
                     questPush();
                     const unlockNote = gearUnlockNote();
@@ -9622,6 +10623,312 @@ function DeepWaterPrototype({ onExit, newLook }) {
         function questPush() { setUiQuest(JSON.parse(JSON.stringify(quest))); }
         questPush();
         function questGiverName(id) { const g = QUEST_GIVERS.find((x) => x.id === id); return g ? g.name : id; }
+        // ===== sea landmarks (begin) =====
+        // The marks that tell a captain where they are on the open sea: buoys, beacons, stakes, rocks, wrecks and a rig. They are built when the boat is
+        // within LM_ON feet and taken down again past LM_OFF, so ten times the sea costs nothing. Some are solid (SEA_LM_SOLID); the rest float or are too
+        // small to hit. Passing within LM_SEEN feet "sees" a mark and puts it on the chart (saved in quest.stats.marksSeen).
+        const LM_ON = 980, LM_OFF = 1180, LM_SEEN = 470;
+        const lmMat = (c, o) => new THREE.MeshPhongMaterial(Object.assign({ color: c, flatShading: true }, o || {}));
+        const LMM = {
+            wood: lmMat(0x6b5a45), dark: lmMat(0x3f362c), rust: lmMat(0x8a4a2a), steel: lmMat(0x8a949a), white: lmMat(0xe8e6de), red: lmMat(0xc0392b), green: lmMat(0x2e8b57),
+            yellow: lmMat(0xe6b422), orange: lmMat(0xf08a24), rock: lmMat(0x5d6063), rockDk: lmMat(0x3d4144), guano: lmMat(0xe9e6dc), black: lmMat(0x1c1c1c), concrete: lmMat(0x9a9a92),
+            weedA: lmMat(0x7d6d2b, { side: THREE.DoubleSide }), weedB: lmMat(0x5f6a2c, { side: THREE.DoubleSide }),
+            rip: new THREE.MeshBasicMaterial({ color: 0x0f6a70, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }),
+            foam: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
+        };
+        const lmBulbMat = (c) => new THREE.MeshBasicMaterial({ color: c, fog: false });
+        const lmHaloMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.3, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+        const LMB = { red: lmBulbMat(0xff4040), white: lmBulbMat(0xfff4d0), amber: lmBulbMat(0xffb030), orange: lmBulbMat(0xff7a20) };
+        const LMH = { red: lmHaloMat(0xff2020), white: lmHaloMat(0xffeebb), amber: lmHaloMat(0xff9a20), orange: lmHaloMat(0xff6010) };
+        const lmBulbGeo = new THREE.SphereGeometry(0.5, 6, 5), lmHaloGeo = new THREE.SphereGeometry(1.6, 8, 6);
+        function seaLmBuild(kind, seed) {
+            const rnd = makeRng(Math.floor(seed * 1e6) + 17), g = new THREE.Group(), lights = [];
+            let bob = 0, pulse = null;
+            const add = (geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx)
+                m.rotation.x = rx; if (ry)
+                m.rotation.y = ry; if (rz)
+                m.rotation.z = rz; g.add(m); return m; };
+            const cyl = (rb, rt, h, seg) => new THREE.CylinderGeometry(rt, rb, h, seg || 8);
+            const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+            const light = (x, y, z, col, period, on, s) => {
+                const b = add(lmBulbGeo, LMB[col], x, y, z), h = add(lmHaloGeo, LMH[col], x, y, z);
+                if (s) {
+                    b.scale.setScalar(s);
+                    h.scale.setScalar(s);
+                }
+                lights.push({ b, h, period, on, phase: rnd() * period });
+            };
+            if (kind === "buoyrw") { // fairway buoy: red and white sphere, red ball on a short mast
+                add(new THREE.SphereGeometry(1.4, 10, 8, 0, Math.PI), LMM.red, 0, 0.5, 0, 0, 0, 0).rotation.y = 0;
+                add(new THREE.SphereGeometry(1.4, 10, 8, Math.PI, Math.PI), LMM.white, 0, 0.5, 0);
+                add(cyl(0.18, 0.12, 3.4, 5), LMM.steel, 0, 2.9, 0);
+                add(new THREE.SphereGeometry(0.5, 7, 6), LMM.red, 0, 4.7, 0);
+                light(0, 5.4, 0, "white", 6, 0.25);
+                bob = 0.35;
+            }
+            else if (kind === "whistle") { // whistle buoy: red body, steel tower and bell cage
+                add(cyl(1.9, 0.9, 2.2, 8), LMM.red, 0, 0.4, 0);
+                add(cyl(1.2, 1.2, 0.5, 8), LMM.white, 0, 1.7, 0);
+                for (let i = 0; i < 4; i++) {
+                    const a = i * Math.PI / 2 + 0.4;
+                    add(cyl(0.12, 0.1, 6.4, 4), LMM.steel, Math.cos(a) * 0.8, 4.8, Math.sin(a) * 0.8, Math.sin(a) * -0.09, 0, Math.cos(a) * 0.09);
+                }
+                add(box(1.8, 0.3, 1.8), LMM.steel, 0, 7.9, 0);
+                add(new THREE.SphereGeometry(0.5, 6, 5), LMM.rust, 0, 6.7, 0);
+                light(0, 8.5, 0, "red", 5, 0.2);
+                bob = 0.45;
+            }
+            else if (kind === "wxbuoy") { // weather buoy: yellow disc, white stripe, mast with a solar panel
+                add(cyl(2.3, 2.1, 1.2, 10), LMM.yellow, 0, 0.3, 0);
+                add(cyl(2.32, 2.32, 0.3, 10), LMM.white, 0, 0.5, 0);
+                add(cyl(0.22, 0.16, 7.5, 5), LMM.steel, 0, 4.6, 0);
+                add(box(2.4, 0.15, 1.4), LMM.black, 0, 6.6, 0, 0.4, 0, 0);
+                add(cyl(0.05, 0.05, 2.6, 3), LMM.steel, 0.6, 9.2, 0);
+                add(box(0.9, 0.5, 0.9), LMM.white, 0, 2.4, 0);
+                light(0, 8.6, 0, "white", 4, 0.3);
+                bob = 0.5;
+            }
+            else if (kind === "fad") { // fish-aggregating buoy: orange float, pole, flag and radar reflector
+                add(new THREE.SphereGeometry(1.2, 8, 6), LMM.orange, 0, 0.5, 0);
+                add(cyl(0.1, 0.1, 5.4, 4), LMM.steel, 0, 3.4, 0);
+                add(new THREE.OctahedronGeometry(0.7), LMM.steel, 0, 6.4, 0);
+                add(box(1.6, 0.9, 0.05), LMM.orange, 0.85, 5.2, 0);
+                light(0, 7.3, 0, "amber", 3, 0.25, 0.7);
+                bob = 0.45;
+            }
+            else if (kind === "daybeacon") { // a piling with a green square or a red triangle at the top
+                add(cyl(0.38, 0.32, 12, 6), LMM.dark, 0, 5.2, 0);
+                add(cyl(0.9, 0.7, 0.8, 6), LMM.wood, 0, 0.2, 0);
+                if (rnd() < 0.5)
+                    add(box(2.6, 2.6, 0.14), LMM.green, 0, 10.4, 0.3);
+                else
+                    add(new THREE.ConeGeometry(1.7, 2.7, 3), LMM.red, 0, 10.4, 0.3).rotation.x = Math.PI / 2 * 0;
+                add(cyl(0.5, 0.5, 0.4, 6), LMM.white, 0, 11.4, 0);
+            }
+            else if (kind === "spars") { // two leaning channel spars
+                add(cyl(0.3, 0.2, 9, 5), LMM.wood, -1.6, 4.0, 0, 0, 0, 0.12);
+                add(cyl(0.3, 0.2, 7, 5), LMM.dark, 1.5, 3.1, 0.6, -0.1, 0, -0.1);
+                add(box(3.6, 0.2, 0.3), LMM.wood, 0, 2.2, 0.2, 0, 0, 0.1);
+            }
+            else if (kind === "stakes") { // a row of poling stakes
+                const n = 5, a = rnd() * Math.PI;
+                for (let i = 0; i < n; i++) {
+                    const t = (i - (n - 1) / 2) * 6.5;
+                    const h = 4 + rnd() * 2.4;
+                    const s = add(cyl(0.22, 0.16, h, 5), i % 3 === 0 ? LMM.wood : LMM.dark, Math.cos(a) * t, h / 2 - 0.2, Math.sin(a) * t, (rnd() - 0.5) * 0.18, 0, (rnd() - 0.5) * 0.18);
+                    if (i % 2 === 0)
+                        add(cyl(0.3, 0.3, 0.35, 5), LMM.white, s.position.x, h - 0.3, s.position.z);
+                }
+            }
+            else if (kind === "crabfloats") { // a line of crab-pot floats
+                const n = 8, a = rnd() * Math.PI;
+                for (let i = 0; i < n; i++) {
+                    const t = (i - (n - 1) / 2) * 9;
+                    add(new THREE.SphereGeometry(0.5, 6, 5), i % 2 ? LMM.orange : LMM.white, Math.cos(a) * t + (rnd() - 0.5) * 2, 0.15, Math.sin(a) * t + (rnd() - 0.5) * 2);
+                    if (i % 3 === 1)
+                        add(cyl(0.05, 0.05, 2.2, 3), LMM.steel, Math.cos(a) * t, 1.2, Math.sin(a) * t);
+                }
+                bob = 0.15;
+            }
+            else if (kind === "rubble") { // rocks just breaking the surface
+                for (let i = 0; i < 9; i++) {
+                    const a = rnd() * Math.PI * 2, r = rnd() * 7, h = 0.35 + rnd() * 1.1;
+                    add(new THREE.ConeGeometry(0.9 + rnd() * 1.6, h * 2, 5 + Math.floor(rnd() * 2)), i % 3 === 0 ? LMM.rockDk : LMM.rock, Math.cos(a) * r, h * 0.2, Math.sin(a) * r, 0, rnd() * 3, 0);
+                }
+            }
+            else if (kind === "pilings") { // the stumps of an old bridge: two ragged rows
+                for (let row = 0; row < 2; row++)
+                    for (let i = 0; i < 5; i++) {
+                        const h = 3 + rnd() * 6;
+                        add(cyl(0.45, 0.38, h, 6), rnd() < 0.5 ? LMM.dark : LMM.wood, (i - 2) * 3.4 + (rnd() - 0.5), h / 2 - 0.8, (row - 0.5) * 4.6, (rnd() - 0.5) * 0.2, 0, (rnd() - 0.5) * 0.2);
+                    }
+                add(box(3.4, 0.35, 0.5), LMM.wood, 0, 4.6, -2.3, 0, 0, 0.06);
+            }
+            else if (kind === "mast") { // a wreck's mast and the top of its deckhouse
+                add(cyl(0.55, 0.4, 14, 6), LMM.rust, 0, 6.5, 0, 0.06, 0, -0.08);
+                add(cyl(1.1, 1.1, 0.55, 8), LMM.rust, -0.55, 13.2, 0.4);
+                add(box(7, 0.28, 0.3), LMM.rust, -0.4, 10.4, 0.2, 0, 0, 0.08);
+                add(box(5.5, 2.4, 3.4), LMM.rust, 4.2, 0.3, 1.6, 0.04, 0.3, 0.06);
+                add(box(4.2, 0.4, 2.8), LMM.dark, 4.2, 1.6, 1.6, 0.04, 0.3, 0.06);
+            }
+            else if (kind === "platform") { // an oil platform: legs, decks, crane, flare stack
+                const lg = 9.5;
+                [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => add(cyl(1.35, 1.1, 30, 8), LMM.steel, sx * lg, 9, sz * lg));
+                [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([sx, sz]) => { add(box(sx ? 0.5 : lg * 2, 0.5, sz ? 0.5 : lg * 2), LMM.steel, sx * lg, 8, sz * lg); add(box(sx ? 0.5 : lg * 2, 0.5, sz ? 0.5 : lg * 2), LMM.steel, sx * lg, 16, sz * lg); });
+                add(box(26, 2.2, 26), LMM.concrete, 0, 24.3, 0);
+                add(box(15, 3.4, 12), LMM.white, -2, 27.1, -1);
+                add(box(6, 2.6, 6), LMM.red, 6, 26.6, 6);
+                add(cyl(2.6, 2.6, 0.4, 12), LMM.white, -8, 25.6, 9);
+                add(box(1.2, 11, 1.2), LMM.steel, 8, 31, -8);
+                add(box(1.0, 0.8, 16), LMM.steel, 8, 36.5, -3, 0.5, 0, 0);
+                add(cyl(0.5, 0.35, 15, 6), LMM.steel, -9, 33, -9);
+                light(-9, 41.2, -9, "orange", 0.9, 0.55, 1.3);
+                light(8, 37.5, -9, "red", 2, 0.5, 1.2);
+                [[-12, -12], [12, -12], [-12, 12], [12, 12]].forEach(([x, z]) => light(x, 26, z, "white", 1, 1, 0.9));
+            }
+            else if (kind === "stack") { // a sea stack: rock with a white cap of bird droppings
+                const rock = new THREE.CylinderGeometry(2.6, 6.4, 17, 7, 3);
+                const p = rock.attributes.position;
+                for (let i = 0; i < p.count; i++) {
+                    const k = 1 + (rnd() - 0.5) * 0.32;
+                    p.setX(i, p.getX(i) * k);
+                    p.setZ(i, p.getZ(i) * k);
+                }
+                rock.computeVertexNormals();
+                add(rock, LMM.rock, 0, 7.6, 0);
+                add(new THREE.ConeGeometry(2.7, 3.4, 7), LMM.guano, 0, 16.7, 0);
+                add(new THREE.ConeGeometry(2.8, 5, 6), LMM.rockDk, 5.8, 1.2, 2.4, 0, 1, 0);
+                add(new THREE.ConeGeometry(1.7, 3, 5), LMM.rockDk, -5, 0.4, -3, 0, 2, 0);
+            }
+            else if (kind === "tower") { // a skeleton light tower on a concrete pad
+                add(cyl(6.4, 6.4, 1.9, 12), LMM.concrete, 0, 0.3, 0);
+                [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const l = add(cyl(0.34, 0.24, 41, 5), LMM.steel, sx * 2.5, 21, sz * 2.5); l.rotation.z = -sx * 0.055; l.rotation.x = sz * 0.055; });
+                [8, 18, 28].forEach((y, i) => { const w = 2.5 * (1 - y / 88); [[1, 0], [0, 1]].forEach(([a, b]) => { add(box(a ? w * 2 : 0.22, 0.22, b ? w * 2 : 0.22), LMM.steel, 0, y, 0); }); add(box(w * 2, 0.22, 0.22), LMM.steel, 0, y, w, 0, 0, 0.5); });
+                add(box(5, 0.5, 5), LMM.steel, 0, 41.5, 0);
+                add(cyl(1.3, 1.3, 2.6, 8), LMM.white, 0, 43.2, 0);
+                add(cyl(1.6, 0.1, 1.4, 8), LMM.red, 0, 45.2, 0);
+                light(0, 43.2, 0, "white", 5, 0.3, 1.4);
+            }
+            else if (kind === "weed") { // a mat line of sargassum, drifting in a streak
+                const a = rnd() * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+                for (let i = 0; i < 24; i++) {
+                    const t = (rnd() - 0.5) * 120, w = (rnd() - 0.5) * 22;
+                    const r = 1.6 + rnd() * 3.6;
+                    const m = add(new THREE.CircleGeometry(r, 6), rnd() < 0.5 ? LMM.weedA : LMM.weedB, ca * t - sa * w, 0.12, sa * t + ca * w, -Math.PI / 2, 0, 0);
+                    m.rotation.z = rnd() * 6;
+                }
+                bob = 0.04;
+            }
+            else if (kind === "foam") { // a tide rip: a darker band of water with streaks of foam along it
+                const a = rnd() * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+                const band = add(new THREE.PlaneGeometry(130, 24), LMM.rip, 0, 0.1, 0, -Math.PI / 2, 0, 0);
+                band.rotation.z = a;
+                for (let i = 0; i < 16; i++) {
+                    const t = (rnd() - 0.5) * 112, w = (rnd() - 0.5) * 18, L = 8 + rnd() * 20;
+                    const f = add(new THREE.PlaneGeometry(L, 0.9 + rnd() * 0.9), LMM.foam, ca * t - sa * w, 0.13, sa * t + ca * w, -Math.PI / 2, 0, 0);
+                    f.rotation.z = a;
+                }
+                pulse = LMM.foam;
+            }
+            return { group: g, lights, bob, pulse };
+        }
+        const seaLm = SEA_LANDMARKS.map((l) => ({ l, ph: seaHash(l.id + "p") * 6.28, group: null, lights: [], bob: 0 }));
+        const marksSeen = Object.assign({}, quest.stats.marksSeen);
+        quest.stats.marksSeen = marksSeen;
+        setUiMarksSeen({ ...marksSeen });
+        SEA_LANDMARKS.forEach((l) => { if (l.r)
+            SOLID_DISCS.push({ x: l.x, z: l.z, r: l.r }); }); // the rock, the mast, the rig and the pilings can be hit
+        let seaLmClock = 0, seaLmCheckT = 0;
+        // ---- navigation: the position the chart reads, the course point, and fast sail ----
+        // Fast sail multiplies the boat's top speed (high gear, throttle ahead) by FAST_MUL while the way is clear; it eases off by itself near land,
+        // marks, grounds and when a line is out, and returns when the way is clear again. fastMulNow is read by the boat movement code.
+        const FAST_MUL = 3.2;
+        stateRef.current.fastSailWanted = false;
+        stateRef.current.wp = null;
+        let fastMulNow = 1, fastCheckT = 0, fastSafeNow = false;
+        function seaFastSafe() {
+            if (!stateRef.current.fastSailWanted || fishingState.docked || fishingState.anchored || walkMode || fishingState.mode !== "idle")
+                return false;
+            const h = boatHeading;
+            for (let i = 0; i < SEA_FAST_PROBES.length; i++) {
+                const pr = SEA_FAST_PROBES[i], a = h + pr[1];
+                if (isLandOrObstacleAt(boatPos.x + Math.sin(a) * pr[0], boatPos.z + Math.cos(a) * pr[0]))
+                    return false;
+            }
+            for (let i = 0; i < FISH_SPOTS.length; i++) {
+                const sp = FISH_SPOTS[i];
+                if (Math.hypot(boatPos.x - sp.x, boatPos.z - sp.z) < 190)
+                    return false;
+            }
+            for (let i = 0; i < SEA_LANDMARKS.length; i++) {
+                const l = SEA_LANDMARKS[i];
+                if (Math.hypot(boatPos.x - l.x, boatPos.z - l.z) < (l.r || 0) + 150)
+                    return false;
+            }
+            return true;
+        }
+        function seaNavStep(dt) {
+            const nv = stateRef.current.nav || (stateRef.current.nav = { x: 0, z: 0, h: 0 });
+            nv.x = boatPos.x;
+            nv.z = boatPos.z;
+            nv.h = boatHeading;
+            const wp = stateRef.current.wp;
+            if (wp && Math.hypot(boatPos.x - wp.x, boatPos.z - wp.z) < 140) {
+                marineShowToast("🎯 Arrived: " + wp.name, "#ffd36b", 4);
+                stateRef.current.wp = null;
+                setUiWaypoint(null);
+            }
+            fastCheckT -= dt;
+            if (fastCheckT <= 0) {
+                fastCheckT = 0.2;
+                const safe = seaFastSafe();
+                if (safe !== fastSafeNow) {
+                    fastSafeNow = safe;
+                    setUiFastOk(safe);
+                }
+            }
+            const engaged = fastSafeNow && gear === "high" && throttle > 0.05;
+            const target = engaged ? FAST_MUL : 1;
+            fastMulNow += (target - fastMulNow) * Math.min(1, dt * (target > fastMulNow ? 1.2 : 3));
+            if (Math.abs(fastMulNow - target) < 0.01)
+                fastMulNow = target;
+        }
+        function updateSeaLandmarks(dt) {
+            seaNavStep(dt);
+            seaLmClock += dt;
+            seaLmCheckT -= dt;
+            let changed = false;
+            if (seaLmCheckT <= 0) { // (the stream in/out and "seen" test runs a few times a second; the animation below runs every frame)
+                seaLmCheckT = 0.4;
+                for (let i = 0; i < seaLm.length; i++) {
+                    const e = seaLm[i], l = e.l, d = Math.hypot(boatPos.x - l.x, boatPos.z - l.z);
+                    if (d < LM_ON && !e.group) {
+                        const b = seaLmBuild(l.kind, seaHash(l.id));
+                        e.group = b.group;
+                        e.lights = b.lights;
+                        e.bob = b.bob;
+                        e.pulse = b.pulse;
+                        e.group.position.set(l.x, 0, l.z);
+                        e.group.rotation.y = seaHash(l.id + "h") * 6.28;
+                        scene.add(e.group);
+                    }
+                    else if (d > LM_OFF && e.group) {
+                        scene.remove(e.group);
+                        e.group.traverse((o) => { if (o.geometry && o.geometry !== lmBulbGeo && o.geometry !== lmHaloGeo)
+                            o.geometry.dispose(); });
+                        e.group = null;
+                        e.lights = [];
+                    }
+                    if (d < LM_SEEN && !marksSeen[l.id]) {
+                        marksSeen[l.id] = true;
+                        changed = true;
+                        if (!l.spot)
+                            marineShowToast("🧭 " + l.name, "#8fd9e6", 3);
+                    }
+                }
+                if (changed) {
+                    questSave(quest);
+                    setUiMarksSeen({ ...marksSeen });
+                }
+            }
+            for (let i = 0; i < seaLm.length; i++) {
+                const e = seaLm[i];
+                if (!e.group)
+                    continue;
+                if (e.bob) {
+                    e.group.position.y = Math.sin(seaLmClock * 0.9 + e.ph) * e.bob;
+                    e.group.rotation.z = Math.sin(seaLmClock * 0.7 + e.ph) * 0.03;
+                }
+                for (let k = 0; k < e.lights.length; k++) {
+                    const L = e.lights[k];
+                    const on = (seaLmClock + L.phase) % L.period < L.period * L.on;
+                    L.b.visible = on;
+                    L.h.visible = on;
+                }
+            }
+            LMM.foam.opacity = 0.42 + 0.12 * Math.sin(seaLmClock * 0.5);
+        }
+        // ===== sea landmarks (end) =====
         // Pays out XP (with the streak and perk multipliers) and any level rewards.
         function awardXp(base) {
             const res = questAddXp(quest, base);
@@ -10023,6 +11330,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     quest.stats.spotsFound[sp.id] = true; });
                 REGIONS.forEach((r) => { if (!r.home)
                     quest.travel.unlocked[r.id] = true; }); // every far region open too
+                SEA_LANDMARKS.forEach((l) => { marksSeen[l.id] = true; });
+                setUiMarksSeen({ ...marksSeen });
                 setUiSpotsFound({ ...spotsFound });
                 gearAvailPrev = new Set(gearUnlockedIds(quest));
                 questSave(quest);
@@ -10033,6 +11342,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const fresh = questFresh();
                 Object.keys(quest).forEach((k) => { delete quest[k]; });
                 Object.assign(quest, fresh);
+                Object.keys(marksSeen).forEach((k) => { delete marksSeen[k]; });
+                quest.stats.marksSeen = marksSeen;
+                setUiMarksSeen({});
                 if (stateRef.current.boatIndex !== 0) {
                     stateRef.current.boatIndex = 0;
                     setUiBoatIndex(0);
@@ -10902,6 +12214,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     stateRef.current.dockToggleRequested = false;
                     dockRequest();
                 }
+                if (justPressed("m"))
+                    setUiChartOpen((v) => !v); // the chart
+                if (justPressed("j"))
+                    seaToggleFast(); // fast sail
                 if (stateRef.current.dockServicesRequested) { // marina services straight from the boat while tied up
                     stateRef.current.dockServicesRequested = false;
                     if (fs.docked && !ashoreMode && !dockAnim)
@@ -11261,7 +12577,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             fs.species = sp;
                             let wRoll = hf.weightRoll !== undefined ? hf.weightRoll : Math.random();
                             if (gearNow.trophy > 0 && Math.random() < gearNow.trophy)
-                                wRoll = Math.max(wRoll, Math.random(), Math.random()); // Trophy Hunter perk
+                                wRoll = Math.min(Math.max(wRoll, Math.random(), Math.random()), hf.wcap !== undefined ? hf.wcap : 1); // Trophy Hunter perk (a ground never gives more than its size window)
                             fs.weight = sp.weightRange[0] + wRoll * (sp.weightRange[1] - sp.weightRange[0]);
                             fs.weightRoll = wRoll;
                             fightStart(fs, sp, quality, Math.random);
@@ -11413,6 +12729,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                 }
                 updateFishingSpots(dt);
+                updateSeaLandmarks(dt);
                 updateSplashes(dt);
                 travelStep(dt);
                 if (fs.mode === "idle") {
@@ -11588,12 +12905,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     // else: throttle holds its position — it's a lever, not a gas pedal
                     const handlingMax = boatDef.maxSpeed * gearNow.topSpeed * (0.5 + 0.5 * handling);
                     const gearMax = gear === "low" ? handlingMax * LOW_GEAR_FRACTION : handlingMax;
-                    const targetSpeed = throttle >= 0 ? throttle * gearMax : throttle * handlingMax * REVERSE_FRACTION;
-                    const accel = 6 * handling * gearNow.accel;
+                    const fastM = gear === "high" ? fastMulNow : 1; // fast sail (see seaNavStep)
+                    const targetSpeed = throttle >= 0 ? throttle * gearMax * fastM : throttle * handlingMax * REVERSE_FRACTION;
+                    const accel = 6 * handling * gearNow.accel * (1 + (fastM - 1) * 0.8);
                     if (boatSpeed < targetSpeed)
                         boatSpeed = Math.min(targetSpeed, boatSpeed + accel * dt);
                     else if (boatSpeed > targetSpeed)
-                        boatSpeed = Math.max(targetSpeed, boatSpeed - accel * dt);
+                        boatSpeed = Math.max(targetSpeed, boatSpeed - accel * dt * (boatSpeed > handlingMax * 1.1 ? 3 : 1));
                     // The wheel moves while you hold a direction, and now eases back toward
                     // center on its own once you let go — no more holding a turn forever.
                     const wheelInput = (keysNow["a"] || keysNow["arrowleft"] ? 1 : 0) - (keysNow["d"] || keysNow["arrowright"] ? 1 : 0) - stateRef.current.joyX;
@@ -11606,7 +12924,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                     // Steerage: a rudder barely bites at low speed, full effect by a moderate cruise speed.
                     const steerage = Math.min(1, Math.abs(boatSpeed) / (handlingMax * 0.28));
-                    const targetYawRate = wheelAngle * boatDef.turnRate * handling * steerage;
+                    const targetYawRate = wheelAngle * boatDef.turnRate * handling * steerage / (1 + 0.3 * (fastM - 1)); // (a gentler wheel at fast-sail speed)
                     // The hull lags behind the wheel — bigger boats take longer to spool into
                     // and out of a turn.
                     const yawLag = Math.min(1, dt / boatDef.yawInertia);
@@ -12415,6 +13733,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                 });
                 birds.forEach((b) => {
+                    if (Math.abs(b.centerX - boatPos.x) > 1100 || Math.abs(b.centerZ - boatPos.z) > 1100) {
+                        b.group.visible = false;
+                        return;
+                    } // (the sea is big: birds far from the boat are not drawn or moved)
+                    b.group.visible = true;
                     b.angle += b.orbitSpeed * dt;
                     b.flapPhase += dt * 6;
                     // Occasional dive toward the water, simulating a bird diving for bait.
@@ -12527,6 +13850,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         window.addEventListener("resize", onResize);
         return () => {
+            clearTimeout(seaLandTimer);
             cancelAnimationFrame(raf);
             window.removeEventListener("resize", onResize);
             window.removeEventListener("keydown", onKeyDown);
@@ -12679,7 +14003,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         hudAttention && !uiHudOpen && React.createElement("span", { "aria-label": "Something needs attention", style: { width: 8, height: 8, borderRadius: 4, background: "#7fe6a8", flex: "0 0 auto" } }),
                         uiToastLog.length > 0 && !uiHudOpen && React.createElement("span", { "aria-label": "New notifications", style: { fontSize: 11, flex: "0 0 auto" } }, "\uD83D\uDD14"),
                         React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, opacity: 0.7 } }, uiHudOpen ? "▲" : "▼")),
-                    React.createElement("button", { onClick: () => setUiShowSonar((v) => !v), "aria-pressed": uiShowSonar, "aria-label": "Sonar", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiShowSonar ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiShowSonar ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83D\uDCE1")),
+                    React.createElement("button", { onClick: () => setUiShowSonar((v) => !v), "aria-pressed": uiShowSonar, "aria-label": "Sonar", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiShowSonar ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiShowSonar ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83D\uDCE1"),
+                    React.createElement("button", { onClick: () => setUiMiniOn((v) => !v), "aria-pressed": uiMiniOn, "aria-label": "Mini-map", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiMiniOn ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiMiniOn ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83E\uDDED")),
                 tapPrompt && React.createElement("div", { style: { fontSize: 11, marginTop: 5, color: "#ffb84d" } }, tapPrompt))),
             (!TOUCH_UI || uiHudOpen) && (React.createElement(React.Fragment, null,
                 !TOUCH_UI && React.createElement("div", { style: { ...labelStyle, color: "#ffb84d" } },
@@ -12970,20 +14295,26 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         (REGIONS.find((r) => r.id === uiRegion) || REGIONS[0]).name),
                     React.createElement("button", { onClick: () => setUiSpotsOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 12 } },
-                    "The water near the marina holds only a few fish. The rich grounds are out in the open sea \u2014 ",
+                    "The water beside the marina holds only small fish. The bigger fish live further out, in the grounds you find \u2014 ",
                     foundN,
                     " of ",
                     remoteN,
-                    " found. Watch for birds circling over the water, and for sonar marks. North is up the +Z axis, east is +X; distances are in feet."),
-                rows.map(({ sp, dist, dir, found }) => (React.createElement("div", { key: sp.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 6, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" } },
-                    React.createElement("div", { style: { fontSize: 22, width: 28, textAlign: "center", opacity: found ? 1 : 0.35 } }, found ? SPOT_TYPE_ICON[sp.type] : "❓"),
+                    " found. Each ground has a buoy, a wreck, a rock or some other mark; birds circle over it. Open the Chart (\uD83E\uDDED) to see where you are, and tap a ground there to set a course."),
+                rows.filter((r) => r.found).map(({ sp, dist, dir }) => (React.createElement("div", { key: sp.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 6, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" } },
+                    React.createElement("div", { style: { fontSize: 22, width: 28, textAlign: "center" } }, SPOT_TYPE_ICON[sp.type]),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, found ? sp.name : "Unexplored water"),
-                        React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, found ? SPOT_TYPE_LABEL[sp.type] + (sp.home ? " · near the marina" : " · rich grounds") : "Not found yet")),
-                    found && React.createElement("div", { style: { fontSize: 12, color: "#7fe6a8", textAlign: "right" } },
-                        Math.round(dist),
-                        " ft ",
-                        dir))))));
+                        React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, sp.name),
+                        React.createElement("div", { style: { fontSize: 10, opacity: 0.7 } }, SPOT_TYPE_LABEL[sp.type] + (sp.home ? " · near the marina" : sp.lv ? " · Level " + sp.lv + " ground" : " · rich grounds"))),
+                    React.createElement("div", { style: { fontSize: 12, color: "#7fe6a8", textAlign: "right" } },
+                        seaDistText(dist),
+                        " ",
+                        dir),
+                    !sp.home && React.createElement("button", { onClick: () => { seaSetWaypoint({ x: sp.x, z: sp.z, name: sp.name, sub: "Fishing ground" }); setUiSpotsOpen(false); }, "aria-label": "Set course for " + sp.name, style: { fontSize: 11, padding: "4px 8px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,214,120,0.5)", background: "rgba(255,214,120,0.1)", color: "#ffd36b" } }, "\u27A4 Course")))),
+                rows.some((r) => !r.found) && (React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 6, borderRadius: 6, background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.15)" } },
+                    React.createElement("div", { style: { fontSize: 22, width: 28, textAlign: "center", opacity: 0.4 } }, "\u2753"),
+                    React.createElement("div", { style: { flex: 1, fontSize: 12, opacity: 0.75 } },
+                        rows.filter((r) => !r.found).length,
+                        " more grounds are still unexplored. Sail the open water, look for landmarks and circling birds, and watch the sonar.")))));
         })(),
         uiWildlifeOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
@@ -13051,7 +14382,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "⭐", label: "Progress", enabled: true, run: () => setUiProgressOpen(true) },
                         { icon: "★", label: "Story", enabled: true, run: () => setUiStoryOpen(true) },
                         { icon: "📋", label: "Missions", enabled: true, run: () => setUiMissionsOpen(true) },
+                        { icon: "🧭", label: "Chart", enabled: true, run: () => setUiChartOpen(true) },
                         { icon: "🗺️", label: "Fishing Spots", enabled: true, run: () => setUiSpotsOpen(true) },
+                        { icon: "◎", label: "Mini-map", active: uiMiniOn, enabled: true, keepOpen: true, run: () => setUiMiniOn((v) => !v) },
                         { icon: "🐬", label: "Wildlife", enabled: true, run: () => setUiWildlifeOpen(true) },
                         ...(TOUCH_UI ? [] : [{ icon: "⌨️", label: "Controls", active: uiShowHelp, enabled: true, keepOpen: true, run: () => setUiShowHelp((v) => !v) }]),
                         ...(onExit ? [{ icon: "🏠", label: "Main Menu", enabled: !boatLocked, why: "Land the fish first", run: () => onExit() }] : []),
@@ -13099,6 +14432,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         React.createElement("div", { style: { fontSize: 11, letterSpacing: 1.2, color: "#ffb84d", fontWeight: 700 } }, menu.title),
                         React.createElement("div", { style: { fontSize: 9, marginTop: 3, opacity: 0.75, lineHeight: 1.25 } }, uiWheelNote || (uiWheelMenu === "main" ? "tap here to close" : "tap here to go back"))))));
         })(),
+        uiMiniOn && !uiChartOpen && (React.createElement("div", { style: { position: "absolute", zIndex: 56, pointerEvents: "none", ...(TOUCH_UI ? { left: 0, top: 62 } : { right: 0, top: uiShowSonar ? 216 : 76 }) } },
+            React.createElement(SeaMini, { getData: getSeaData, size: TOUCH_UI ? 100 : 132, range: uiMiniRange, onOpen: () => setUiChartOpen(true), onRange: () => setUiMiniRange((r) => (r >= 1600 ? 400 : r * 2)) }))),
+        React.createElement("button", { onClick: seaToggleFast, "aria-pressed": uiFastSail, "aria-label": "Fast sail", style: { position: "absolute", right: 14, bottom: TOUCH_UI ? 64 : 112, zIndex: 56, cursor: "pointer", padding: TOUCH_UI ? "7px 10px" : "6px 10px", borderRadius: 18, border: "1px solid " + (uiFastSail ? (uiFastOk ? "#8fd97a" : "#ffb84d") : "rgba(255,255,255,0.22)"), background: uiFastSail ? (uiFastOk ? "rgba(143,217,122,0.22)" : "rgba(255,184,77,0.18)") : "rgba(14,31,40,0.82)", color: "#eaf3f5", fontSize: 12, fontWeight: 700 } },
+            "\u23E9",
+            uiFastSail ? (uiFastOk ? " FAST" : " ready") : "",
+            !TOUCH_UI && React.createElement("span", { style: { fontSize: 8, opacity: 0.55, marginLeft: 5 } }, "J")),
+        uiChartOpen && React.createElement(SeaChart, { getData: getSeaData, onClose: () => setUiChartOpen(false), onWaypoint: seaSetWaypoint, fastSail: uiFastSail, onFastSail: seaToggleFast, fastOk: uiFastOk, topSpeed: BOATS[uiBoatIndex].maxSpeed, touch: TOUCH_UI }),
         React.createElement("div", { onClick: TOUCH_UI ? () => setUiReadoutOpen((o) => !o) : undefined, style: { position: "absolute", bottom: 14, right: 14, ...panelStyle, textAlign: "right", ...(TOUCH_UI ? { padding: "6px 10px", cursor: "pointer" } : {}) } },
             TOUCH_UI && !uiReadoutOpen && React.createElement("div", { style: { ...monoStyle, fontSize: 13, color: "#ffb84d", whiteSpace: "nowrap" } },
                 speedReadout.toFixed(1),
