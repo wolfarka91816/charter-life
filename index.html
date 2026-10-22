@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.13", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.14", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -1715,13 +1715,13 @@ const STORY_CHAPTERS = [
 // (cap, shades, glasses, headset, pipe, headwrap). The 3D townsfolk and the portraits are both drawn from this, so they always match.
 const STORY_CAST = {
     marlow: { name: "Captain Marlow", role: "Dockmaster", age: 2, brow: "thick", hat: { style: "captain", color: 0x1d3557 }, look: { skin: "s3", hair: "short", hairColor: "white", beard: "full", build: "stocky", top: { id: "top.polo", color: 0x8a4a5a }, bottom: { id: "bot.dock", color: 0x38414a } } },
-    dana: { name: "Dana Reyes", role: "Charter booker", age: 0, brow: "thin", acc: "headset", look: { skin: "s5", hair: "long", hairColor: "black", beard: "none", build: "avg", top: { id: "top.polo", color: 0x3a5a7a }, bottom: { id: "bot.dock", color: 0xd2bf93 } } },
+    dana: { name: "Dana Reyes", role: "Charter booker", age: 0, brow: "thin", acc: "headset", look: { body: "f", skin: "s5", hair: "long", hairColor: "black", beard: "none", build: "avg", top: { id: "top.polo", color: 0x3a5a7a }, bottom: { id: "bot.dock", color: 0xd2bf93 } } },
     pete: { name: "Old Pete", role: "Retired guide", age: 2, brow: "thick", hat: { style: "cap", color: 0x6b7a3a }, acc: "pipe", look: { skin: "s2", hair: "short", hairColor: "grey", beard: "mustache", build: "slim", top: { id: "top.flannel", color: 0xc8a848, trim: 0x5a3f2a }, bottom: { id: "bot.jeans", color: 0x3d5f86 } } },
     gus: { name: "Gus Brandt", role: "Marina store", age: 1, brow: "thick", glasses: { style: "specs", color: 0x2a2a2a }, look: { skin: "s6", hair: "buzz", hairColor: "black", beard: "goatee", build: "stocky", top: { id: "top.tee", color: 0x7a4a3a }, bottom: { id: "bot.shorts", color: 0xa8956a }, extra: { id: "ext.apron", color: 0x3f7a45 } } },
     tobe: { name: "Tobe Hale", role: "Reel Deal Charters", age: 0, brow: "med", glasses: { style: "shades", color: 0x2a3a4a }, look: { skin: "s2", hair: "short", hairColor: "blond", beard: "stubble", build: "avg", top: { id: "top.jersey", color: 0x1d3557, trim: 0xf2c230 }, bottom: { id: "bot.dock", color: 0xd2bf93 } } },
-    wren: { name: "Wren Okafor", role: "Trading post, Shoals Landing", age: 1, brow: "thin", acc: "headwrap", accColor: 0xe0762a, look: { skin: "s7", hair: "bun", hairColor: "black", beard: "none", build: "slim", top: { id: "top.fishing", color: 0x7cc9b0 }, bottom: { id: "bot.board", color: 0x1f8a8a } } },
-    imani: { name: "Dr. Imani Brooks", role: "Marine biologist", age: 0, brow: "thin", glasses: { style: "specs", color: 0x1f2a33 }, look: { skin: "s5", hair: "curly", hairColor: "dark", beard: "none", build: "avg", top: { id: "top.hoodie", color: 0x1f8a8a }, bottom: { id: "bot.jeans", color: 0x3d5f86 } } },
-    ruth: { name: "Captain Ruth Calloway", role: "Legend of Halyard Point", age: 2, brow: "med", hat: { style: "captain", color: 0x1d3557 }, look: { skin: "s2", hair: "ponytail", hairColor: "grey", beard: "none", build: "avg", top: { id: "top.calloway", color: 0x7a5a30, trim: 0x1c1f22 }, bottom: { id: "bot.dock", color: 0x38414a } } },
+    wren: { name: "Wren Okafor", role: "Trading post, Shoals Landing", age: 1, brow: "thin", acc: "headwrap", accColor: 0xe0762a, look: { body: "f", skin: "s7", hair: "bun", hairColor: "black", beard: "none", build: "slim", top: { id: "top.fishing", color: 0x7cc9b0 }, bottom: { id: "bot.board", color: 0x1f8a8a } } },
+    imani: { name: "Dr. Imani Brooks", role: "Marine biologist", age: 0, brow: "thin", glasses: { style: "specs", color: 0x1f2a33 }, look: { body: "f", skin: "s5", hair: "afro", hairColor: "dark", beard: "none", build: "avg", top: { id: "top.hoodie", color: 0x1f8a8a }, bottom: { id: "bot.jeans", color: 0x3d5f86 } } },
+    ruth: { name: "Captain Ruth Calloway", role: "Legend of Halyard Point", age: 2, brow: "med", hat: { style: "captain", color: 0x1d3557 }, look: { body: "f", skin: "s2", hair: "braid", hairColor: "grey", beard: "none", build: "avg", top: { id: "top.calloway", color: 0x7a5a30, trim: 0x1c1f22 }, bottom: { id: "bot.dock", color: 0x38414a } } },
 };
 const STORY_REGION_NAMES = { shoals: "Sandy Shoals", jetty: "Jetty Rocks", banks: "Blue Water Banks", marina: "the marina" };
 // How each step works. need = what must be true before it starts; goal = what to do (a list: every item must be met).
@@ -2624,7 +2624,9 @@ const LOOK_HAIR_COLORS = [
 const LOOK_HAIR_STYLES = [
     { id: "bald", name: "Bald" }, { id: "buzz", name: "Buzz" }, { id: "short", name: "Short" }, { id: "curly", name: "Curly" },
     { id: "long", name: "Long" }, { id: "ponytail", name: "Ponytail" }, { id: "bun", name: "Bun" },
+    { id: "bob", name: "Bob" }, { id: "pixie", name: "Pixie" }, { id: "braid", name: "Braid" }, { id: "pigtails", name: "Pigtails" }, { id: "wavy", name: "Wavy" }, { id: "afro", name: "Afro" },
 ];
+const LOOK_BODIES = [{ id: "m", name: "Masculine" }, { id: "f", name: "Feminine" }]; // the frame: shoulders, hips, face and lips
 const LOOK_BEARDS = [
     { id: "none", name: "Clean" }, { id: "stubble", name: "Stubble" }, { id: "mustache", name: "Mustache" }, { id: "goatee", name: "Goatee" },
     { id: "short", name: "Short beard" }, { id: "full", name: "Full beard" },
@@ -2646,6 +2648,8 @@ const WARDROBE = [
     // --- tops ---
     { id: "top.tee", slot: "top", name: "Crew Tee", price: 0, req: {}, color: 0x3d5f86, shape: { sleeves: "short" }, blurb: "Cotton, soft from a hundred washes." },
     { id: "top.tank", slot: "top", name: "Deck Tank", price: 0, req: {}, color: 0xe0762a, shape: { sleeves: "none" }, blurb: "Arms free for the long fight." },
+    { id: "top.halter", slot: "top", name: "Halter Top", price: 0, req: {}, color: 0xe0607a, shape: { sleeves: "none", halter: true }, blurb: "Light, bright and easy to move in." },
+    { id: "top.blouse", slot: "top", name: "Linen Blouse", price: 70, req: { level: 2 }, color: 0xf2f0e6, trim: 0xd9b84a, shape: { sleeves: "long", cuffs: true, collar: true }, blurb: "Sleeves rolled, collar open, never wrinkled for long." },
     { id: "top.fishing", slot: "top", name: "Vented Fishing Shirt", price: 90, req: { level: 3 }, color: 0x6fb4d8, shape: { sleeves: "long", vents: true }, blurb: "Long sleeves, sun-proof, dries in minutes." },
     { id: "top.polo", slot: "top", name: "Dockside Polo", price: 130, req: { level: 6 }, color: 0xf2f0e6, shape: { sleeves: "short", collar: true }, blurb: "Smart enough for a charter client." },
     { id: "top.flannel", slot: "top", name: "Flannel Shirt", price: 110, req: { level: 5 }, color: 0xb5382e, trim: 0x1c1f22, shape: { sleeves: "long", bands: [0.25, 0.5, 0.75], collar: true }, blurb: "Check pattern, cold-morning approved." },
@@ -2659,6 +2663,8 @@ const WARDROBE = [
     // --- bottoms ---
     { id: "bot.shorts", slot: "bottom", name: "Cargo Shorts", price: 0, req: {}, color: 0xa8956a, shape: { length: 0.5 }, blurb: "Plenty of pockets, none of them dry." },
     { id: "bot.jeans", slot: "bottom", name: "Jeans", price: 0, req: {}, color: 0x3d5f86, shape: { length: 1 }, blurb: "Tough and plain." },
+    { id: "bot.skirt", slot: "bottom", name: "Wrap Skirt", price: 0, req: {}, color: 0x1f8a8a, shape: { length: 0.42, skirt: true }, blurb: "Swishes on the dock and dries in the sun." },
+    { id: "bot.capris", slot: "bottom", name: "Deck Capris", price: 60, req: { level: 3 }, color: 0x38414a, shape: { length: 0.7 }, blurb: "Cropped at the calf, out of the spray." },
     { id: "bot.board", slot: "bottom", name: "Board Shorts", price: 60, req: { level: 2 }, color: 0x1f8a8a, shape: { length: 0.62 }, blurb: "Quick-dry, knee length." },
     { id: "bot.dock", slot: "bottom", name: "Dock Pants", price: 80, req: { level: 4 }, color: 0xd2bf93, shape: { length: 1 }, blurb: "Light canvas that shrugs off fish slime." },
     { id: "bot.bibs", slot: "bottom", name: "Oilskin Bibs", price: 260, req: { level: 10 }, color: 0xe0762a, shape: { length: 1, bib: true }, blurb: "Bib-front waterproofs for heavy weather." },
@@ -2676,11 +2682,38 @@ const WARDROBE_SETS = [
     { id: "set.foul", name: "Foul-Weather Set", blurb: "Yellow jacket and orange oilskins. Offshore in any weather.", pieces: { top: ["top.slicker", 0xf2c230], bottom: ["bot.bibs", 0xe0762a] } },
     { id: "set.charter", name: "Charter Captain", blurb: "A crisp polo and dock pants. Clients tip better.", pieces: { top: ["top.polo", 0xf2f0e6], bottom: ["bot.dock", 0xd2bf93] } },
     { id: "set.beach", name: "Beach Day", blurb: "Tank, board shorts and a sun buff.", pieces: { top: ["top.tank", 0xe0762a], bottom: ["bot.board", 0x1f8a8a], extra: ["ext.buff", 0x6fb4d8] } },
+    { id: "set.shore", name: "Shore Leave", blurb: "A linen blouse and a wrap skirt. Dinner after the dock.", pieces: { top: ["top.blouse", 0xf2f0e6], bottom: ["bot.skirt", 0x1f8a8a] } },
     { id: "set.old", name: "Old Salt", blurb: "Flannel, jeans and a red bandana.", pieces: { top: ["top.flannel", 0xb5382e], bottom: ["bot.jeans", 0x3d5f86], extra: ["ext.bandana", 0xb5382e] } },
     { id: "set.tourney", name: "Tournament Day", blurb: "Team jersey over pressed dock pants.", pieces: { top: ["top.jersey", 0x1d3557], bottom: ["bot.dock", 0xd2bf93] } },
     { id: "set.admiral", name: "Full Dress", blurb: "The captain's coat and trousers.", pieces: { top: ["top.coat", 0x1d3557], bottom: ["bot.trousers", 0x1d3557] } },
 ];
-const WARDROBE_START = { "top.tee": true, "top.tank": true, "bot.shorts": true, "bot.jeans": true, "ext.none": true };
+const WARDROBE_START = { "top.tee": true, "top.tank": true, "top.halter": true, "bot.shorts": true, "bot.jeans": true, "bot.skirt": true, "ext.none": true };
+// Ready-made avatars for the character creator: a body, a face, hair and an outfit made only of free pieces (so every one is a real start).
+// Tapping one dresses the captain in it; every part can still be changed afterwards.
+const LOOK_AVATARS = [
+    { id: "av.marisol", first: "Marisol", tag: "Charter deckhand", body: "f", skin: "s4", hair: "long", hairColor: "black", beard: "none", build: "avg", top: ["top.halter", 0xe0762a], bottom: ["bot.skirt", 0x1f8a8a] },
+    { id: "av.jack", first: "Jack", tag: "Dock kid turned captain", body: "m", skin: "s3", hair: "short", hairColor: "brown", beard: "none", build: "avg", top: ["top.tee", 0x3d5f86], bottom: ["bot.shorts", 0xa8956a] },
+    { id: "av.kenya", first: "Kenya", tag: "Tournament regular", body: "f", skin: "s7", hair: "afro", hairColor: "black", beard: "none", build: "avg", top: ["top.tank", 0xf2c230], bottom: ["bot.jeans", 0x3d5f86] },
+    { id: "av.kai", first: "Kai", tag: "Surf-town local", body: "m", skin: "s5", hair: "curly", hairColor: "black", beard: "none", build: "slim", top: ["top.tank", 0x1f8a8a], bottom: ["bot.shorts", 0xd2bf93] },
+    { id: "av.freya", first: "Freya", tag: "Northern trawler family", body: "f", skin: "s1", hair: "braid", hairColor: "blond", beard: "none", build: "slim", top: ["top.tee", 0x6fb4d8], bottom: ["bot.shorts", 0xa8956a] },
+    { id: "av.omar", first: "Omar", tag: "Harbour pilot", body: "m", skin: "s4", hair: "short", hairColor: "dark", beard: "full", build: "stocky", top: ["top.tee", 0x6b7a3a], bottom: ["bot.jeans", 0x38414a] },
+    { id: "av.mei", first: "Mei", tag: "Fish-market numbers whiz", body: "f", skin: "s2", hair: "bob", hairColor: "black", beard: "none", build: "slim", top: ["top.halter", 0x7cc9b0], bottom: ["bot.skirt", 0x1d3557] },
+    { id: "av.rafa", first: "Rafa", tag: "Night-bite specialist", body: "m", skin: "s4", hair: "ponytail", hairColor: "dark", beard: "mustache", build: "avg", top: ["top.tank", 0xb5382e], bottom: ["bot.shorts", 0xa8956a] },
+    { id: "av.ayesha", first: "Ayesha", tag: "Marine-school dropout", body: "f", skin: "s5", hair: "wavy", hairColor: "dark", beard: "none", build: "avg", top: ["top.tee", 0x6e2430], bottom: ["bot.jeans", 0x38414a] },
+    { id: "av.dre", first: "Dre", tag: "Ex-line cook, all appetite", body: "m", skin: "s8", hair: "buzz", hairColor: "black", beard: "goatee", build: "stocky", top: ["top.tee", 0xf2f0e6], bottom: ["bot.jeans", 0x38414a] },
+    { id: "av.josie", first: "Josie", tag: "Born on a bait boat", body: "f", skin: "s3", hair: "ponytail", hairColor: "ginger", beard: "none", build: "avg", top: ["top.tank", 0x1f8a8a], bottom: ["bot.shorts", 0xd2bf93] },
+    { id: "av.tane", first: "Tane", tag: "Drifter with a good rod", body: "m", skin: "s6", hair: "long", hairColor: "black", beard: "stubble", build: "avg", top: ["top.tee", 0x7cc9b0], bottom: ["bot.shorts", 0xa8956a] },
+    { id: "av.tamsin", first: "Tamsin", tag: "Lighthouse keeper's niece", body: "f", skin: "s2", hair: "pixie", hairColor: "platinum", beard: "none", build: "slim", top: ["top.tee", 0x1c1f22], bottom: ["bot.jeans", 0x3d5f86] },
+    { id: "av.cal", first: "Cal", tag: "Fast hands, loud shirts", body: "m", skin: "s2", hair: "short", hairColor: "ginger", beard: "none", build: "slim", top: ["top.tee", 0xf2c230], bottom: ["bot.jeans", 0x3d5f86] },
+    { id: "av.pip", first: "Pip", tag: "Youngest crew on the coast", body: "f", skin: "s6", hair: "pigtails", hairColor: "teal", beard: "none", build: "slim", top: ["top.halter", 0xe0607a], bottom: ["bot.shorts", 0x3d5f86] },
+    { id: "av.viktor", first: "Viktor", tag: "Retired shipwright", body: "m", skin: "s1", hair: "bald", hairColor: "grey", beard: "short", build: "stocky", top: ["top.tank", 0x38414a], bottom: ["bot.jeans", 0x3d5f86] },
+    { id: "av.lena", first: "Lena", tag: "Fixer of anything with an engine", body: "f", skin: "s3", hair: "bun", hairColor: "auburn", beard: "none", build: "stocky", top: ["top.tee", 0x3f7a45], bottom: ["bot.shorts", 0xa8956a] },
+    { id: "av.ben", first: "Ben", tag: "Quiet and patient", body: "m", skin: "s2", hair: "bun", hairColor: "blond", beard: "stubble", build: "avg", top: ["top.tee", 0xe6dcc0], bottom: ["bot.shorts", 0x38414a] },
+];
+function lookAvatar(id) { return LOOK_AVATARS.find((a) => a.id === id) || null; }
+function lookFromAvatar(av) {
+    return { body: av.body, skin: av.skin, hair: av.hair, hairColor: av.hairColor, beard: av.body === "f" ? "none" : av.beard, build: av.build, top: lookPiece("top", av.top[0], av.top[1]), bottom: lookPiece("bottom", av.bottom[0], av.bottom[1]), extra: lookPiece("extra", "ext.none") };
+}
 function wardrobeItem(id) { return WARDROBE.find((w) => w.id === id) || null; }
 function wardrobeSet(id) { return WARDROBE_SETS.find((s) => s.id === id) || null; }
 function wardrobeFresh() { return { owned: { ...WARDROBE_START } }; }
@@ -2700,7 +2733,7 @@ function lookPiece(slot, id, color, trim) {
     return piece;
 }
 function lookFresh() {
-    return { rev: 1, name: "Captain", skin: "s3", hair: "short", hairColor: "brown", beard: "none", build: "avg", top: lookPiece("top", "top.tee"), bottom: lookPiece("bottom", "bot.shorts"), extra: lookPiece("extra", "ext.none") };
+    return { rev: 1, name: "Captain", body: "m", skin: "s3", hair: "short", hairColor: "brown", beard: "none", build: "avg", top: lookPiece("top", "top.tee"), bottom: lookPiece("bottom", "bot.shorts"), extra: lookPiece("extra", "ext.none") };
 }
 function lookName(n) { return String(n === undefined || n === null ? "" : n).replace(/[^A-Za-z0-9 '.\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 14); }
 function lookSanitize(l, wardrobe) {
@@ -2710,10 +2743,12 @@ function lookSanitize(l, wardrobe) {
     const pick = (list, id, dflt) => (list.some((x) => x.id === id) ? id : dflt);
     const out = {
         rev: Number.isFinite(l.rev) ? Math.max(1, Math.floor(l.rev)) : 1,
-        name: lookName(l.name) || d.name,
+        name: lookName(l.name) || d.name, body: pick(LOOK_BODIES, l.body, d.body),
         skin: pick(LOOK_SKINS, l.skin, d.skin), hair: pick(LOOK_HAIR_STYLES, l.hair, d.hair), hairColor: pick(LOOK_HAIR_COLORS, l.hairColor, d.hairColor),
         beard: pick(LOOK_BEARDS, l.beard, d.beard), build: pick(LOOK_BUILDS, l.build, d.build),
     };
+    if (out.body === "f")
+        out.beard = "none";
     ["top", "bottom", "extra"].forEach((slot) => {
         const p = l[slot] || {};
         let piece = lookPiece(slot, p.id, p.color, p.trim);
@@ -2725,6 +2760,8 @@ function lookSanitize(l, wardrobe) {
 }
 function lookSkinColor(look) { return (LOOK_SKINS.find((s) => s.id === look.skin) || LOOK_SKINS[2]).color; }
 function lookHairColor(look) { return (LOOK_HAIR_COLORS.find((s) => s.id === look.hairColor) || LOOK_HAIR_COLORS[2]).color; }
+function lookMatchesAvatar(look, av) { return !!look && look.body === av.body && look.skin === av.skin && look.hair === av.hair && look.hairColor === av.hairColor && look.beard === (av.body === "f" ? "none" : av.beard) && look.build === av.build && look.top.id === av.top[0] && look.top.color === av.top[1] && look.bottom.id === av.bottom[0] && look.bottom.color === av.bottom[1] && look.extra.id === "ext.none"; }
+function lookFem(look) { return !!look && look.body === "f"; }
 function lookBuildWidth(look) { return (LOOK_BUILDS.find((s) => s.id === look.build) || LOOK_BUILDS[1]).w; }
 function wardrobeReqLines(qs, item) {
     if (item.storyOnly)
@@ -2754,7 +2791,7 @@ function wardrobeApply(qs, a, opts) {
     };
     switch (a.type) {
         case "lookset": {
-            const lists = { skin: LOOK_SKINS, hair: LOOK_HAIR_STYLES, hairColor: LOOK_HAIR_COLORS, beard: LOOK_BEARDS, build: LOOK_BUILDS };
+            const lists = { skin: LOOK_SKINS, hair: LOOK_HAIR_STYLES, hairColor: LOOK_HAIR_COLORS, beard: LOOK_BEARDS, build: LOOK_BUILDS, body: LOOK_BODIES };
             if (a.field === "name") {
                 look.name = lookName(a.value) || "Captain";
                 return bump();
@@ -2762,6 +2799,18 @@ function wardrobeApply(qs, a, opts) {
             if (!lists[a.field] || !lists[a.field].some((x) => x.id === a.value))
                 return { ok: false, msg: "Not an option" };
             look[a.field] = a.value;
+            if (a.field === "body" && a.value === "f")
+                look.beard = "none"; // (a feminine frame has no facial hair options)
+            return bump();
+        }
+        case "lookpreset": { // a ready-made avatar: its body, face, hair and free outfit (it keeps the captain's name unless the name is still a default)
+            const av = lookAvatar(a.id);
+            if (!av)
+                return { ok: false, msg: "No such avatar" };
+            const keepName = look.name && look.name !== "Captain" && !LOOK_AVATARS.some((x) => x.first === look.name) ? look.name : av.first;
+            const nl = lookFromAvatar(av, W);
+            Object.keys(nl).forEach((k) => { look[k] = nl[k]; });
+            look.name = keepName;
             return bump();
         }
         case "wardrobeequip": {
@@ -2868,6 +2917,23 @@ function lookBuildKit(THREE, group, head, torso, legs, arms, mats) {
     H.tail.rotation.x = -0.5;
     H.tie = add(head, ball(0.034), k.hairMat, 0, 0.04, -0.155);
     H.bun = add(head, ball(0.062), k.hairMat, 0, 0.17, -0.07);
+    H.bobBack = add(head, box(0.29, 0.17, 0.06), k.hairMat, 0, -0.045, -0.125);
+    H.bobSides = [-1, 1].map((sx) => add(head, box(0.04, 0.17, 0.2), k.hairMat, sx * 0.15, -0.04, -0.03));
+    H.swoop = add(head, box(0.12, 0.028, 0.05), k.hairMat, 0.04, 0.072, 0.13);
+    H.swoop.rotation.z = -0.28;
+    H.braid = [[0, -0.12, -0.17, 0.045], [0, -0.19, -0.185, 0.04], [0, -0.26, -0.19, 0.036], [0, -0.32, -0.19, 0.03]].map((q) => add(head, ball(q[3]), k.hairMat, q[0], q[1], q[2]));
+    H.pig = [-1, 1].reduce((a, sx) => { const t = add(head, new THREE.CylinderGeometry(0.034, 0.016, 0.2, 5), k.hairMat, sx * 0.15, -0.07, -0.05); t.rotation.z = sx * 0.35; const tie = add(head, ball(0.03), k.hairMat, sx * 0.135, 0.025, -0.05); return a.concat([t, tie]); }, []);
+    H.waves = [[-0.15, -0.2, -0.04], [0.15, -0.2, -0.04], [-0.12, -0.3, -0.1], [0.12, -0.3, -0.1], [0, -0.3, -0.15]].map((q) => add(head, ball(0.055), k.hairMat, q[0], q[1], q[2]));
+    H.afro = add(head, ball(0.215), k.hairMat, 0, 0.075, -0.07);
+    H.afro.scale.set(1.02, 0.96, 0.9);
+    // the feminine frame: lashes, fuller lips, a bust and wider hips, and a skirt for the skirt bottoms (all hidden on the masculine frame)
+    k.lashMat = M(0x15110f);
+    k.lipMat = M(0xc0505a);
+    k.lashes = [-1, 1].map((sx) => add(head, box(0.056, 0.009, 0.012), k.lashMat, sx * 0.053, 0.036, 0.1385));
+    k.lips = add(head, box(0.05, 0.014, 0.011), k.lipMat, 0, -0.0585, 0.1445);
+    k.bust = [-1, 1].map((sx) => { const b = add(torso, ball(0.062), mats.shirtMat, sx * 0.066, 0.07, 0.148); b.scale.set(1, 0.95, 0.8); return b; });
+    k.hips = add(torso, new THREE.CylinderGeometry(0.208, 0.238, 0.12, 10), mats.pantsMat, 0, -0.27, 0);
+    k.skirt = add(torso, new THREE.CylinderGeometry(0.205, 0.31, 0.3, 12), mats.pantsMat, 0, -0.37, 0);
     // beards (same colour as the hair)
     const B = k.beardParts = {};
     B.stub = add(head, new THREE.SphereGeometry(0.153, 8, 5, 0, Math.PI, Math.PI * 0.6, Math.PI * 0.3), k.stubMat, 0, 0, 0);
@@ -2926,6 +2992,7 @@ function lookApply(pr, look) {
     if (!k || !look)
         return;
     const dim = (m, c, f) => { m.color.setHex(c); m.color.multiplyScalar(f); };
+    const on = (m, v) => { m.visible = !!v; }, onAll = (list, v) => list.forEach((m) => on(m, v));
     const topIt = wardrobeItem(look.top.id), botIt = wardrobeItem(look.bottom.id), extIt = wardrobeItem(look.extra.id);
     const ts = (topIt && topIt.shape) || {}, bs = (botIt && botIt.shape) || {}, es = (extIt && extIt.shape) || {};
     const skin = lookSkinColor(look), hair = lookHairColor(look), w = lookBuildWidth(look), trim = look.top.trim !== undefined ? look.top.trim : look.top.color;
@@ -2949,22 +3016,42 @@ function lookApply(pr, look) {
     k.trimMat.color.setHex(trim);
     k.extraMat.color.setHex(look.extra.color);
     dim(k.creaseMat, look.bottom.color, 1.25);
-    // build
-    pr.torso.scale.set(w, 1, w);
-    pr.legs.forEach((l) => l.scale.set(w, 1, w));
+    // build and frame
+    const fem = lookFem(look);
+    pr.torso.scale.set(w * (fem ? 0.9 : 1), 1, w * (fem ? 0.93 : 1));
+    pr.legs.forEach((l) => l.scale.set(w * (fem ? 0.93 : 1), 1, w * (fem ? 0.93 : 1)));
+    onAll(k.lashes, fem);
+    on(k.lips, fem);
+    onAll(k.bust, fem);
+    on(k.hips, fem && !bs.skirt);
+    on(k.skirt, !!bs.skirt);
+    if (fem) {
+        const mx = (sh) => Math.round(((skin >> sh) & 255) * 0.38 + ((0xc0505a >> sh) & 255) * 0.62);
+        k.lipMat.color.setHex((mx(16) << 16) | (mx(8) << 8) | mx(0));
+        k.brows.forEach((b) => b.scale.set(0.9, 0.6, 1));
+    }
+    k.mouth.scale.set(fem ? 1.1 : 1, fem ? 1.4 : 1, 1);
     // hair
-    const H = k.hairParts, hs = look.hair, on = (m, v) => { m.visible = !!v; }, onAll = (list, v) => list.forEach((m) => on(m, v));
+    const H = k.hairParts, hs = look.hair;
+    const longish = hs === "long" || hs === "wavy";
     on(H.dome, hs !== "bald");
-    H.dome.scale.setScalar(hs === "buzz" ? 0.97 : hs === "curly" ? 1.04 : 1);
-    on(H.fringe, hs === "short");
-    onAll(H.sides, hs !== "bald");
-    on(H.nape, hs !== "bald" && hs !== "long");
-    on(H.back, hs === "long");
-    onAll(H.backSides, hs === "long");
+    H.dome.scale.setScalar(hs === "buzz" ? 0.97 : hs === "curly" ? 1.04 : hs === "afro" ? 1.02 : 1);
+    on(H.fringe, hs === "short" || hs === "bob" || hs === "pigtails");
+    on(H.swoop, hs === "pixie");
+    onAll(H.sides, hs !== "bald" && hs !== "afro");
+    on(H.nape, hs !== "bald" && !longish && hs !== "bob" && hs !== "afro");
+    on(H.back, longish);
+    onAll(H.backSides, longish);
     onAll(H.curls, hs === "curly");
     on(H.tail, hs === "ponytail");
     on(H.tie, hs === "ponytail");
     on(H.bun, hs === "bun");
+    on(H.bobBack, hs === "bob");
+    onAll(H.bobSides, hs === "bob");
+    onAll(H.braid, hs === "braid");
+    onAll(H.pig, hs === "pigtails");
+    onAll(H.waves, hs === "wavy");
+    on(H.afro, hs === "afro");
     // beard
     const B = k.beardParts, bd = look.beard;
     on(B.stub, bd === "stubble");
@@ -3027,7 +3114,7 @@ function npcLook(def, i) {
     const tops = ["top.tee", "top.polo", "top.hoodie", "top.flannel", "top.fishing"], bots = ["bot.jeans", "bot.dock", "bot.shorts", "bot.jeans"];
     const topId = pick(tops, 1), botId = pick(bots, 2), bot = wardrobeItem(botId);
     return Object.assign(d, {
-        skin: pick(LOOK_SKINS, 0).id, hair: pick(LOOK_HAIR_STYLES, 1).id, hairColor: pick(LOOK_HAIR_COLORS.slice(0, 9), 2).id, beard: i % 3 === 0 ? pick(LOOK_BEARDS, 3).id : "none", build: pick(LOOK_BUILDS, 4).id,
+        body: i % 2 === 1 ? "f" : "m", skin: pick(LOOK_SKINS, 0).id, hair: pick(LOOK_HAIR_STYLES, 1).id, hairColor: pick(LOOK_HAIR_COLORS.slice(0, 9), 2).id, beard: i % 2 === 0 && i % 3 === 0 ? pick(LOOK_BEARDS, 3).id : "none", build: pick(LOOK_BUILDS, 4).id,
         top: { id: topId, color: def.shirt, trim: wardrobeItem(topId).trim }, bottom: { id: botId, color: bot.color }, extra: { id: "ext.none", color: 0xf2f0e6 },
     });
 }
@@ -4931,18 +5018,37 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const pb = new THREE.Vector3(dockX + dockHalfW * 0.75, groundY + 1.0, pz);
             scene.add(cylinderBetween(pa, pb, 0.06, dockPilingMat));
         }
-        // Railings along both sides of the walkway.
-        [-dockHalfW, dockHalfW].forEach((side) => {
-            const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, dockLength, 5), dockRailMat);
-            rail.rotation.x = Math.PI / 2;
-            rail.position.set(dockX + side, dockDeckY + 0.85, dockStartZ + dockLength / 2);
-            scene.add(rail);
-            for (let i = 0; i <= 10; i++) {
-                const pz = dockStartZ + (i / 10) * dockLength;
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 5), dockRailMat);
-                post.position.set(dockX + side, dockDeckY + 0.425, pz);
-                scene.add(post);
-            }
+        // Railings along both sides of the walkway: a top and a mid rail in runs that stop at each finger dock, so the way onto a finger is open.
+        const dockFingerZs = [dockStartZ + 10, dockStartZ + 22]; // (the same spots the finger docks are built at below)
+        const dockRailRuns = (() => {
+            const runs = [];
+            let z0 = dockStartZ + 0.1;
+            dockFingerZs.forEach((fz) => { runs.push([z0, fz - 1.0]); z0 = fz + 1.0; });
+            runs.push([z0, dockStartZ + dockLength - 0.1]);
+            return runs;
+        })();
+        const dockRailPostMat = new THREE.MeshPhongMaterial({ color: 0x4f402b, flatShading: true });
+        [-dockHalfW + 0.05, dockHalfW - 0.05].forEach((side) => {
+            dockRailRuns.forEach(([za, zb]) => {
+                const len = zb - za;
+                [0.9, 0.5].forEach((hy, ri) => {
+                    const rail = new THREE.Mesh(new THREE.CylinderGeometry(ri ? 0.035 : 0.05, ri ? 0.035 : 0.05, len, 5), dockRailMat);
+                    rail.rotation.x = Math.PI / 2;
+                    rail.position.set(dockX + side, dockDeckY + hy, (za + zb) / 2);
+                    scene.add(rail);
+                });
+                const n = Math.max(1, Math.round(len / 2.6));
+                for (let i = 0; i <= n; i++) {
+                    const pz = za + (i / n) * len;
+                    const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1.0, 0.11), dockRailPostMat);
+                    post.position.set(dockX + side, dockDeckY + 0.5, pz);
+                    scene.add(post);
+                }
+                // a low toe board along the edge keeps feet and gear on the deck
+                const toe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, len), dockRailPostMat);
+                toe.position.set(dockX + side, dockDeckY + 0.19, (za + zb) / 2);
+                scene.add(toe);
+            });
         });
         // Covered platform at the end — a small roofed gazebo, wider than the
         // walkway, giving the dock a real destination instead of just ending abruptly.
@@ -4956,8 +5062,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, postHeight, 6), dockPilingMat);
             post.position.set(dockX + px, gazeboGroundY + postHeight / 2, gazeboZ + pz);
             scene.add(post);
-            const roofPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 5), dockRailMat);
-            roofPost.position.set(dockX + px, dockDeckY + 1.2, gazeboZ + pz);
+            const roofPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.1, 6), dockRailPostMat);
+            roofPost.position.set(dockX + px, dockDeckY + 1.05, gazeboZ + pz);
             scene.add(roofPost);
         });
         const roofMat = new THREE.MeshPhongMaterial({ color: 0x7a4530, flatShading: true });
@@ -4965,6 +5071,39 @@ function DeepWaterPrototype({ onExit, newLook }) {
         roof.position.set(dockX, dockDeckY + 2.5, gazeboZ);
         roof.rotation.y = Math.PI / 4;
         scene.add(roof);
+        const gazeboWalkCircles = [];
+        {
+            // the gazebo finished: a beam frame under the roof, side rails with an open entry and a gap at the seaward end, benches, a lantern and a burgee
+            const gz = (x, y, z, w, h, d, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, gazeboZ + z); scene.add(b); return b; };
+            [-1.8, 1.8].forEach((c) => { gz(c, 2.0, 0, 0.14, 0.14, 3.7, dockRailPostMat); gz(0, 2.0, c, 3.7, 0.14, 0.14, dockRailPostMat); });
+            [-1.8, 1.8].forEach((x) => {
+                [0.9, 0.5].forEach((hy) => gz(x, hy, 0.5, 0.06, 0.06, 2.6, dockRailMat));
+                [-0.8, 0.2, 1.2, 1.8].forEach((z) => gz(x, 0.5, z, 0.1, 1.0, 0.1, dockRailPostMat));
+            });
+            [[-1.3, -0.9], [0.9, 1.3]].forEach(([xa, xb]) => {
+                [0.9, 0.5].forEach((hy) => gz((xa + xb) / 2 + (xa < 0 ? -0.25 : 0.25), hy, 1.8, 1.1, 0.06, 0.06, dockRailMat));
+            });
+            [-1.5, -0.8, 0.8, 1.5].forEach((x) => gz(x, 0.5, 1.8, 0.1, 1.0, 0.1, dockRailPostMat));
+            const benchM = new THREE.MeshPhongMaterial({ color: 0x9a7c56, flatShading: true });
+            [-1.45, 1.45].forEach((x) => {
+                gz(x, 0.45, 0.6, 0.42, 0.07, 1.7, benchM);
+                gz(x, 0.22, 1.3, 0.34, 0.4, 0.08, dockRailPostMat);
+                gz(x, 0.22, -0.1, 0.34, 0.4, 0.08, dockRailPostMat);
+                gazeboWalkCircles.push([dockX + x, gazeboZ + 0.2, 0.3], [dockX + x, gazeboZ + 1.0, 0.3]); // (handed to WALK_CIRCLES further down, once that exists)
+            });
+            const lanternGlow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
+            gz(0, 1.75, 0, 0.03, 0.4, 0.03, dockRailPostMat);
+            gz(0, 1.45, 0, 0.26, 0.3, 0.26, lanternGlow);
+            const finial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), dockRailPostMat);
+            finial.position.set(dockX, dockDeckY + 3.5, gazeboZ);
+            scene.add(finial);
+            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.0, 5), dockRailPostMat);
+            mast.position.set(dockX, dockDeckY + 3.95, gazeboZ);
+            scene.add(mast);
+            const burgee = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.4), new THREE.MeshPhongMaterial({ color: 0x2f6f78, side: THREE.DoubleSide }));
+            burgee.position.set(dockX + 0.37, dockDeckY + 4.25, gazeboZ);
+            scene.add(burgee);
+        }
         // ---------- Small town on the sandy key — houses and a bait shop.
         // Placement height comes from the key's actual dome surface function
         // (verified numerically first), not a guessed flat value, so buildings
@@ -5143,6 +5282,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // ---------- Marina expansion — finger docks creating real boat slips,
         // with small decorative boats tied up, turning the bare dock into an
         // actual working marina.
+        const dockIronMat = new THREE.MeshPhongMaterial({ color: 0x2f3236, flatShading: true });
         function buildFingerDock(startPoint, dirX, length) {
             const group = new THREE.Group();
             const deck = new THREE.Mesh(woodBox(length, 0.22, 1.4, "dock"), dockMat);
@@ -5154,11 +5294,22 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, pilingHeight, 6), dockPilingMat);
             piling.position.set(dirX * length * 0.85, -(dockDeckY - endGround - pilingHeight / 2), 0);
             group.add(piling);
+            [-0.5, 0.5].forEach((oz) => {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 6), dockRailPostMat);
+                post.position.set(dirX * (length - 0.2), 0.4, oz);
+                group.add(post);
+                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.07, 6), dockIronMat);
+                cap.position.set(dirX * (length - 0.2), 0.78, oz);
+                group.add(cap);
+            });
+            const bump = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 1.0), dockIronMat); // a rubber bumper across the tip
+            bump.position.set(dirX * (length + 0.04), -0.05, 0);
+            group.add(bump);
             group.position.copy(startPoint);
             group.position.y = dockDeckY;
             return group;
         }
-        const fingerZs = [dockStartZ + 10, dockStartZ + 22];
+        const fingerZs = dockFingerZs;
         fingerZs.forEach((fz) => {
             [-1, 1].forEach((dir) => {
                 const startPoint = new THREE.Vector3(dockX + dir * dockHalfW, 0, fz);
@@ -6207,6 +6358,88 @@ function DeepWaterPrototype({ onExit, newLook }) {
             sp2.position.set(keyCenter.x + 17.5, gh2 === null ? 2 : gh2, keyCenter.z - 2.8);
             scene.add(sp2);
             WALK_CIRCLES.push([keyCenter.x + 17.5, keyCenter.z - 2.8, 0.3]);
+        }
+        // ---- the dock dressed: an entrance gate with the marina's name, lamps, cleats, fenders, life rings, crates and rope
+        {
+            const D = (w, h, d, m, x, y, z, ry) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, dockStartZ + z); if (ry)
+                b.rotation.y = ry; scene.add(b); return b; };
+            gazeboWalkCircles.forEach((c) => WALK_CIRCLES.push(c));
+            const iron = dockIronMat, wood = dockRailPostMat, glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
+            // the gate: two stout posts, a cross beam, and a painted board hung under it (readable from the street and from the water)
+            [-1.9, 1.9].forEach((x) => {
+                const gh = Math.min(keyShoreHeightAt(dockX + x, dockStartZ + 0.7), dockDeckY - 0.2), top = dockDeckY + 3.2;
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, top - gh, 7), wood);
+                post.position.set(dockX + x, (top + gh) / 2, dockStartZ + 0.7);
+                scene.add(post);
+                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 7), iron);
+                cap.position.set(dockX + x, top + 0.04, dockStartZ + 0.7);
+                scene.add(cap);
+                WALK_CIRCLES.push([dockX + x, dockStartZ + 0.7, 0.28]);
+            });
+            D(4.3, 0.2, 0.2, wood, 0, 3.05, 0.7);
+            D(3.0, 0.7, 0.08, wood, 0, 2.55, 0.7); // backing board
+            const boardTex = makeBoardTex(768, 224, (c, w, h) => {
+                c.fillStyle = "#1f5a64";
+                c.fillRect(0, 0, w, h);
+                c.strokeStyle = "#f4ecd6";
+                c.lineWidth = 8;
+                c.strokeRect(8, 8, w - 16, h - 16);
+                c.fillStyle = "#f6efdb";
+                c.textAlign = "center";
+                c.textBaseline = "middle";
+                c.font = "bold 78px system-ui, sans-serif";
+                c.fillText("HALYARD POINT", w / 2, h * 0.38);
+                c.font = "600 52px system-ui, sans-serif";
+                c.fillText("MARINA", w / 2, h * 0.74);
+            });
+            [[0.08, 0], [-0.08, Math.PI]].forEach(([dz, ry]) => { const bp = signPlane(2.9, 0.62, boardTex, 0x1f5a64); bp.position.set(dockX, dockDeckY + 2.55, dockStartZ + 0.7 + dz); bp.rotation.y = ry; scene.add(bp); });
+            [-1.0, 1.0].forEach((x) => D(0.05, 0.3, 0.05, iron, x, 2.85, 0.7));
+            // lamps on the rail line: a pole, an arm and a glowing lantern, clear of the finger docks
+            [4, 16, 28].forEach((lz) => [-1, 1].forEach((sd) => {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.5, 6), iron);
+                pole.position.set(dockX + sd * (dockHalfW - 0.05), dockDeckY + 1.25, dockStartZ + lz);
+                scene.add(pole);
+                D(0.5, 0.06, 0.06, iron, sd * (dockHalfW - 0.3), 2.45, lz);
+                D(0.26, 0.3, 0.26, glow, sd * (dockHalfW - 0.5), 2.3, lz);
+                D(0.34, 0.06, 0.34, iron, sd * (dockHalfW - 0.5), 2.5, lz);
+            }));
+            // deck cleats and rubber fenders hung over the edge, between the finger docks
+            [3, 6.5, 13.5, 16.5, 19, 25, 28.5, 32].forEach((cz) => [-1, 1].forEach((sd) => {
+                const cx = sd * (dockHalfW - 0.28);
+                D(0.14, 0.05, 0.34, iron, cx, 0.15, cz);
+                D(0.1, 0.1, 0.07, iron, cx, 0.22, cz - 0.1);
+                D(0.1, 0.1, 0.07, iron, cx, 0.22, cz + 0.1);
+                if (cz !== 3 && cz !== 32)
+                    D(0.1, 0.34, 0.34, new THREE.MeshPhongMaterial({ color: 0x1c1f22, flatShading: true }), sd * (dockHalfW + 0.07), -0.12, cz);
+            }));
+            // life rings on the rail
+            [[-1, 8.2], [1, 19.8], [-1, 30]].forEach(([sd, lz]) => {
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), new THREE.MeshPhongMaterial({ color: 0xd8532e, flatShading: true }));
+                ring.rotation.y = Math.PI / 2;
+                ring.position.set(dockX + sd * (dockHalfW - 0.16), dockDeckY + 0.78, dockStartZ + lz);
+                scene.add(ring);
+                const hook = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.06), iron);
+                hook.position.set(dockX + sd * (dockHalfW - 0.1), dockDeckY + 1.03, dockStartZ + lz);
+                scene.add(hook);
+            });
+            // a crate stack and a barrel by the gate, a coil of rope opposite, and a bait bucket
+            const crateM = new THREE.MeshPhongMaterial({ color: 0xa88a5c, flatShading: true }), crateD = new THREE.MeshPhongMaterial({ color: 0x7a6040, flatShading: true });
+            D(0.7, 0.5, 0.55, crateM, 0.85, 0.37, 2.2, 0.15);
+            D(0.6, 0.45, 0.5, crateD, 0.9, 0.84, 2.25, -0.2);
+            D(0.55, 0.4, 0.45, crateM, 0.9, 0.35, 3.15, 0.3);
+            WALK_CIRCLES.push([dockX + 0.85, dockStartZ + 2.2, 0.4], [dockX + 0.9, dockStartZ + 3.15, 0.35]);
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 0.7, 10), new THREE.MeshPhongMaterial({ color: 0x3a5f78, flatShading: true }));
+            barrel.position.set(dockX - 0.9, dockDeckY + 0.47, dockStartZ + 2.3);
+            scene.add(barrel);
+            [0.2, 0.6].forEach((y) => { const band = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.265, 0.05, 10), iron); band.position.set(dockX - 0.9, dockDeckY + 0.12 + y, dockStartZ + 2.3); scene.add(band); });
+            WALK_CIRCLES.push([dockX - 0.9, dockStartZ + 2.3, 0.32]);
+            const coil = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 6, 14), new THREE.MeshPhongMaterial({ color: 0xc8a878, flatShading: true }));
+            coil.rotation.x = Math.PI / 2;
+            coil.position.set(dockX - 0.85, dockDeckY + 0.2, dockStartZ + 3.4);
+            scene.add(coil);
+            const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.32, 8), new THREE.MeshPhongMaterial({ color: 0xe0b83a, flatShading: true }));
+            bucket.position.set(dockX - 0.95, dockDeckY + 0.29, dockStartZ + 4.3);
+            scene.add(bucket);
         }
         // ---- the marina store: a proper storefront on the quay, with a painted sign, an awning, a bait tank and a fuel pump
         const STORE = { cx: -12.5, cz: 20.6, w: 10, d: 6.2, h: 3.6 };
@@ -13203,9 +13436,9 @@ function CharacterPreview({ look, gear, height }) {
     const skinC = hexCss(skin), hairC = hexCss(hair), topC = hexCss(look.top.color), botC = hexCss(look.bottom.color), extC = hexCss(look.extra.color);
     const trimC = hexCss(look.top.trim !== undefined ? look.top.trim : look.top.color);
     const dark = shadeCss(look.top.color, 0.8);
-    const sw = 36 * w, hemW = 32 * w + (ts.hem ? 6 : 0), top = 88, hem = ts.hem ? 190 : 172, cx = 100;
+    const fem = lookFem(look), sw = 36 * w * (fem ? 0.88 : 1), hemW = 32 * w * (fem ? 1.06 : 1) + (ts.hem ? 6 : 0), top = 88, hem = ts.hem ? 190 : 172, cx = 100;
     const sleeve = ts.sleeves || "none", armC = sleeve === "long" ? topC : skinC;
-    const len = bs.length === undefined ? 1 : bs.length, legY = 168, legH = 96, legW = 24 * w, legGap = 2;
+    const len = bs.length === undefined ? 1 : bs.length, legY = 168, legH = 96, legW = 24 * w * (fem ? 0.95 : 1), legGap = 2;
     const parts = [];
     const hs = look.hair, bd = look.beard;
     // hair behind the head
@@ -13213,6 +13446,21 @@ function CharacterPreview({ look, gear, height }) {
         parts.push(React.createElement("path", { key: "hl", d: "M" + (cx - 31) + " 50 Q" + (cx - 36) + " 110 " + (cx - 28) + " 118 L" + (cx + 28) + " 118 Q" + (cx + 36) + " 110 " + (cx + 31) + " 50 Z", fill: hairC }));
     if (hs === "ponytail")
         parts.push(React.createElement("path", { key: "hp", d: "M" + (cx + 22) + " 38 Q" + (cx + 52) + " 52 " + (cx + 40) + " 96 Q" + (cx + 30) + " 66 " + (cx + 20) + " 52 Z", fill: hairC }));
+    if (hs === "bob")
+        parts.push(React.createElement("path", { key: "hbob", d: "M" + (cx - 31) + " 50 Q" + (cx - 37) + " 86 " + (cx - 28) + " 97 L" + (cx + 28) + " 97 Q" + (cx + 37) + " 86 " + (cx + 31) + " 50 Z", fill: hairC }));
+    if (hs === "wavy") {
+        parts.push(React.createElement("path", { key: "hwv", d: "M" + (cx - 31) + " 50 Q" + (cx - 38) + " 110 " + (cx - 30) + " 124 L" + (cx + 30) + " 124 Q" + (cx + 38) + " 110 " + (cx + 31) + " 50 Z", fill: hairC }));
+        [-1, 1].forEach((sd) => [92, 108, 122].forEach((y, i) => parts.push(React.createElement("circle", { key: "wv" + sd + i, cx: cx + sd * (33 + (i % 2) * 2), cy: y, r: "6", fill: hairC }))));
+    }
+    if (hs === "braid") {
+        parts.push(React.createElement("path", { key: "hbr", d: "M" + (cx - 30) + " 50 Q" + (cx - 34) + " 80 " + (cx - 26) + " 88 L" + (cx + 26) + " 88 Q" + (cx + 34) + " 80 " + (cx + 30) + " 50 Z", fill: hairC }));
+        for (let i = 0; i < 7; i++)
+            parts.push(React.createElement("ellipse", { key: "br" + i, cx: cx + 31 + Math.sin(i * 1.3) * 1.5, cy: 74 + i * 13, rx: 6 - i * 0.4, ry: "7", fill: i % 2 ? hairC : shadeCss(hair, 0.8) }));
+    }
+    if (hs === "pigtails")
+        [-1, 1].forEach((sd) => parts.push(React.createElement("path", { key: "pg" + sd, d: "M" + (cx + sd * 26) + " 44 Q" + (cx + sd * 50) + " 56 " + (cx + sd * 42) + " 96 Q" + (cx + sd * 34) + " 70 " + (cx + sd * 24) + " 56 Z", fill: hairC })));
+    if (hs === "afro")
+        parts.push(React.createElement("circle", { key: "haf", cx: cx, cy: "40", r: "37", fill: hairC }));
     if (ts.hood)
         parts.push(React.createElement("ellipse", { key: "hd", cx: cx, cy: top + 2, rx: 30 * w, ry: "12", fill: dark }));
     return (React.createElement("svg", { viewBox: "0 0 200 290", style: { height: height || 260, width: "auto", display: "block", margin: "0 auto" }, role: "img", "aria-label": "Your captain" },
@@ -13229,6 +13477,10 @@ function CharacterPreview({ look, gear, height }) {
                     React.createElement("rect", { x: x - 3, y: legY + legH - 6, width: legW + 6, height: "8", rx: "3", fill: shadeCss(boot.color, 0.7) })) : React.createElement("rect", { x: x - 1, y: legY + legH - 5, width: legW + 2, height: "8", rx: "3", fill: shadeCss(skin, 0.85) })));
         }),
         React.createElement("path", { d: "M" + (cx - sw) + " " + top + " Q" + cx + " " + (top - 8) + " " + (cx + sw) + " " + top + " L" + (cx + hemW) + " " + hem + " L" + (cx - hemW) + " " + hem + " Z", fill: topC }),
+        bs.skirt && React.createElement("path", { d: "M" + (cx - hemW - 1) + " " + (hem - 6) + " L" + (cx + hemW + 1) + " " + (hem - 6) + " L" + (cx + legW * 2 + 16) + " " + (legY + legH * len) + " L" + (cx - legW * 2 - 16) + " " + (legY + legH * len) + " Z", fill: botC }),
+        bs.skirt && React.createElement("path", { d: "M" + (cx - legW * 2 - 16) + " " + (legY + legH * len - 5) + " L" + (cx + legW * 2 + 16) + " " + (legY + legH * len - 5) + " L" + (cx + legW * 2 + 16) + " " + (legY + legH * len) + " L" + (cx - legW * 2 - 16) + " " + (legY + legH * len) + " Z", fill: shadeCss(look.bottom.color, 0.8) }),
+        ts.halter && [-1, 1].map((sd) => React.createElement("path", { key: "hl" + sd, d: "M" + (cx + sd * (sw - 1)) + " " + (top + 1) + " L" + (cx + sd * 15) + " " + (top + 2) + " L" + (cx + sd * 15) + " " + (top + 30) + " L" + (cx + sd * (sw - 1)) + " " + (top + 24) + " Z", fill: skinC })),
+        fem && React.createElement("path", { d: "M" + (cx - hemW) + " " + (hem - 16) + " Q" + (cx - hemW - 4) + " " + hem + " " + (cx - hemW + 2) + " " + hem + " L" + (cx + hemW - 2) + " " + hem + " Q" + (cx + hemW + 4) + " " + hem + " " + (cx + hemW) + " " + (hem - 16) + " Z", fill: bs.skirt ? "none" : botC }),
         ts.hem && React.createElement("rect", { x: cx - hemW, y: hem - 6, width: hemW * 2, height: "6", fill: dark }),
         (ts.bands || []).map((f, i) => React.createElement("rect", { key: "b" + i, x: cx - sw + (sw - 32 * w) * f - 0.5, y: top + (172 - top) * f - 3, width: (sw + (32 * w - sw) * f) * 2 + 1, height: "6", fill: trimC })),
         ts.pocket && React.createElement("rect", { x: cx - 22, y: top + 52, width: "44", height: "18", rx: "2", fill: shadeCss(look.top.color, 0.82) }),
@@ -13270,9 +13522,10 @@ function CharacterPreview({ look, gear, height }) {
         React.createElement("circle", { cx: cx - 10, cy: "55", r: "3", fill: "#15181b" }),
         React.createElement("circle", { cx: cx + 10, cy: "55", r: "3", fill: "#15181b" }),
         React.createElement("rect", { x: cx - 1.5, y: "58", width: "3", height: "9", rx: "1.5", fill: shadeCss(skin, 0.86) }),
-        React.createElement("rect", { x: cx - 6, y: "72", width: "12", height: "2.4", rx: "1.2", fill: shadeCss(skin, 0.62) }),
-        hs !== "bald" && React.createElement("path", { d: hs === "buzz" ? "M" + (cx - 25) + " 50 Q" + (cx - 24) + " 30 " + cx + " 29 Q" + (cx + 24) + " 30 " + (cx + 25) + " 50 Q" + cx + " 40 " + (cx - 25) + " 50 Z" : "M" + (cx - 28) + " 56 Q" + (cx - 30) + " 24 " + cx + " 24 Q" + (cx + 30) + " 24 " + (cx + 28) + " 56 L" + (cx + 22) + " 44 Q" + cx + " 36 " + (cx - 22) + " 44 Z", fill: hairC }),
-        hs === "short" && React.createElement("path", { d: "M" + (cx - 24) + " 42 Q" + cx + " 30 " + (cx + 24) + " 42 L" + (cx + 24) + " 38 Q" + cx + " 26 " + (cx - 24) + " 38 Z", fill: hairC }),
+        React.createElement("rect", { x: cx - 6, y: "72", width: "12", height: fem ? 3.2 : 2.4, rx: "1.4", fill: fem ? "#b5505a" : shadeCss(skin, 0.62) }),
+        fem && [-1, 1].map((sd) => React.createElement("path", { key: "ls" + sd, d: "M" + (cx + sd * 12.5) + " 53.6 l" + sd * 3.2 + " -2.6", stroke: "#15110f", strokeWidth: "1.6", strokeLinecap: "round" })),
+        hs !== "bald" && React.createElement("path", { d: hs === "buzz" || hs === "afro" ? "M" + (cx - 25) + " 50 Q" + (cx - 24) + " 30 " + cx + " 29 Q" + (cx + 24) + " 30 " + (cx + 25) + " 50 Q" + cx + " 40 " + (cx - 25) + " 50 Z" : "M" + (cx - 28) + " 56 Q" + (cx - 30) + " 24 " + cx + " 24 Q" + (cx + 30) + " 24 " + (cx + 28) + " 56 L" + (cx + 22) + " 44 Q" + cx + " 36 " + (cx - 22) + " 44 Z", fill: hairC }),
+        (hs === "short" || hs === "pixie" || hs === "bob" || hs === "pigtails") && React.createElement("path", { d: "M" + (cx - 24) + " 42 Q" + cx + " 30 " + (cx + 24) + " 42 L" + (cx + 24) + " 38 Q" + cx + " 26 " + (cx - 24) + " 38 Z", fill: hairC }),
         hs === "curly" && [[-18, 28], [-6, 22], [8, 22], [20, 29], [-26, 42], [26, 42], [0, 30]].map((p, i) => React.createElement("circle", { key: "c" + i, cx: cx + p[0], cy: p[1], r: "10", fill: hairC })),
         hs === "bun" && React.createElement("circle", { cx: cx, cy: "16", r: "12", fill: hairC }),
         bd !== "none" && bd !== "mustache" && React.createElement("path", { d: bd === "goatee" ? "M" + (cx - 7) + " 76 Q" + cx + " 96 " + (cx + 7) + " 76 Z" : "M" + (cx - 26) + " 60 Q" + (cx - 24) + " " + (bd === "full" ? 92 : 82) + " " + cx + " " + (bd === "full" ? 92 : 84) + " Q" + (cx + 24) + " " + (bd === "full" ? 92 : 82) + " " + (cx + 26) + " 60 Q" + (cx + 18) + " 70 " + cx + " 70 Q" + (cx - 18) + " 70 " + (cx - 26) + " 60 Z", fill: hairC, opacity: bd === "stubble" ? 0.4 : 1 }),
@@ -13295,8 +13548,8 @@ function CharacterPreview({ look, gear, height }) {
             React.createElement("rect", { x: cx - 28, y: "32", width: "56", height: "6", fill: "#d9b84a" }),
             React.createElement("rect", { x: cx - 20, y: "38", width: "40", height: "5", rx: "2", fill: "#15181b" }))));
 }
-function WardrobePanel({ qs, send, canBuy, compact }) {
-    const [tab, setTab] = useState("look");
+function WardrobePanel({ qs, send, canBuy, compact, startTab }) {
+    const [tab, setTab] = useState(startTab || "look");
     const [name, setName] = useState(qs.look.name);
     useEffect(() => { setName(qs.look.name); }, [qs.look.name]);
     const small = (color) => ({ fontSize: 12, padding: "5px 11px", borderRadius: 5, cursor: "pointer", border: "1px solid " + color, background: "rgba(255,255,255,0.06)", color });
@@ -13304,7 +13557,7 @@ function WardrobePanel({ qs, send, canBuy, compact }) {
     const swatches = (list, current, onPick, getColor) => (React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, list.map((o) => { const c = getColor(o), on = current === o.id || current === c; return React.createElement("button", { key: o.id, title: o.name, "aria-label": o.name, "aria-pressed": on, onClick: () => onPick(o), style: { width: 26, height: 26, borderRadius: 13, cursor: "pointer", border: on ? "2px solid #ffb84d" : "1px solid rgba(255,255,255,0.35)", background: hexCss(c), padding: 0, boxShadow: on ? "0 0 0 2px rgba(255,184,77,0.35)" : "none" } }); })));
     const label = (t) => React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.3, textTransform: "uppercase", opacity: 0.55, margin: "12px 0 6px" } }, t);
     const set = (field, value) => send({ type: "lookset", field, value });
-    const tabs = [{ id: "look", name: "Look" }, ...WARDROBE_SLOTS, { id: "sets", name: "Sets" }];
+    const tabs = [{ id: "avatars", name: "Avatars" }, { id: "look", name: "Look" }, ...WARDROBE_SLOTS, { id: "sets", name: "Sets" }];
     const owned = qs.wardrobe.owned;
     const pieceCard = (it) => {
         const worn = qs.look[it.slot].id === it.id, has = !!owned[it.id], unlocked = wardrobeUnlocked(qs, it), cost = wardrobePrice(qs, it), lines = wardrobeReqLines(qs, it).filter((l) => !l.met);
@@ -13347,19 +13600,31 @@ function WardrobePanel({ qs, send, canBuy, compact }) {
             React.createElement("div", { style: { borderRadius: 12, overflow: "hidden", border: "2px solid " + STORY_ACCENT.you, marginBottom: compact ? 4 : 8 } },
                 React.createElement(Portrait, { spec: storyPortraitSpec("you", qs), mood: "happy", size: compact ? 92 : 120 }))),
         React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 } }, tabs.map((t) => React.createElement("button", { key: t.id, onClick: () => setTab(t.id), "aria-pressed": tab === t.id, style: chip(tab === t.id) }, t.name))),
+        tab === "avatars" && (React.createElement("div", null,
+            label("Pick a look to start from, then change anything you like"),
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 } }, LOOK_AVATARS.map((av) => {
+                const on = lookMatchesAvatar(qs.look, av), lk = { ...lookFromAvatar(av), rev: 1, name: av.first };
+                return (React.createElement("button", { key: av.id, "aria-pressed": on, "aria-label": "Avatar: " + av.first, onClick: () => send({ type: "lookpreset", id: av.id }), style: { appearance: "none", textAlign: "center", cursor: "pointer", padding: 4, borderRadius: 10, border: "2px solid " + (on ? "#ffb84d" : "rgba(255,255,255,0.14)"), background: on ? "rgba(255,184,77,0.14)" : "rgba(255,255,255,0.04)", color: "inherit", font: "inherit" } },
+                    React.createElement("div", { style: { borderRadius: 7, overflow: "hidden", lineHeight: 0 } },
+                        React.createElement(Portrait, { spec: { id: "you", look: lk, gear: { hat: null, glasses: null, gloves: null, boots: null }, name: av.first, age: 0, brow: "med" }, mood: "neutral", size: compact ? 76 : 88, lite: true })),
+                    React.createElement("div", { style: { fontSize: 12, fontWeight: 700, marginTop: 4 } }, av.first),
+                    React.createElement("div", { style: { fontSize: 10, opacity: 0.6, lineHeight: 1.25 } }, av.tag)));
+            })))),
         tab === "look" && (React.createElement("div", null,
             label("Captain's name"),
             React.createElement("input", { id: "captain-name", value: name, maxLength: 14, onChange: (e) => setName(e.target.value), onBlur: () => { if (lookName(name) !== qs.look.name)
                     set("name", name); }, onKeyDown: (e) => { if (e.key === "Enter")
                     e.currentTarget.blur(); }, style: { fontSize: 14, padding: "7px 10px", borderRadius: 5, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.07)", color: "#eaf3f5", width: "min(240px, 100%)", boxSizing: "border-box" } }),
+            label("Body"),
+            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, LOOK_BODIES.map((o) => React.createElement("button", { key: o.id, "aria-pressed": qs.look.body === o.id, onClick: () => set("body", o.id), style: chip(qs.look.body === o.id) }, o.name))),
             label("Skin"),
             swatches(LOOK_SKINS, qs.look.skin, (o) => set("skin", o.id), (o) => o.color),
             label("Hair"),
             React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, LOOK_HAIR_STYLES.map((o) => React.createElement("button", { key: o.id, "aria-pressed": qs.look.hair === o.id, onClick: () => set("hair", o.id), style: chip(qs.look.hair === o.id) }, o.name))),
             label("Hair colour"),
             swatches(LOOK_HAIR_COLORS, qs.look.hairColor, (o) => set("hairColor", o.id), (o) => o.color),
-            label("Facial hair"),
-            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, LOOK_BEARDS.map((o) => React.createElement("button", { key: o.id, "aria-pressed": qs.look.beard === o.id, onClick: () => set("beard", o.id), style: chip(qs.look.beard === o.id) }, o.name))),
+            qs.look.body !== "f" && label("Facial hair"),
+            qs.look.body !== "f" && React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, LOOK_BEARDS.map((o) => React.createElement("button", { key: o.id, "aria-pressed": qs.look.beard === o.id, onClick: () => set("beard", o.id), style: chip(qs.look.beard === o.id) }, o.name))),
             label("Build"),
             React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, LOOK_BUILDS.map((o) => React.createElement("button", { key: o.id, "aria-pressed": qs.look.build === o.id, onClick: () => set("build", o.id), style: chip(qs.look.build === o.id) }, o.name))))),
         WARDROBE_SLOTS.some((s) => s.id === tab) && (React.createElement("div", { style: { marginTop: 8 } }, WARDROBE.filter((w) => w.slot === tab).map(pieceCard))),
@@ -13399,7 +13664,7 @@ function CharacterCreator({ onDone, onBack }) {
         React.createElement("div", { style: { maxWidth: 520, margin: "0 auto", padding: "max(16px, env(safe-area-inset-top, 0px)) 16px 16px" } },
             React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: "#ffb84d" } }, "New game"),
             React.createElement("div", { style: { fontSize: 22, fontWeight: 800, margin: "2px 0 10px" } }, "Create your captain"),
-            React.createElement(WardrobePanel, { qs: qs, send: send, canBuy: false }),
+            React.createElement(WardrobePanel, { qs: qs, send: send, canBuy: false, startTab: "avatars" }),
             React.createElement("div", { style: { position: "sticky", bottom: 0, display: "flex", gap: 10, padding: "12px 0 max(12px, env(safe-area-inset-bottom, 0px))", marginTop: 12, background: "linear-gradient(180deg, rgba(14,31,40,0), #0e1f28 30%)" } },
                 React.createElement("button", { onClick: onBack, style: { appearance: "none", fontSize: 14, padding: "12px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid rgba(255,184,77,0.55)", background: "rgba(8,26,34,0.9)", color: "#eaf3f5" } }, "Back"),
                 React.createElement("button", { onClick: () => onDone(JSON.parse(JSON.stringify(qs.look))), style: { appearance: "none", flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: "0.08em", padding: "12px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #ffd27a", background: "#ffb84d", color: "#1b1004" } }, "START FISHING")))));
@@ -13440,7 +13705,7 @@ function storyPortraitSpec(id, qs) {
     const gear = { hat: c.hat ? { style: c.hat.style, color: c.hat.color } : null, glasses: c.glasses ? { style: c.glasses.style, color: c.glasses.color } : null, gloves: null, boots: null };
     return { id, look, gear, name: c.name, age: c.age || 0, brow: c.brow || "med", acc: c.acc, accColor: c.accColor };
 }
-function Portrait({ spec, mood, size }) {
+function Portrait({ spec, mood, size, lite }) {
     const [uid] = useState(() => "pt" + ++portraitUid);
     if (!spec)
         return null;
@@ -13452,8 +13717,8 @@ function Portrait({ spec, mood, size }) {
     const topC = hexCss(look.top.color), topD = mixCss(look.top.color, 0x000000, 0.28), topL = mixCss(look.top.color, 0xffffff, 0.18);
     const trimC = hexCss(look.top.trim !== undefined ? look.top.trim : look.top.color), extC = hexCss(look.extra.color);
     const eyeC = hexCss(PORTRAIT_EYES[spec.id] || 0x3a2a1c);
-    const hs = look.hair, bd = look.beard, age = spec.age || 0;
-    const browW = spec.brow === "thick" ? 4.8 : spec.brow === "thin" ? 2.6 : 3.7, browC = mixCss(hairHex, 0x000000, 0.25);
+    const hs = look.hair, bd = look.beard, age = spec.age || 0, fem = lookFem(look), lipW = fem ? 1.7 : 1;
+    const browW = (spec.brow === "thick" ? 4.8 : spec.brow === "thin" ? 2.6 : 3.7) * (fem ? 0.8 : 1), browC = mixCss(hairHex, 0x000000, 0.25);
     const sx = 0.94 + (w - 0.9) * 0.45; // shoulder/jaw width follows the build
     const cx = 100, ey = 100, mouthY = 137, tilt = M.head;
     const ids = { bg: uid + "bg", glow: uid + "gl", skin: uid + "sk", hair: uid + "hr", shade: uid + "sh", paint: uid + "pn", grain: uid + "gr", clip: uid + "cl", cloth: uid + "ct" };
@@ -13470,6 +13735,10 @@ function Portrait({ spec, mood, size }) {
             React.createElement("path", { d: "M" + (x - 8.8) + " " + ey + " Q" + x + " " + (ey - h * 2.1 + h * 2 * lid) + " " + (x + 8.8) + " " + ey, fill: "none", stroke: skinDD, strokeWidth: "1.5", strokeLinecap: "round" }),
             M.squint > 0 && React.createElement("path", { d: "M" + (x - 9) + " " + (ey + 1.6) + " Q" + x + " " + (ey + 1.6 - 2 * (h * 0.5 * M.squint + 0.4)) + " " + (x + 9) + " " + (ey + 1.6) + " L" + (x + 9) + " " + (ey + h + 3) + " L" + (x - 9) + " " + (ey + h + 3) + " Z", fill: "url(#" + ids.skin + ")" }),
             React.createElement("path", { d: "M" + (x - 7.5) + " " + (ey + 6.2) + " Q" + x + " " + (ey + 8.2) + " " + (x + 7.5) + " " + (ey + 6.2), fill: "none", stroke: skinD, strokeWidth: "0.9", opacity: "0.7" }),
+            fem && React.createElement("g", { stroke: "#1a0f0c", strokeLinecap: "round", fill: "none" },
+                React.createElement("path", { d: "M" + (x - 9) + " " + (ey - 0.4) + " Q" + x + " " + (ey - h * 2.1 + h * 2 * lid - 1.4) + " " + (x + 9.2) + " " + (ey - 0.4), strokeWidth: "2.7" }),
+                React.createElement("path", { d: "M" + (x + sd * 8.8) + " " + (ey - 0.6) + " l" + sd * 4.2 + " -3.4", strokeWidth: "1.9" }),
+                React.createElement("path", { d: "M" + (x + sd * 6) + " " + (ey - h - 0.8) + " l" + sd * 3 + " -2.6", strokeWidth: "1.3" })),
             React.createElement("path", { d: "M" + (x - 10 * 1) + " " + (ey - 11 + browLift + sd * 0) + " Q" + x + " " + (ey - 14.5 + browLift) + " " + (x + 10) + " " + (ey - 11 + browLift), fill: "none", stroke: "none" })));
     };
     const brow = (sd) => {
@@ -13490,11 +13759,11 @@ function Portrait({ spec, mood, size }) {
         if (M.mouth === "smile")
             return React.createElement("g", null,
                 React.createElement("path", { d: "M" + (cx - 12) + " " + (my - 1) + " Q" + cx + " " + (my + 8) + " " + (cx + 12) + " " + (my - 1), fill: "none", stroke: mc, strokeWidth: lineW, strokeLinecap: "round" }),
-                React.createElement("path", { d: "M" + (cx - 6) + " " + (my + 4.5) + " Q" + cx + " " + (my + 7.5) + " " + (cx + 6) + " " + (my + 4.5), fill: "none", stroke: lipC, strokeWidth: "2.2", strokeLinecap: "round", opacity: lw ? 0.8 : 0.35 }));
+                React.createElement("path", { d: "M" + (cx - 6) + " " + (my + 4.5) + " Q" + cx + " " + (my + 7.5) + " " + (cx + 6) + " " + (my + 4.5), fill: "none", stroke: lipC, strokeWidth: 2.2 * lipW, strokeLinecap: "round", opacity: lw ? 0.8 : 0.35 }));
         if (M.mouth === "frown")
             return React.createElement("g", null,
                 React.createElement("path", { d: "M" + (cx - 9) + " " + (my + 2.5) + " Q" + cx + " " + (my - 3.5) + " " + (cx + 9) + " " + (my + 2.5), fill: "none", stroke: mc, strokeWidth: lineW, strokeLinecap: "round" }),
-                React.createElement("path", { d: "M" + (cx - 5) + " " + (my + 5.5) + " Q" + cx + " " + (my + 3.5) + " " + (cx + 5) + " " + (my + 5.5), fill: "none", stroke: lipC, strokeWidth: "2", strokeLinecap: "round", opacity: lw ? 0.7 : 0.3 }));
+                React.createElement("path", { d: "M" + (cx - 5) + " " + (my + 5.5) + " Q" + cx + " " + (my + 3.5) + " " + (cx + 5) + " " + (my + 5.5), fill: "none", stroke: lipC, strokeWidth: 2 * lipW, strokeLinecap: "round", opacity: lw ? 0.7 : 0.3 }));
         if (M.mouth === "frownsmall")
             return React.createElement("g", null,
                 React.createElement("path", { d: "M" + (cx - 7) + " " + (my + 2) + " Q" + cx + " " + (my - 2.5) + " " + (cx + 7) + " " + (my + 2), fill: "none", stroke: mc, strokeWidth: lineW, strokeLinecap: "round" }));
@@ -13511,10 +13780,10 @@ function Portrait({ spec, mood, size }) {
                 React.createElement("path", { d: "M" + (cx - 9) + " " + (my + 0.5) + " Q" + cx + " " + (my - 1.2) + " " + (cx + 9) + " " + (my + 0.8), fill: "none", stroke: mc, strokeWidth: lineW + 0.3, strokeLinecap: "round" }));
         return React.createElement("g", null,
             React.createElement("path", { d: "M" + (cx - 9.5) + " " + my + " Q" + cx + " " + (my + 1.6) + " " + (cx + 9.5) + " " + my, fill: "none", stroke: mc, strokeWidth: lineW, strokeLinecap: "round" }),
-            React.createElement("path", { d: "M" + (cx - 5.5) + " " + (my + 4.4) + " Q" + cx + " " + (my + 6.2) + " " + (cx + 5.5) + " " + (my + 4.4), fill: "none", stroke: lipC, strokeWidth: "2", strokeLinecap: "round", opacity: lw ? 0.6 : 0.25 }));
+            React.createElement("path", { d: "M" + (cx - 5.5) + " " + (my + 4.4) + " Q" + cx + " " + (my + 6.2) + " " + (cx + 5.5) + " " + (my + 4.4), fill: "none", stroke: lipC, strokeWidth: 2 * lipW, strokeLinecap: "round", opacity: lw ? 0.6 : 0.25 }));
     })();
     // ----- head shape (the jaw widens with the build) -----
-    const jw = 33 * sx + (w > 1.05 ? 2 : 0), headPath = "M" + cx + " 52 C" + (cx + jw * 0.95) + " 52 " + (cx + jw + 2) + " 78 " + (cx + jw) + " 104 C" + (cx + jw - 2) + " 128 " + (cx + jw * 0.64) + " 150 " + cx + " 155 C" + (cx - jw * 0.64) + " 150 " + (cx - jw + 2) + " 128 " + (cx - jw) + " 104 C" + (cx - jw - 2) + " 78 " + (cx - jw * 0.95) + " 52 " + cx + " 52 Z";
+    const jw = 33 * sx * (fem ? 0.92 : 1) + (w > 1.05 ? 2 : 0), headPath = "M" + cx + " 52 C" + (cx + jw * 0.95) + " 52 " + (cx + jw + 2) + " 78 " + (cx + jw) + " 104 C" + (cx + jw - 2) + " 128 " + (cx + jw * 0.64) + " 150 " + cx + " 155 C" + (cx - jw * 0.64) + " 150 " + (cx - jw + 2) + " 128 " + (cx - jw) + " 104 C" + (cx - jw - 2) + " 78 " + (cx - jw * 0.95) + " 52 " + cx + " 52 Z";
     // ----- hair -----
     const hairBack = [], hairFront = [];
     const P = (...a) => a.join(" ");
@@ -13531,19 +13800,50 @@ function Portrait({ spec, mood, size }) {
             React.createElement("path", { d: P("M", cx - 14, 32, "Q", cx, 24, cx + 14, 32), stroke: hairD, strokeWidth: "1.5", fill: "none", opacity: "0.6" })));
     if (hs === "curly")
         [[-30, 54, 15], [-15, 38, 16], [3, 31, 17], [21, 37, 16], [35, 53, 15], [-38, 74, 12], [40, 74, 12], [0, 44, 16]].forEach((p, i) => hairBack.push(React.createElement("circle", { key: "cu" + i, cx: cx + p[0], cy: p[1], r: p[2], fill: i % 2 ? hairC : hairD })));
+    if (hs === "bob")
+        hairBack.push(React.createElement("path", { key: "hbob", d: P("M", cx - jw - 8, 68, "C", cx - jw - 17, 108, cx - jw - 13, 142, cx - jw + 4, 156, "L", cx + jw - 4, 156, "C", cx + jw + 13, 142, cx + jw + 17, 108, cx + jw + 8, 68, "Z"), fill: hairD }));
+    if (hs === "wavy") {
+        hairBack.push(React.createElement("path", { key: "hwv", d: P("M", cx - jw - 6, 66, "C", cx - jw - 18, 150, cx - jw - 14, 200, cx - jw - 2, 232, "L", cx + jw + 2, 232, "C", cx + jw + 14, 200, cx + jw + 18, 150, cx + jw + 6, 66, "Z"), fill: hairD }));
+        [-1, 1].forEach((sd) => [[132, 11], [162, 12], [192, 12], [218, 11]].forEach((q, i) => hairBack.push(React.createElement("circle", { key: "wv" + sd + i, cx: cx + sd * (jw + 8 + (i % 2) * 3), cy: q[0], r: q[1], fill: i % 2 ? hairC : hairD }))));
+    }
+    if (hs === "braid")
+        hairBack.push(React.createElement("path", { key: "hbr", d: P("M", cx - jw - 4, 68, "C", cx - jw - 10, 110, cx - jw - 6, 140, cx - jw + 6, 152, "L", cx + jw - 6, 152, "C", cx + jw + 6, 140, cx + jw + 10, 110, cx + jw + 4, 68, "Z"), fill: hairD }));
+    if (hs === "pigtails")
+        [-1, 1].forEach((sd) => hairBack.push(React.createElement("g", { key: "pg" + sd },
+            React.createElement("path", { d: P("M", cx + sd * (jw - 2), 82, "C", cx + sd * (jw + 30), 92, cx + sd * (jw + 36), 140, cx + sd * (jw + 18), 190, "C", cx + sd * (jw + 12), 152, cx + sd * (jw + 6), 124, cx + sd * (jw - 6), 104, "Z"), fill: hairD }),
+            React.createElement("path", { d: P("M", cx + sd * (jw + 8), 98, "C", cx + sd * (jw + 22), 124, cx + sd * (jw + 22), 150, cx + sd * (jw + 16), 176), stroke: hairL, strokeWidth: "2", fill: "none", opacity: "0.55" }))));
+    if (hs === "afro") {
+        hairBack.push(React.createElement("circle", { key: "af0", cx: cx, cy: "62", r: "54", fill: hairD }));
+        [[-46, 78, 17], [-48, 52, 19], [-34, 28, 20], [-12, 14, 21], [14, 14, 21], [36, 28, 20], [50, 52, 19], [48, 78, 17]].forEach((q, i) => hairBack.push(React.createElement("circle", { key: "af" + i, cx: cx + q[0], cy: q[1], r: q[2], fill: i % 2 ? hairC : hairD })));
+    }
     // the hairline: where the hair stops on the forehead (side-swept for short hair, high and even for a buzz cut)
     const dome = (hl) => P("M", cx - jw - 2, 94, "C", cx - jw - 7, 44, cx - 22, 27, cx, 27, "C", cx + 22, 27, cx + jw + 7, 44, cx + jw + 2, 94, "C", cx + jw - 1, 80, ...hl, cx - jw + 1, 80, cx - jw - 2, 94, "Z");
     if (hs !== "bald") {
-        const hl = hs === "buzz" ? [cx + 20, 56, cx - 20, 56, cx, 54] : hs === "short" ? [cx + 24, 64, cx - 4, 50, cx - 22, 60] : hs === "long" ? [cx + 14, 54, cx - 14, 54, cx, 52] : [cx + 18, 58, cx - 18, 58, cx, 56];
+        const hk = hs === "pixie" ? "short" : hs === "afro" ? "buzz" : hs === "bob" || hs === "wavy" || hs === "braid" || hs === "pigtails" ? "long" : hs;
+        const hl = hk === "buzz" ? [cx + 20, 56, cx - 20, 56, cx, 54] : hk === "short" ? [cx + 24, 64, cx - 4, 50, cx - 22, 60] : hk === "long" ? [cx + 14, 54, cx - 14, 54, cx, 52] : [cx + 18, 58, cx - 18, 58, cx, 56];
         // dome path with a hairline curve through three points
         const top = hs === "buzz" ? 29 : 27;
         const d = P("M", cx - jw - 2, 94, "C", cx - jw - 7, 44, cx - 22, top, cx, top, "C", cx + 22, top, cx + jw + 7, 44, cx + jw + 2, 94, "C", cx + jw - 2, 78, cx + jw - 6, 68, hl[0], hl[1], "C", hl[2], hl[3], hl[4], hl[5], cx - jw + 6, 66, "C", cx - jw + 2, 74, cx - jw - 1, 82, cx - jw - 2, 94, "Z");
         hairFront.push(React.createElement("path", { key: "hc", d: d, fill: hs === "buzz" ? hairD : "url(#" + ids.hair + ")", opacity: hs === "buzz" ? 0.92 : 1 }));
-        if (hs !== "buzz" && hs !== "curly")
+        if (hs !== "buzz" && hs !== "curly" && hs !== "afro")
             [[-22, 40, -8, 33, 8, 31], [-30, 52, -14, 40, 4, 36], [-34, 66, -20, 50, -4, 42], [2, 33, 18, 36, 30, 46], [14, 31, 30, 38, 38, 54]].forEach((q, i) => hairFront.push(React.createElement("path", { key: "hst" + i, d: P("M", cx + q[0], q[1], "Q", cx + q[2], q[3], cx + q[4], q[5]), stroke: i % 2 ? hairD : hairL, strokeWidth: "1.6", fill: "none", opacity: "0.55", strokeLinecap: "round" })));
         if (hs === "curly")
             [[-26, 44, 11], [-8, 33, 12], [12, 35, 12], [28, 46, 11], [-34, 62, 9], [36, 62, 9]].forEach((p, i) => hairFront.push(React.createElement("circle", { key: "cf" + i, cx: cx + p[0], cy: p[1], r: p[2], fill: i % 2 ? hairC : hairL, opacity: i % 2 ? 1 : 0.55 })));
-        if (hs === "long")
+        if (hs === "pixie")
+            hairFront.push(React.createElement("path", { key: "hpx", d: P("M", cx - jw + 3, 66, "C", cx - 16, 40, cx + 18, 38, cx + jw - 1, 62, "C", cx + 10, 54, cx - 10, 58, cx - jw + 3, 66, "Z"), fill: hairC }));
+        if (hs === "bob")
+            [-1, 1].forEach((sd) => hairFront.push(React.createElement("path", { key: "bl" + sd, d: P("M", cx + sd * (jw + 3), 90, "C", cx + sd * (jw + 9), 118, cx + sd * (jw + 6), 144, cx + sd * (jw - 6), 154, "L", cx + sd * (jw - 12), 144, "C", cx + sd * (jw - 7), 122, cx + sd * (jw - 4), 100, cx + sd * (jw - 6), 82, "Z"), fill: hairC })));
+        if (hs === "pigtails")
+            [-1, 1].forEach((sd) => hairFront.push(React.createElement("circle", { key: "pt" + sd, cx: cx + sd * (jw + 1), cy: "84", r: "6", fill: "#e0607a" })));
+        if (hs === "braid") {
+            const bx = cx + jw + 6;
+            for (let i = 0; i < 7; i++)
+                hairFront.push(React.createElement("ellipse", { key: "br" + i, cx: bx + Math.sin(i * 1.3) * 2.2, cy: 112 + i * 16, rx: 9 - i * 0.7, ry: "9.5", fill: i % 2 ? hairC : hairD }));
+            hairFront.push(React.createElement("circle", { key: "brt", cx: bx, cy: "226", r: "4", fill: "#e0607a" }));
+        }
+        if (hs === "afro")
+            [[-30, 36, 12], [-12, 28, 13], [10, 28, 13], [30, 38, 12], [-40, 58, 10], [40, 58, 10]].forEach((q, i) => hairFront.push(React.createElement("circle", { key: "afr" + i, cx: cx + q[0], cy: q[1], r: q[2], fill: i % 2 ? hairC : hairL, opacity: i % 2 ? 1 : 0.5 })));
+        if (hs === "long" || hs === "wavy" || hs === "braid")
             hairFront.push(React.createElement("path", { key: "hlf", d: P("M", cx - jw - 2, 112, "C", cx - jw - 10, 60, cx - 12, 36, cx + 2, 40, "C", cx + 22, 42, cx + jw + 10, 64, cx + jw + 2, 112, "C", cx + jw - 3, 78, cx + 12, 56, cx - 2, 54, "C", cx - 18, 56, cx - jw + 3, 78, cx - jw - 2, 112, "Z"), fill: hairC }));
         if (hs === "ponytail")
             hairFront.push(React.createElement("circle", { key: "ht", cx: cx + jw + 1, cy: "68", r: "4.5", fill: hairL, opacity: "0.7" }));
@@ -13567,12 +13867,12 @@ function Portrait({ spec, mood, size }) {
     if (bd === "mustache")
         beard.push(React.createElement("path", { key: "mu2", d: P("M", cx - 19, 131, "Q", cx - 10, 120, cx, 126, "Q", cx + 10, 120, cx + 19, 131, "Q", cx + 10, 136, cx, 132, "Q", cx - 10, 136, cx - 19, 131, "Z"), fill: bgrad }));
     // ----- body and clothes -----
-    const sw = 78 * sx, sleeve = ts.sleeves || "none";
+    const sw = 78 * sx * (fem ? 0.9 : 1), sleeve = ts.sleeves || "none";
     const torso = P("M", cx - 15, 160, "C", cx - 30, 165, cx - sw + 36, 170, cx - sw + 20, 181, "C", cx - sw + 8, 192, cx - sw + 6, 214, cx - sw + 24, 240, "L", cx + sw - 24, 240, "C", cx + sw - 6, 214, cx + sw - 8, 192, cx + sw - 20, 181, "C", cx + sw - 36, 170, cx + 30, 165, cx + 15, 160, "Z");
     const armShape = (s) => P("M", cx + s * (sw - 24), 180, "Q", cx + s * (sw + 4), 176, cx + s * (sw + 8), 196, "L", cx + s * (sw + 14), 240, "L", cx + s * (sw - 26), 240, "Q", cx + s * (sw - 30), 208, cx + s * (sw - 24), 180, "Z");
     const armUpper = (s) => P("M", cx + s * (sw - 24), 180, "Q", cx + s * (sw + 4), 176, cx + s * (sw + 8), 196, "L", cx + s * (sw + 10.5), 214, "L", cx + s * (sw - 28), 214, "Q", cx + s * (sw - 30), 200, cx + s * (sw - 24), 180, "Z");
     const body = (React.createElement("g", null,
-        React.createElement("rect", { x: cx - 15, y: "132", width: "30", height: "42", fill: skinD }),
+        React.createElement("rect", { x: cx - (fem ? 12 : 15), y: "132", width: fem ? 24 : 30, height: "42", fill: skinD }),
         React.createElement("ellipse", { cx: cx, cy: "156", rx: "19", ry: "11", fill: skinDD, opacity: "0.4" }),
         ts.hood && React.createElement("path", { d: P("M", cx - 32, 176, "Q", cx, 146, cx + 32, 176, "L", cx + 28, 192, "L", cx - 28, 192, "Z"), fill: topD }),
         React.createElement("path", { d: torso, fill: topC }),
@@ -13581,6 +13881,9 @@ function Portrait({ spec, mood, size }) {
             sleeve === "short" && React.createElement("path", { d: armUpper(s), fill: topC }),
             React.createElement("path", { d: armShape(s), fill: "none", stroke: sleeve === "none" ? skinD : topD, strokeWidth: "1.2", opacity: "0.7" }))),
         React.createElement("path", { d: torso, fill: "url(#" + ids.cloth + ")" }),
+        ts.halter && [-1, 1].map((sd) => React.createElement("g", { key: "hl" + sd },
+            React.createElement("path", { d: P("M", cx + sd * (sw - 20), 181, "C", cx + sd * (sw - 30), 174, cx + sd * 40, 172, cx + sd * 27, 204, "L", cx + sd * (sw - 12), 214, "Z"), fill: skinC }),
+            React.createElement("path", { d: P("M", cx + sd * 27, 204, "Q", cx + sd * 24, 184, cx + sd * 13, 162), stroke: topC, strokeWidth: "5", fill: "none", strokeLinecap: "round" }))),
         (ts.bands || []).map((f, i) => React.createElement("rect", { key: "bn" + i, x: cx - sw + 24 - f * 6, y: 176 + f * 60, width: (sw - 24 + f * 6) * 2, height: ts.bands.length === 3 ? 3 : 4.5, fill: trimC, opacity: ts.bands.length === 3 ? 0.55 : 0.95 })),
         ts.bands && ts.bands.length === 3 && [-52, -26, 26, 52].map((dx, i) => React.createElement("rect", { key: "pv" + i, x: cx + dx * sx, y: "174", width: "3", height: "66", fill: trimC, opacity: "0.45" })),
         ts.hem && React.createElement("rect", { x: cx - sw + 24, y: "230", width: (sw - 24) * 2, height: "10", fill: topD }),
@@ -13715,15 +14018,15 @@ function Portrait({ spec, mood, size }) {
             React.createElement("circle", { cx: "30", cy: "48", r: "26", fill: "#ffffff", opacity: "0.06" }),
             React.createElement("circle", { cx: "176", cy: "84", r: "34", fill: "#ffffff", opacity: "0.05" }),
             React.createElement("path", { d: "M0 196 Q50 182 100 196 T200 192 L200 240 L0 240 Z", fill: "#000000", opacity: "0.12" }),
-            React.createElement("g", { filter: "url(#" + ids.paint + ")", transform: "rotate(" + rot + " 100 160)" },
+            React.createElement("g", { filter: lite ? undefined : "url(#" + ids.paint + ")", transform: "rotate(" + rot + " 100 160)" },
                 hairBack,
                 body,
                 React.createElement("ellipse", { cx: cx - jw - 1, cy: "108", rx: "6.5", ry: "11", fill: skinD }),
                 React.createElement("ellipse", { cx: cx + jw + 1, cy: "108", rx: "6.5", ry: "11", fill: skinD }),
                 React.createElement("path", { d: headPath, fill: "url(#" + ids.skin + ")" }),
                 React.createElement("path", { d: "M" + (cx - 24) + " 152 Q" + cx + " 166 " + (cx + 24) + " 152 L" + (cx + 22) + " 160 Q" + cx + " 172 " + (cx - 22) + " 160 Z", fill: skinDD, opacity: "0.28" }),
-                React.createElement("ellipse", { cx: cx - 22, cy: "122", rx: "9", ry: "6", fill: "#e0607a", opacity: "0.1" }),
-                React.createElement("ellipse", { cx: cx + 22, cy: "122", rx: "9", ry: "6", fill: "#e0607a", opacity: "0.1" }),
+                React.createElement("ellipse", { cx: cx - 22, cy: "122", rx: "9", ry: "6", fill: "#e0607a", opacity: fem ? 0.2 : 0.1 }),
+                React.createElement("ellipse", { cx: cx + 22, cy: "122", rx: "9", ry: "6", fill: "#e0607a", opacity: fem ? 0.2 : 0.1 }),
                 lines,
                 eye(-1),
                 eye(1),
@@ -13740,7 +14043,7 @@ function Portrait({ spec, mood, size }) {
                 acc,
                 glass,
                 hat),
-            React.createElement("rect", { width: "200", height: "240", filter: "url(#" + ids.grain + ")", opacity: "0.5" }),
+            !lite && React.createElement("rect", { width: "200", height: "240", filter: "url(#" + ids.grain + ")", opacity: "0.5" }),
             React.createElement("rect", { width: "200", height: "240", fill: "none", stroke: "#000000", strokeOpacity: "0.35", strokeWidth: "3", rx: "14" }))));
 }
 // ---------- Story screens: the scene player, the journal, the HUD chip ----------
