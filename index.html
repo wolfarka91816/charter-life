@@ -1,66 +1,42 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Charter Life Demo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#08161c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CL Demo">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Charter Life">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
-  #cl-install { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%); z-index: 99998;
-    display: none; align-items: center; gap: 8px; padding: 9px 10px 9px 16px; border-radius: 999px; background: #ffbe55; color: #1b1206;
-    font: 600 14px system-ui, sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,.45); white-space: nowrap; }
-  #cl-install button { font: inherit; border: 0; background: none; color: inherit; cursor: pointer; padding: 0; }
-  #cl-install .x { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.12); font-size: 13px; }
-</style>
-<script>
-  (function () {
-    if ("serviceWorker" in navigator) window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
-    var standalone = window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: fullscreen)").matches || navigator.standalone;
-    if (standalone) return;
-    var deferred = null, bar = null;
-    function hide() { if (bar) bar.style.display = "none"; }
-    function show(label, onTap) {
-      if (!bar) {
-        bar = document.createElement("div"); bar.id = "cl-install";
-        bar.innerHTML = '<button class="go"></button><button class="x" aria-label="Close">✕</button>';
-        document.body.appendChild(bar);
-        bar.querySelector(".x").onclick = function (e) { e.stopPropagation(); hide(); };
-        document.addEventListener("pointerdown", function (e) { if (bar && !bar.contains(e.target)) hide(); }, true);
-      }
-      var go = bar.querySelector(".go"); go.textContent = label; go.onclick = onTap; bar.style.display = "flex";
-    }
-    window.addEventListener("beforeinstallprompt", function (e) {
-      e.preventDefault(); deferred = e;
-      show("📲 Install Charter Life", function () { hide(); deferred.prompt(); deferred = null; });
-    });
-    window.addEventListener("appinstalled", hide);
-    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (ios) window.addEventListener("load", function () { show("📲 To install: tap Share, then Add to Home Screen", hide); });
-  })();
-</script>
-
-<style>
-  :root { color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: #08161c; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; touch-action: none; }
-  #root { width: 100%; height: 100%; }
-  #boot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #9fc6d1; font: 14px system-ui, sans-serif; text-align: center; padding: 24px; }
+  html, body { margin: 0; height: 100%; background: #08161c; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; touch-action: none; -webkit-touch-callout: none; }
+  #root { width: 100vw; height: 100dvh; }
+  #boot { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; color: #9fc6d1; font: 14px system-ui, sans-serif; text-align: center; padding: 24px; }
+  #boot img { width: 96px; height: 96px; border-radius: 22px; }
+  #boot button { background: #0e7480; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px; font: 600 15px system-ui, sans-serif; }
+  #inst { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); z-index: 99990; display: none; align-items: center; gap: 10px; background: rgba(8,22,28,0.94); color: #e6f4f7; border: 1px solid #1d5a66; border-radius: 999px; padding: 8px 8px 8px 16px; font: 600 13px system-ui, sans-serif; max-width: calc(100vw - 24px); box-shadow: 0 6px 24px rgba(0,0,0,.5); touch-action: manipulation; }
+  #inst button { border: 0; border-radius: 999px; font: 600 13px system-ui, sans-serif; padding: 9px 14px; }
+  #inst .go { background: #f2b84b; color: #1a1205; } #inst .x { background: transparent; color: #9fc6d1; padding: 9px 11px; }
   #err { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40%; overflow: auto; background: rgba(120,20,20,0.92); color: #fff; font: 11px monospace; padding: 8px 10px; display: none; z-index: 99999; white-space: pre-wrap; }
 </style>
-
+</head>
+<body>
 <div id="root"></div>
-<div id="boot">Loading Charter Life Demo...</div>
+<div id="boot"><img src="icon-192.png" alt=""><div id="bootmsg">Loading Charter Life Demo...</div></div>
 <div id="err"></div>
+<div id="inst"><span id="insttxt"></span><button class="go" id="instgo">Install</button><button class="x" id="instx" aria-label="Dismiss">&#10005;</button></div>
 <script>
   window.addEventListener("error", function (e) { var el = document.getElementById("err"); el.style.display = "block"; el.textContent += (e.message || "error") + (e.lineno ? " (line " + e.lineno + ")" : "") + "\n"; });
   window.addEventListener("unhandledrejection", function (e) { var el = document.getElementById("err"); el.style.display = "block"; el.textContent += "Unhandled: " + (e.reason && e.reason.message || e.reason) + "\n"; });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script>
+// The game itself, pre-compiled. It only runs once the three libraries below have loaded.
+function __makeGame() {
 const { useEffect, useRef, useState } = React;
 
 // ---------- Build flavour. This one file makes three builds (build.py flips the switches below and writes each):
@@ -73,10 +49,12 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.7", // shown on the title screen and badges
+    version: "0.13", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
+const BUILD_LABEL = "v" + BUILD.version + (BUILD.build ? " \u00b7 " + BUILD.build : ""); // e.g. "v0.13 \u00b7 22 Oct 2026"
 const STAGE_HEIGHT = BUILD.fullscreen ? "100dvh" : "640px"; // the game and the title screen share one stage size
 const BOATS = [
     { name: "Tideline 16", tier: "Skiff", length: 17, beam: 5.3, freeboardRatio: 0.088, gunwaleHeight: 0.45, hullColor: 0xf2f0e6, accent: 0x1c5d7a, maxSpeed: 9, turnRate: 0.85, rockFactor: 1.6, yawInertia: 0.3, rodStiffness: 1.4, tensionMult: 1.25, rodButtWidth: 3.4, tackleLabel: "12 LB CLASS SPIN" },
@@ -416,7 +394,7 @@ function landmassBaseHeightAt(lm, wx, wz, seafloorFn) {
     const wob = 0.11 * Math.sin(3 * th + lm.seed) + 0.07 * Math.sin(5 * th + lm.seed * 1.7) + 0.04 * Math.sin(9 * th + lm.seed * 2.3);
     const t = u / (1 + wob);
     const relief = 0.6 + 0.4 * Math.sin(wx * 0.045 + lm.seed) * Math.cos(wz * 0.05 - lm.seed * 0.7);
-    const land = 1.2 + lm.peak * Math.pow(Math.max(0, 1 - t / 0.6), 1.3) * relief;
+    const land = (lm.plateau !== undefined ? lm.plateau : 1.2) + lm.peak * Math.pow(Math.max(0, 1 - t / 0.6), 1.3) * relief; // plateau: a flat lawn level for the harbor land
     const sea = seafloorFn(wx, wz) - 0.08; // just under the real seafloor so the two surfaces never z-fight
     if (t < 0.6)
         return land;
@@ -1755,15 +1733,17 @@ const STORY_STEPS = [
             ["narr", "Halyard Point Marina, first light. A gull watches you from a piling like it has already decided you are trouble."],
             ["marlow", "You the new captain? Huh. Thought you'd be taller.", "neutral"],
             ["you", "The lease says I'm the captain. That's good enough for me.", "happy"],
-            ["marlow", "Paperwork's paperwork. See that skiff at the end of the dock? The Tideline. She's been sitting there six years waiting on somebody who'd actually take her out.", "neutral"],
+            ["marlow", "Paperwork's paperwork. The skiff you've leased is the Tideline. She's been up on blocks in the yard six years waiting on somebody who'd actually take her out.", "neutral"],
             ["marlow", "Her last captain was Ruth Calloway. Best hand I ever saw on this coast. One morning she left the keys in the skiff and a note on the dash. It said, 'For whoever's next.'", "sad"],
-            ["marlow", "I figure that's you. Don't make me regret it. Go land three fish, any fish. I want to see you can hold a rod without hurting yourself.", "neutral"],
+            ["marlow", "I figure that's you. But I don't hand keys to somebody who's never held a rod. Walk out to the end of the dock, drop a line off the side, and land three fish. Any fish.", "neutral"],
+            ["marlow", "Do that and I'll have her brought round and tied up right here at the dock.", "happy"],
         ],
-        goal: [{ type: "catch", n: 3 }], obj: "Land 3 fish",
+        goal: [{ type: "catch", n: 3 }], obj: "Land 3 fish from the dock",
         outro: [
             ["marlow", "Three fish and all your fingers. Not bad.", "happy"],
             ["marlow", "You've got steady hands. Ruth had steady hands. Hold onto that.", "proud"],
-        ], reward: { xp: 120, money: 100 } },
+            ["marlow", "The yard boys just brought the Tideline round. She's tied up along the dock. The keys are yours, captain.", "happy"],
+        ], reward: { xp: 120, money: 100, flag: "skiff" } },
     { id: "1.2", ch: 1, title: "Sell What You Catch", who: "gus", how: "talk", need: { level: 1 },
         intro: [
             ["gus", "There she is! Gus Brandt, I run the store. Bait, tackle, rumors. The rumors are free.", "happy"],
@@ -2262,7 +2242,7 @@ function storyHud(qs) {
 }
 // ---------- end of the story section ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh() };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), skiffRule: 1 };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -2287,8 +2267,12 @@ function questLoad(speciesInfo) {
         const raw = typeof localStorage !== "undefined" ? localStorage.getItem(QUEST_SAVE_KEY) : null;
         if (raw) {
             const p = JSON.parse(raw);
-            if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught)
+            if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught) {
                 qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story) };
+                if (!p.skiffRule && (p.xp > 0 || p.stats.totalCaught > 0 || (p.story && p.story.i > 0)))
+                    qs.story.flags.skiff = true; // a save from before the dock start already has the skiff
+                qs.skiffRule = 1;
+            }
         }
     }
     catch (e) {
@@ -4238,6 +4222,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiWalkMode, setUiWalkMode] = useState(false);
     const [uiAshoreMode, setUiAshoreMode] = useState(false);
     const [uiCanGoAshore, setUiCanGoAshore] = useState(false);
+    const [uiCastOk, setUiCastOk] = useState(false); // the line can go out from here (anchored, tied up, or standing on the dock)
+    const [uiSkiff, setUiSkiff] = useState(true); // the skiff has arrived (a new game starts without it)
     const [uiNearShop, setUiNearShop] = useState(false);
     const [uiNearSite, setUiNearSite] = useState(null); // name of the marina lot the player is close to, or null
     const [uiWheelOpen, setUiWheelOpen] = useState(false); // command wheel (Q or the ring button)
@@ -4563,18 +4549,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // the shoreline where it crosses the waterline, not scattered randomly.
         const mangroveTrunkMat = new THREE.MeshPhongMaterial({ color: 0x4a3828, flatShading: true });
         const mangroveLeafMat = new THREE.MeshPhongMaterial({ color: 0x2f5c3a, flatShading: true });
-        for (let i = 0; i < 22; i++) {
-            const lx = -20 - Math.random() * 60; // clustered near the waterline, not deep inland
-            const lz = -50 + Math.random() * 100;
-            const mx = inshoreCenter.x + lx, mz = inshoreCenter.z + lz;
-            const trunkH = 1.8 + Math.random() * 1.4;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, trunkH, 5), mangroveTrunkMat);
-            trunk.position.set(mx, trunkH / 2 - 0.3, mz);
-            scene.add(trunk);
-            const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.3 + Math.random() * 0.8, 6, 5), mangroveLeafMat);
-            canopy.position.set(mx, trunkH + 0.4, mz);
-            canopy.scale.y = 0.7;
-            scene.add(canopy);
+        {
+            const mRng = makeRng(909), placed = [];
+            for (let tries = 0; placed.length < 22 && tries < 600; tries++) {
+                const lx = -20 - mRng() * 60, lz = -50 + mRng() * 100; // clustered near the waterline, not deep inland
+                const mx = inshoreCenter.x + lx, mz = inshoreCenter.z + lz, gh = shoreHeightAt(mx, mz);
+                if (gh < -0.2 || gh > 1.4)
+                    continue; // roots in the shallows or on the damp edge of the shore, never floating over deep water or up on the hill
+                if (placed.some((q) => Math.hypot(q[0] - mx, q[1] - mz) < 3.2))
+                    continue;
+                placed.push([mx, mz]);
+                const trunkH = 1.8 + mRng() * 1.4;
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, trunkH, 5), mangroveTrunkMat);
+                trunk.position.set(mx, gh + trunkH / 2 - 0.3, mz);
+                scene.add(trunk);
+                const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.3 + mRng() * 0.8, 6, 5), mangroveLeafMat);
+                canopy.position.set(mx, gh + trunkH + 0.4 - 0.3, mz);
+                canopy.scale.y = 0.7;
+                scene.add(canopy);
+            }
         }
         // ---------- Shipwreck (second structure, distinct habitat from the
         // rocky reef) — gives grouper/snapper/cobia a second reachable
@@ -4662,8 +4655,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
             return d !== null && d > QUAY.y ? d : QUAY.y;
         }
         const ROADS = [
-            { name: "Harbor Road", w: 3.4, pts: [[175, 3], [140, 2], [110, 1], [84, 0.5], [62, 0], [44, 0], [30, 0], [20, 0.5], [13, 1.5], [8, 4], [4.5, 8.5], [2, 13.5], [0.2, 17.2]] },
-            { name: "Store Lane", w: 2.6, pts: [[2.4, 13.0], [-0.6, 15.4], [-3.4, 17.8]] },
+            { name: "Harbor Road", w: 3.4, lamps: 17, pts: [[175, 3], [140, 2], [110, 1], [84, 0.5], [62, 0], [44, 0], [30, 0], [20, 0.5], [13, 1.5], [8, 4], [4.5, 8.5], [2.4, 13.1]] }, // ends at the marina plaza, well back from the water; a worn path carries on to the pier head
+            { name: "Store Lane", w: 2.6, pts: [[2.4, 13.0], [-0.9, 14.5], [-3.4, 17.4]] },
+            { name: "Beach Lane", w: 2.6, lamps: 22, pts: [[16, 1.0], [15.4, -6], [14, -14], [10, -22], [2, -30], [-8, -36], [-20, -40]] }, // north from Harbor Road across the new north shore
         ];
         function roadDist(offsetX, offsetZ) {
             let best = 1e9;
@@ -4677,6 +4671,174 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             return best;
         }
+        // ---------- Town layout (key-local coordinates). One plan decides where the houses stand, which way they face, their paths and yard planting,
+        // and where every palm and tree near town may go; nothing is dropped on a road, in a house, on the quay, dock or store, or on another tree.
+        // It is plain data from a fixed seed (so the town is the same every time), and the same data feeds the walking collision.
+        const NPC_AT = { gus: [-5.2, 20.2], dana: [-6.6, 7.2], pete: [-19, -2], road: [29.75, 3.0], marlow: [1.0, 33] }; // where the townsfolk stand
+        const HOUSE_SPOTS = [
+            { x: -12, z: 4.5 }, { x: -4.5, z: -12 }, { x: 12, z: 10.5 }, // on the island: they turn to face the nearest road
+            { x: 24, z: -6.8, rot: 0 }, { x: 31.5, z: -6.8, rot: 0 }, { x: 39, z: -6.8, rot: 0 }, { x: 26.5, z: 6.8, rot: Math.PI }, { x: 34, z: 6.8, rot: Math.PI }, { x: 41, z: 6.8, rot: Math.PI },
+            { x: 31, z: -15.5, rot: 0.2 }, { x: 40, z: -15, rot: -0.15 }, { x: 31, z: 14, rot: Math.PI - 0.2 }, { x: 40, z: 15, rot: Math.PI + 0.15 }, // two rows facing Harbor Road, and a back row
+            { x: 21, z: -14 }, { x: 6.5, z: -17 }, { x: 18, z: -26 }, { x: -3.5, z: -26 }, { x: 8, z: -34 }, { x: -13, z: -32 }, { x: -20, z: -46 }, // along Beach Lane on the new north shore: they turn to face it
+        ];
+        const ROAD_PALMS = [[56, -5.2], [60, 5.5], [72, -5.5], [80, 5.2], [92, -5.4], [100, 5.6], [-3.5, 13.5], [8.5, 15.5]]; // palms planted along the road
+        const FIXED_PROPS = [[5.4, 11.2, 0.6], [17.5, -2.8, 0.6], [-24, 17.5, 0.5], [-22, 24.9, 0.4], [-12.5, 24.9, 0.4], [-4.5, 24.9, 0.4], [-20, 24.4, 1.3], [-5.5, 22.2, 1.3]]; // signposts, flagpole, quay lamps, benches
+        const DOCK_PATH = [[2.4, 13.1], [1.6, 15.6], [0.6, 18.0]]; // a worn sand path from the end of the road to the head of the pier
+        const ROAD_LAMPS = []; // street lamps (key-local): alternate sides along every lit road, set back from the shoulder
+        ROADS.forEach((rd) => {
+            if (!rd.lamps)
+                return;
+            roadSamples(rd, rd.lamps).forEach((p, i) => {
+                if (p.x > 120 || (rd.name === "Harbor Road" && p.x < 6))
+                    return;
+                const side = i % 2 ? 1 : -1, lx = p.x + (-p.tz) * side * (rd.w / 2 + 1.3), lz = p.z + p.tx * side * (rd.w / 2 + 1.3), rn = roadNearest(lx, lz);
+                if (rn.d > rn.w / 2 + 0.9)
+                    ROAD_LAMPS.push([lx, lz]); // (none right at a junction, where another road runs by)
+            });
+        });
+        function roadNearest(x, z) {
+            let best = { x: 0, z: 0, d: 1e9, w: 3.4 };
+            for (let r = 0; r < ROADS.length; r++) {
+                const p = ROADS[r].pts;
+                for (let i = 0; i < p.length - 1; i++) {
+                    const ax = p[i][0], az = p[i][1], bx = p[i + 1][0], bz = p[i + 1][1], dx = bx - ax, dz = bz - az;
+                    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))), qx = ax + dx * t, qz = az + dz * t, d = Math.hypot(x - qx, z - qz);
+                    if (d < best.d)
+                        best = { x: qx, z: qz, d, w: ROADS[r].w };
+                }
+            }
+            return best;
+        }
+        function townGroundH(kx, kz) {
+            const q = quayHeightAt(kx, kz);
+            if (q !== null)
+                return q;
+            let best = keyHeightAt(kx, kz);
+            if (kx >= 18 && kx <= 44 && kz >= -26 && kz <= 26) {
+                const h = extHeightAt(kx, kz);
+                if (h > 0.3 && (best === null || h > best))
+                    best = h;
+            }
+            if (kx >= 44 && kx <= 474 && kz >= FAR_Z_MIN && kz <= FAR_Z_MAX) {
+                const h = farCountrysideHeightAt(kx, kz);
+                if (h > 0.3 && (best === null || h > best))
+                    best = h;
+            }
+            const li = landmassGroundAt(keyCenter.x + kx, keyCenter.z + kz);
+            if (li !== null && (best === null || li > best))
+                best = li;
+            return best !== null && best > 0.3 ? best : null;
+        }
+        function inHouse(h, x, z, pad) {
+            const dx = x - h.x, dz = z - h.z, c = Math.cos(h.rot), s = Math.sin(h.rot), lx = dx * c - dz * s, lz = dx * s + dz * c; // the house's own frame: +z is its front
+            return Math.abs(lx) < h.hx + pad && lz > -h.hz - pad && lz < h.hz + 1.1 + pad;
+        }
+        function townClear(plan, x, z, r) {
+            const rd = roadNearest(x, z);
+            if (rd.d < rd.w / 2 + 0.65 + r + 0.3)
+                return false; // the road and its shoulder
+            for (let i = 0; i < plan.houses.length; i++)
+                if (inHouse(plan.houses[i], x, z, r + 0.3))
+                    return false;
+            if (x > QUAY.x0 - r && x < QUAY.x1 + r && z > QUAY.z0 - r && z < QUAY.z1 + r)
+                return false; // the quay (and the store on it)
+            if (Math.abs(x) < 9 + r && z > 17)
+                return false; // the dock and its fingers
+            for (let i = 0; i < FIXED_PROPS.length; i++)
+                if (Math.hypot(x - FIXED_PROPS[i][0], z - FIXED_PROPS[i][1]) < FIXED_PROPS[i][2] + r + 0.3)
+                    return false;
+            for (let i = 0; i < ROAD_PALMS.length; i++)
+                if (Math.hypot(x - ROAD_PALMS[i][0], z - ROAD_PALMS[i][1]) < r + 1.0)
+                    return false;
+            for (let i = 0; i < ROAD_LAMPS.length; i++)
+                if (Math.hypot(x - ROAD_LAMPS[i][0], z - ROAD_LAMPS[i][1]) < r + 0.7)
+                    return false;
+            for (const k in NPC_AT)
+                if (Math.hypot(x - NPC_AT[k][0], z - NPC_AT[k][1]) < r + 1.4)
+                    return false;
+            for (let i = 0; i < plan.round.length; i++) {
+                const o = plan.round[i];
+                if (Math.hypot(x - o[0], z - o[1]) < r + o[2] + 0.2)
+                    return false;
+            }
+            return true;
+        }
+        function townPlan() {
+            const rng = makeRng(4242), plan = { houses: [], round: [], palms: [], shrubs: [], yardTrees: [], farTrees: [], paths: [] };
+            HOUSE_SPOTS.forEach((sp, i) => {
+                const key = i < 3, variant = key ? i : i - 3 + 1, scale = 0.92 + rng() * 0.2, st = HOME_STYLES[variant % HOME_STYLES.length];
+                let rot = sp.rot;
+                if (rot === undefined) {
+                    const rn = roadNearest(sp.x, sp.z);
+                    rot = Math.atan2(rn.x - sp.x, rn.z - sp.z);
+                } // an island house turns its front to the road
+                plan.houses.push({ x: sp.x, z: sp.z, rot, scale, variant, color: key ? i % 4 : (i - 3 + 2) % 4, hx: st.w * 0.72 * scale / 2, hz: st.d * 0.72 * scale / 2 });
+            });
+            plan.houses.forEach((h) => {
+                const fx = Math.sin(h.rot), fz = Math.cos(h.rot), pf = { x: h.x + fx * (h.hz + 1.3), z: h.z + fz * (h.hz + 1.3) }, rn = roadNearest(pf.x, pf.z);
+                if (rn.d < 1.6 || rn.d > 22)
+                    return;
+                const ux = (pf.x - rn.x) / rn.d, uz = (pf.z - rn.z) / rn.d, e = rn.w / 2 + 0.1; // ends on the road's edge
+                plan.paths.push({ pts: [[pf.x, pf.z], [pf.x + (rn.x + ux * e - pf.x) * 0.5, pf.z + (rn.z + uz * e - pf.z) * 0.5], [rn.x + ux * e, rn.z + uz * e]] });
+            });
+            const put = (list, x, z, r, minGap) => {
+                if (townGroundH(x, z) === null || !townClear(plan, x, z, r))
+                    return false;
+                for (let i = 0; i < plan.round.length; i++)
+                    if (Math.hypot(x - plan.round[i][0], z - plan.round[i][1]) < minGap + plan.round[i][2])
+                        return false;
+                for (let i = 0; i < plan.paths.length; i++) {
+                    const p = plan.paths[i].pts;
+                    for (let k = 0; k < p.length - 1; k++) { // keep off the paths
+                        const ax = p[k][0], az = p[k][1], bx = p[k + 1][0], bz = p[k + 1][1], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+                        if (Math.hypot(x - (ax + dx * t), z - (az + dz * t)) < 0.55 + r + 0.2)
+                            return false;
+                    }
+                }
+                list.push([x, z, r]);
+                plan.round.push([x, z, r]);
+                return true;
+            };
+            for (let tries = 0, n = 0; n < 9 && tries < 600; tries++) { // palms on the island
+                const x = -22 + rng() * 44, z = -17 + rng() * 34, hh = keyHeightAt(x, z);
+                if (x > 17 || hh === null || hh < 0.9)
+                    continue; // (the town strip east of the island has its own planting)
+                if (put(plan.palms, x, z, 0.5, 4.2))
+                    n++;
+            }
+            plan.houses.forEach((h) => {
+                const loc = (lx, lz) => [h.x + lx * Math.cos(h.rot) + lz * Math.sin(h.rot), h.z - lx * Math.sin(h.rot) + lz * Math.cos(h.rot)];
+                [-1, 1].forEach((sd) => { const p = loc(sd * (h.hx + 0.35), h.hz + 0.5); put(plan.shrubs, p[0], p[1], 0.5, 0.2); });
+                [-1, 1].forEach((sd) => { const p = loc(sd * (h.hx * 0.55), -(h.hz + 2.0)); put(plan.shrubs, p[0], p[1], 0.55, 0.2); });
+                const pb = loc((rng() - 0.5) * h.hx * 1.4, -(h.hz + 3.7));
+                put(plan.yardTrees, pb[0], pb[1], 0.5, 1.0);
+            });
+            [[-22, -50], [-2, -53], [24, -54], [46, -50], [-32, -34], [-12, -43], [36, -36], [52, -28], [60, -45], [34, 37], [54, 41], [72, 38], [28, 30]].forEach(([cx, cz]) => {
+                for (let n = 0, tries = 0; n < 5 && tries < 60; tries++) {
+                    const a = rng() * Math.PI * 2, rr = 2 + rng() * 8, x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr, gh = townGroundH(x, z), cr = 1.7 + rng() * 1.0, tH = 2.5 + rng() * 2.2;
+                    if (gh === null || gh < 1.9 || !townClear(plan, x, z, cr * 0.8))
+                        continue;
+                    plan.farTrees.push({ x, z, h: gh, trunkH: tH, canopy: cr, trunkR: 1.8 + rng() * 1.0 });
+                    plan.round.push([x, z, cr * 0.5]);
+                    n++;
+                }
+            });
+            for (let tries = 0, n = 0; n < 30 && tries < 1200; tries++) { // palms along the beaches
+                const x = -42 + rng() * 130, z = -64 + rng() * 108, gh = townGroundH(x, z);
+                if (gh === null || gh < 0.75 || gh > 1.5)
+                    continue;
+                if (put(plan.palms, x, z, 0.5, 5))
+                    n++;
+            }
+            for (let i = 0; i < 60; i++) { // scattered trees across the countryside
+                const fx = 49 + rng() * 400, fz = -105 + rng() * 120, fh = farCountrysideHeightAt(fx, fz), r = 1.8 + rng() * 1.2, tH = 2.5 + rng() * 2.5, cr = 1.8 + rng() * 1.2;
+                if (fh < 1.5 || !townClear(plan, fx, fz, cr * 0.8))
+                    continue;
+                plan.farTrees.push({ x: fx, z: fz, h: fh, trunkH: tH, canopy: cr, trunkR: r });
+                plan.round.push([fx, fz, cr * 0.5]);
+            }
+            return plan;
+        }
         const sandTex = getSandTexture();
         // Colour is lightened to offset the texture's own average darkness, so the island keeps its previous overall tone.
         const sandMat = new THREE.MeshPhongMaterial(sandTex ? { color: 0xefe1ba, map: sandTex, flatShading: true } : { color: 0xd8c8a0, flatShading: true });
@@ -4689,26 +4851,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         scene.add(key);
         const palmTrunkMat = new THREE.MeshPhongMaterial({ color: 0x6b5438, flatShading: true });
         const palmLeafMat = new THREE.MeshPhongMaterial({ color: 0x3a7a3f, flatShading: true });
-        for (let i = 0; i < 6; i++) {
-            const offX = (Math.random() - 0.5) * 21, offZ = (Math.random() - 0.5) * 15;
-            const groundH = keyHeightAt(offX, offZ);
-            if (groundH === null || roadDist(offX, offZ) < 3.4 || quayHeightAt(offX, offZ) !== null)
-                continue; // skip a scatter outside the dome, or on a road or the quay
-            const px = keyCenter.x + offX, pz = keyCenter.z + offZ;
-            const trunkH = 3 + Math.random() * 1.5;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, trunkH, 5), palmTrunkMat);
-            trunk.position.set(px, groundH + trunkH / 2, pz);
-            trunk.rotation.z = (Math.random() - 0.5) * 0.2;
-            scene.add(trunk);
-            for (let f = 0; f < 5; f++) {
-                const frondAngle = (f / 5) * Math.PI * 2;
-                const frond = new THREE.Mesh(new THREE.ConeGeometry(0.25, 2.2, 4), palmLeafMat);
-                frond.position.set(px, groundH + trunkH + 0.3, pz);
-                frond.rotation.z = Math.PI / 2.3;
-                frond.rotation.y = frondAngle;
-                scene.add(frond);
-            }
-        }
+        // (the island's palms are planted further down, from the town plan)
         // ---------- Dock extending from the sandy key island — relocated here
         // (was previously at the mangrove shore) so stepping off the boat
         // actually reaches the same island the houses are on. Path verified
@@ -4995,19 +5138,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             [0xe8c8a8, 0x6b5a4a],
             [0xd0c8b0, 0x7a3a30],
         ];
-        const housePlacements = [
-            { x: -12, z: 4.5 }, { x: -4.5, z: -12 }, { x: 12, z: 10.5 },
-        ];
-        housePlacements.forEach((pos, i) => {
-            const h = keyHeightAt(pos.x, pos.z);
-            if (h === null)
-                return; // safety: skip if somehow outside the island's footprint
-            const [wallColor, roofColor] = houseColors[i % houseColors.length];
-            const house = buildHouse(wallColor, roofColor, 0.9 + Math.random() * 0.25, i);
-            house.position.set(keyCenter.x + pos.x, h, keyCenter.z + pos.z);
-            house.rotation.y = Math.random() * Math.PI * 2;
-            scene.add(house);
-        });
+        // (the houses are placed further down, from the town plan)
         // (the marina store that used to be this small bait shack is now built on the quay, with the harbor front scenery below the terrain functions)
         // ---------- Marina expansion — finger docks creating real boat slips,
         // with small decorative boats tied up, turning the bare dock into an
@@ -5387,17 +5518,6 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // is the opposite of feeling like land continues indefinitely. Replaced
         // below with a much larger rolling countryside that fades into fog
         // instead of presenting a hard edge.
-        // More houses filling out the new extension — verified against the
-        // extension's own height function.
-        const extHousePlacements = [{ x: 24, z: -6.8, rot: 0 }, { x: 31.5, z: -6.8, rot: 0 }, { x: 39, z: -6.8, rot: 0 }, { x: 26.5, z: 6.8, rot: Math.PI }, { x: 34, z: 6.8, rot: Math.PI }, { x: 41, z: 6.8, rot: Math.PI }, { x: 31, z: -15.5, rot: 0.2 }, { x: 40, z: -15, rot: -0.15 }, { x: 31, z: 15.5, rot: Math.PI - 0.2 }, { x: 40, z: 15, rot: Math.PI + 0.15 }]; // two rows facing Harbor Road, and a back row
-        extHousePlacements.forEach((pos, i) => {
-            const h = extHeightAt(pos.x, pos.z);
-            const [wallColor, roofColor] = houseColors[(i + 2) % houseColors.length];
-            const house = buildHouse(wallColor, roofColor, 0.9 + Math.random() * 0.25, i + 1);
-            house.position.set(keyCenter.x + pos.x, h, keyCenter.z + pos.z);
-            house.rotation.y = pos.rot;
-            scene.add(house);
-        });
         // ---------- Far countryside — continues from where the near extension
         // actually ends (offsetX=35, height matches extGroundLevel exactly, no
         // seam), with gentle rolling hills rather than flat ground, extending
@@ -5455,30 +5575,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const farMesh = new THREE.Mesh(farGeo, farMat);
         farMesh.position.set(keyCenter.x + 259, 0, keyCenter.z - 45); // shift matches the lookup offset used above (259, updated from 250 to match the near extension's new endpoint)
         scene.add(farMesh);
-        // Sparse scattered vegetation across the countryside — density
-        // increases with distance, suggesting town gradually gives way to
-        // wilder land rather than a hard boundary.
-        const farTrunkMat = new THREE.MeshPhongMaterial({ color: 0x4a3a2a, flatShading: true });
-        const farLeafMat = new THREE.MeshPhongMaterial({ color: 0x3a6b45, flatShading: true, fog: true });
-        for (let i = 0; i < 60; i++) {
-            const fx = 49 + Math.random() * 400;
-            const fz = -105 + Math.random() * 120;
-            const fh = farCountrysideHeightAt(fx, fz);
-            if (fh < 1.5)
-                continue; // the coasts now wander, so skip spots that fall on the beach or in the water
-            const trunkH = 2.5 + Math.random() * 2.5;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, trunkH, 5), farTrunkMat);
-            trunk.position.set(keyCenter.x + fx, fh + trunkH / 2, keyCenter.z + fz);
-            scene.add(trunk);
-            const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.8 + Math.random() * 1.2, 6, 5), farLeafMat);
-            canopy.position.set(keyCenter.x + fx, fh + trunkH + 0.7, keyCenter.z + fz);
-            canopy.scale.y = 0.75;
-            scene.add(canopy);
-        }
-        // ---------- Island chain — more land on the horizon so the sea doesn't dominate every
-        // view. Each is a real, reachable landmass (boat collision, walkable ground, calmer water in
-        // its lee) built from the shared landmassHeightAt profile. Positions are kept clear of the reef,
-        // wreck, open-water zone, marina and the western island.
+        // ---------- The town and its planting, from the plan above ----------
         const LANDMASSES = [
             { name: "Pelican Cay", cx: -190, cz: -330, rx: 55, rz: 45, peak: 4, seed: 1.3, trees: 45 },
             { name: "Mullet Key", cx: 150, cz: 330, rx: 48, rz: 42, peak: 4, seed: 2.9, trees: 40 },
@@ -5487,7 +5584,79 @@ function DeepWaterPrototype({ onExit, newLook }) {
             { name: "Heron Rock", cx: 760, cz: -330, rx: 40, rz: 34, peak: 8, seed: 6.4, trees: 26 },
             { name: "Driftwood Cay", cx: -760, cz: 330, rx: 46, rz: 40, peak: 5, seed: 7.2, trees: 30 },
             { name: "Lone Palm", cx: 180, cz: -650, rx: 34, rz: 30, peak: 3, seed: 8.1, trees: 14 },
+            // The harbor land: more ground around the marina so the town has room (key-local centres (16,-33), (56,28) and (24,19)). Plateau = lawn level; no
+            // random trees or marina lots here (the town plan plants them), and the mesh is drawn on a finer grid.
+            { name: "Harbor North", cx: 62, cz: -74, rx: 80, rz: 36, peak: 0.8, plateau: 2.2, seed: 2.2, trees: 0, harbor: true, cell: 3 },
+            { name: "Harbor South", cx: 102, cz: -13, rx: 48, rz: 24, peak: 0.8, plateau: 2.2, seed: 5.1, trees: 0, harbor: true, cell: 3 },
+            { name: "Harbor Neck", cx: 62, cz: -31, rx: 10, rz: 8, peak: 0.3, plateau: 2.0, seed: 1.1, trees: 0, harbor: true, cell: 2 }, // fills the little cove between the island, the town strip and the green
+            { name: "Harbor Green", cx: 70, cz: -22, rx: 28, rz: 12, peak: 0.4, plateau: 1.9, seed: 3.7, trees: 0, harbor: true, cell: 2 },
         ];
+        const TOWN = townPlan();
+        const WALK_CIRCLES = [], WALK_HOUSES = []; // what the player cannot walk through (world coordinates): round things, and the houses
+        const townPalmTrunkGeo = new THREE.CylinderGeometry(0.12, 0.2, 1, 5), townFrondGeo = new THREE.ConeGeometry(0.25, 2.2, 4);
+        function addTownPalm(kx, kz, trunkH, lean) {
+            const gh = townGroundH(kx, kz);
+            if (gh === null)
+                return;
+            const px = keyCenter.x + kx, pz = keyCenter.z + kz;
+            const trunk = new THREE.Mesh(townPalmTrunkGeo, palmTrunkMat);
+            trunk.scale.y = trunkH;
+            trunk.position.set(px, gh + trunkH / 2, pz);
+            trunk.rotation.z = lean;
+            scene.add(trunk);
+            for (let f = 0; f < 5; f++) {
+                const frond = new THREE.Mesh(townFrondGeo, palmLeafMat);
+                frond.position.set(px - Math.sin(lean) * trunkH * 0.5, gh + trunkH + 0.3, pz);
+                frond.rotation.z = Math.PI / 2.3;
+                frond.rotation.y = (f / 5) * Math.PI * 2;
+                scene.add(frond);
+            }
+            WALK_CIRCLES.push([px, pz, 0.4]);
+        }
+        TOWN.houses.forEach((h) => {
+            const gh = townGroundH(h.x, h.z);
+            if (gh === null)
+                return;
+            const [wallColor, roofColor] = houseColors[h.color];
+            const house = buildHouse(wallColor, roofColor, h.scale, h.variant);
+            house.position.set(keyCenter.x + h.x, gh, keyCenter.z + h.z);
+            house.rotation.y = h.rot;
+            scene.add(house);
+            WALK_HOUSES.push({ x: keyCenter.x + h.x, z: keyCenter.z + h.z, rot: h.rot, hx: h.hx + 0.25, hz: h.hz + 0.25 });
+        });
+        TOWN.palms.forEach((q, i) => addTownPalm(q[0], q[1], 3 + hash2(q[0], q[1]) * 1.5, (hash2(q[1], q[0]) - 0.5) * 0.2));
+        TOWN.yardTrees.forEach((q) => addTownPalm(q[0], q[1], 2.6 + hash2(q[0], q[1]) * 1.2, (hash2(q[1], q[0]) - 0.5) * 0.15));
+        {
+            const shrubGeo = new THREE.IcosahedronGeometry(1, 0), shrubMats = [0x3f7a45, 0x4a8a4c, 0x356b3d].map((c) => new THREE.MeshPhongMaterial({ color: c, flatShading: true }));
+            TOWN.shrubs.forEach((q, i) => {
+                const gh = townGroundH(q[0], q[1]);
+                if (gh === null)
+                    return;
+                const m = new THREE.Mesh(shrubGeo, shrubMats[i % 3]), r = q[2] * (0.9 + hash2(q[0], q[1]) * 0.3);
+                m.scale.set(r, r * 0.8, r);
+                m.position.set(keyCenter.x + q[0], gh + r * 0.45, keyCenter.z + q[1]);
+                scene.add(m);
+                WALK_CIRCLES.push([keyCenter.x + q[0], keyCenter.z + q[1], r * 0.8]);
+            });
+        }
+        // Scattered trees across the countryside — kept off the road and out of the town, spread a little thinner near it.
+        const farTrunkMat = new THREE.MeshPhongMaterial({ color: 0x4a3a2a, flatShading: true });
+        const farLeafMat = new THREE.MeshPhongMaterial({ color: 0x3a6b45, flatShading: true, fog: true });
+        TOWN.farTrees.forEach((t) => {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, t.trunkH, 5), farTrunkMat);
+            trunk.position.set(keyCenter.x + t.x, t.h + t.trunkH / 2, keyCenter.z + t.z);
+            scene.add(trunk);
+            const canopy = new THREE.Mesh(new THREE.SphereGeometry(t.canopy, 6, 5), farLeafMat);
+            canopy.position.set(keyCenter.x + t.x, t.h + t.trunkH + 0.7, keyCenter.z + t.z);
+            canopy.scale.y = 0.75;
+            scene.add(canopy);
+            WALK_CIRCLES.push([keyCenter.x + t.x, keyCenter.z + t.z, 0.5]);
+        });
+        // ---------- Island chain — more land on the horizon so the sea doesn't dominate every
+        // view. Each is a real, reachable landmass (boat collision, walkable ground, calmer water in
+        // its lee) built from the shared landmassHeightAt profile. Positions are kept clear of the reef,
+        // wreck, open-water zone, marina and the western island.
+        // (LANDMASSES now stands above the town plan: the plan reads the harbor land's ground.)
         // Marina lots — one levelled building plot per island (bearing = direction from the island's centre to
         // the shore the lot faces, degrees, 0 = +X, 90 = +Z). Each is 24x16 and sits just behind the beach.
         const MARINA_PLAN = {
@@ -5521,7 +5690,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const landmassMat = new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, flatShading: true });
         const PAD_GROUND = new THREE.Color(0xc4b284);
         LANDMASSES.forEach((lm) => {
-            const geo = new THREE.PlaneGeometry(3 * lm.rx, 3 * lm.rz, Math.round((3 * lm.rx) / 5), Math.round((3 * lm.rz) / 5));
+            const geo = new THREE.PlaneGeometry(3 * lm.rx, 3 * lm.rz, Math.round((3 * lm.rx) / (lm.cell || 5)), Math.round((3 * lm.rz) / (lm.cell || 5)));
             geo.rotateX(-Math.PI / 2);
             const pos = geo.attributes.position;
             const colors = new Float32Array(pos.count * 3);
@@ -5569,11 +5738,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
         for (let i = 0, placed = 0; placed < 240 && i < 5000; i++) {
             const fx = 60 + landRng() * 410, fz = -150 + landRng() * 170;
             const h = farCountrysideHeightAt(fx, fz);
-            if (h > 1.8 && h < 17) {
+            if (h > 1.8 && h < 17 && townClear(TOWN, fx, fz, 2.4)) {
                 treeSpots.push({ x: keyCenter.x + fx, y: h, z: keyCenter.z + fz, s: 0.8 + landRng() * 0.8 });
                 placed++;
             }
         }
+        treeSpots.forEach((tr) => WALK_CIRCLES.push([tr.x, tr.z, 0.45 * tr.s])); // (the trunks stop you; the canopy is overhead)
         {
             const n = treeSpots.length;
             const trunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.28, 1, 5), farTrunkMat, n);
@@ -5690,15 +5860,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
             });
         }
         function landmassGroundAt(worldX, worldZ) {
+            let best = null; // the highest surface wins where the harbor land overlaps itself
             for (let i = 0; i < LANDMASSES.length; i++) {
                 const lm = LANDMASSES[i];
                 if (Math.abs(worldX - lm.cx) > lm.rx * 1.2 || Math.abs(worldZ - lm.cz) > lm.rz * 1.2)
                     continue; // the shore never reaches past ~0.85 radii
                 const h = landmassHeightAt(lm, worldX, worldZ, seafloorHeightAt);
-                if (h !== null && h > 0.3)
-                    return h;
+                if (h !== null && h > 0.3 && (best === null || h > best))
+                    best = h;
             }
-            return null;
+            return best;
         }
         // ---------- Boat collision — checks against every land mass and major
         // structure so the boat can no longer drive straight through the
@@ -5760,22 +5931,21 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if (h > 0.3 && (domeH === null || h > domeH))
                     domeH = h;
             } // the town surface where it rises above the island's edge
-            if (domeH !== null)
-                return domeH;
+            let best = domeH; // the highest of the land surfaces here wins (the harbor land overlaps the island and the town strip)
             if (kx >= 44 && kx <= 474 && kz >= FAR_Z_MIN && kz <= FAR_Z_MAX) {
                 const h = farCountrysideHeightAt(kx, kz);
-                if (h > 0.3)
-                    return h;
+                if (h > 0.3 && (best === null || h > best))
+                    best = h;
             }
-            if (inShoreFootprint(worldX, worldZ)) {
+            if (best === null && inShoreFootprint(worldX, worldZ)) {
                 const h = shoreHeightAt(worldX, worldZ);
                 if (h > 0.3)
-                    return h;
+                    best = h;
             }
             const islandH = landmassGroundAt(worldX, worldZ);
-            if (islandH !== null)
-                return islandH;
-            return null; // water — not walkable
+            if (islandH !== null && (best === null || islandH > best))
+                best = islandH;
+            return best; // null = water — not walkable
         }
         // ---------- Harbor front: the roads, the quay and the marina store ----------
         // Everything below is laid out in key-local coordinates (the key island's centre is 0,0; +z runs south along the pier). Heights come
@@ -5829,6 +5999,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             if (rd.w >= 3)
                 buildRibbon(rd.pts, 0.16, 0.17, roadLineMat, 0.8, [3, 3]);
         });
+        TOWN.paths.forEach((pa) => buildRibbon(pa.pts, 1.1, 0.10, roadShoulderMat, 1.0)); // the paths from each porch to the road
+        buildRibbon(DOCK_PATH, 2.0, 0.10, roadShoulderMat, 1.0); // and the worn path from the end of Harbor Road to the pier head
         function roadSamples(rd, spacing) {
             const out = [];
             let target = 0, run = 0;
@@ -5934,6 +6106,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 6), iron);
                 p.position.set(keyCenter.x + x, QUAY.y + 1.6, keyCenter.z + QUAY.z1 - 1.6);
                 scene.add(p);
+                WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + QUAY.z1 - 1.6, 0.25]);
                 const l = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), lampGlow);
                 l.position.set(keyCenter.x + x, QUAY.y + 3.4, keyCenter.z + QUAY.z1 - 1.6);
                 scene.add(l);
@@ -5941,6 +6114,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 7, 6), iron);
             fp.position.set(keyCenter.x - 24, QUAY.y + 3.5, keyCenter.z + 17.5);
             scene.add(fp);
+            WALK_CIRCLES.push([keyCenter.x - 24, keyCenter.z + 17.5, 0.25]);
             const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), new THREE.MeshPhongMaterial({ color: 0x2f6f78, side: THREE.DoubleSide }));
             flag.position.set(keyCenter.x - 24, QUAY.y + 6.2, keyCenter.z + 17.5 + 0.95);
             flag.rotation.y = Math.PI / 2;
@@ -5949,6 +6123,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), woodM);
                 seat.position.set(keyCenter.x + x, QUAY.y + 0.5, keyCenter.z + z);
                 scene.add(seat);
+                [-0.7, 0, 0.7].forEach((dx) => WALK_CIRCLES.push([keyCenter.x + x + dx, keyCenter.z + z, 0.4]));
                 const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.08), woodM);
                 back.position.set(keyCenter.x + x, QUAY.y + 0.85, keyCenter.z + z - 0.3);
                 scene.add(back);
@@ -5958,27 +6133,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // ---- street lamps along the harbor road
         {
             const iron = new THREE.MeshPhongMaterial({ color: 0x2f3236, flatShading: true }), glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
-            const rd = ROADS[0];
-            roadSamples(rd, 17).forEach((p, i) => {
-                if (p.x > 120 || p.x < 6)
-                    return;
-                const side = i % 2 ? 1 : -1, lx = p.x + (-p.tz) * side * (rd.w / 2 + 1.3), lz = p.z + p.tx * side * (rd.w / 2 + 1.3);
+            ROAD_LAMPS.forEach(([lx, lz]) => {
                 const gh = groundHeightAt(keyCenter.x + lx, keyCenter.z + lz);
                 if (gh === null)
                     return;
                 const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 6), iron);
                 pole.position.set(keyCenter.x + lx, gh + 1.7, keyCenter.z + lz);
                 scene.add(pole);
+                WALK_CIRCLES.push([keyCenter.x + lx, keyCenter.z + lz, 0.25]);
                 const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.38, 0.4), glow);
                 lamp.position.set(keyCenter.x + lx, gh + 3.55, keyCenter.z + lz);
                 scene.add(lamp);
             });
             // a few palms along the road
             const pm = new THREE.MeshPhongMaterial({ color: 0x6b5438, flatShading: true }), pl = new THREE.MeshPhongMaterial({ color: 0x3a7a3f, flatShading: true });
-            [[56, -5.2], [60, 5.5], [72, -5.5], [80, 5.2], [92, -5.4], [100, 5.6], [-3.5, 13.5], [8.5, 15.5]].forEach(([x, z]) => {
+            ROAD_PALMS.forEach(([x, z]) => {
                 const gh = groundHeightAt(keyCenter.x + x, keyCenter.z + z);
                 if (gh === null || roadDist(x, z) < 3.2)
                     return;
+                WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + z, 0.4]);
                 const th = 3.2 + ((x * 7) % 10) / 10 * 1.4;
                 const t = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, th, 5), pm);
                 t.position.set(keyCenter.x + x, gh + th / 2, keyCenter.z + z);
@@ -6028,15 +6201,35 @@ function DeepWaterPrototype({ onExit, newLook }) {
             sp.position.set(keyCenter.x + sx, gh === null ? 2 : gh, keyCenter.z + sz);
             sp.rotation.y = 0.35;
             scene.add(sp);
+            WALK_CIRCLES.push([keyCenter.x + sx, keyCenter.z + sz, 0.3]);
             const sp2 = buildSignpost([{ text: "TOWN →", color: "#4a6b42", rot: Math.PI, y: 2.6 }]);
             const gh2 = groundHeightAt(keyCenter.x + 17.5, keyCenter.z - 2.8);
             sp2.position.set(keyCenter.x + 17.5, gh2 === null ? 2 : gh2, keyCenter.z - 2.8);
             scene.add(sp2);
+            WALK_CIRCLES.push([keyCenter.x + 17.5, keyCenter.z - 2.8, 0.3]);
         }
         // ---- the marina store: a proper storefront on the quay, with a painted sign, an awning, a bait tank and a fuel pump
         const STORE = { cx: -12.5, cz: 20.6, w: 10, d: 6.2, h: 3.6 };
         const STORE_RECT = { x0: keyCenter.x + STORE.cx - STORE.w / 2 - 0.4, x1: keyCenter.x + STORE.cx + STORE.w / 2 + 0.4, z0: keyCenter.z + STORE.cz - STORE.d / 2 - 0.4, z1: keyCenter.z + STORE.cz + STORE.d / 2 + 0.4 };
         function storeBlocked(x, z) { return x > STORE_RECT.x0 && x < STORE_RECT.x1 && z > STORE_RECT.z0 && z < STORE_RECT.z1; }
+        function walkBlocked(x, z) {
+            if (storeBlocked(x, z))
+                return true;
+            for (let i = 0; i < WALK_HOUSES.length; i++) {
+                const h = WALK_HOUSES[i], dx = x - h.x, dz = z - h.z, c = Math.cos(h.rot), s = Math.sin(h.rot), lx = dx * c - dz * s, lz = dx * s + dz * c;
+                if (Math.abs(lx) < h.hx && lz > -h.hz && lz < h.hz)
+                    return true; // (the porch steps stay open)
+            }
+            for (let i = 0; i < WALK_CIRCLES.length; i++) {
+                const o = WALK_CIRCLES[i], dx = x - o[0];
+                if (dx < o[2] && dx > -o[2]) {
+                    const dz = z - o[1];
+                    if (dx * dx + dz * dz < o[2] * o[2])
+                        return true;
+                }
+            }
+            return false;
+        }
         const shopWorldPos = new THREE.Vector3(keyCenter.x + STORE.cx, QUAY.y, keyCenter.z + STORE.cz + STORE.d / 2 + 1.5); // stand at the door to trade
         function buildMarinaStore() {
             const g = new THREE.Group(), W = STORE.w, D = STORE.d, H = STORE.h;
@@ -6454,6 +6647,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
             rodGroup.quaternion.copy(rodBaseQuat);
             rodGroup.userData.baseQuat = rodBaseQuat.clone();
             group.add(rodGroup);
+            const rodTipAnchor = new THREE.Object3D(); // the very end of the rod: where the fishing line leaves it
+            rodTipAnchor.position.set(0, rodLength + 0.04, 0);
+            rodGroup.add(rodTipAnchor);
             const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, rodLength, 6), rodMat);
             rod.position.y = rodLength / 2;
             rodGroup.add(rod);
@@ -6498,7 +6694,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const handL = new THREE.Mesh(handGeo, handMat);
             handL.position.y = armL.userData.restLength / 2;
             armL.add(handL);
-            group.userData.parts = { armL, armR, torso, rodGroup, crankGroup, reelSeat, crankRadius, crankAngle: 0, legs, reelBody, rodMat, reelMat, hats, hatMat, glassGroup, glassMat, handMat, hands: [handR, handL], bootMat, bootMeshes };
+            group.userData.parts = { armL, armR, torso, rodGroup, rodTipAnchor, crankGroup, reelSeat, crankRadius, crankAngle: 0, legs, reelBody, rodMat, reelMat, hats, hatMat, glassGroup, glassMat, handMat, hands: [handR, handL], bootMat, bootMeshes };
             // Cast net — bundled and held compact near the throwing hand/shoulder,
             // not extended forward like a pole tool, matching how a cast net is
             // actually carried: gathered in loops with the weighted edge bunched,
@@ -7972,6 +8168,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
         let ashoreHeading = 0;
         let ashoreWalkPhase = 0;
         let ashoreWalkCycleAmount = 0;
+        const lineTipPt = new THREE.Vector3();
+        let ashoreCastHeading = null, ashoreLeanX = 0; // fishing from the dock: the way the player turns to the water, and how far they lean into a fish
         let shopOpen = false;
         let homeOpen = false, homePort = null, prevHomeOpen = false; // the home panel, and which home it is for
         let boatDockedPos = new THREE.Vector3(0, 0, 0); // where the boat was left when the player stepped ashore, so they can walk back to it
@@ -7987,7 +8185,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         let walkPhase = 0; // accumulates while moving, drives the alternating leg-swing walk cycle
         let walkCycleAmount = 0; // eases 0-1 as movement starts/stops, so the cycle doesn't snap on/off abruptly
         let turnLean = 0; // banks slightly into turns while walking, eases back to 0 when heading straight
-        let cameraFollowSuspended = false; // true once the camera joystick is used, until movement resumes
+        let camRecenter = false; // true while the camera swings once to sit behind the character (stepping aboard to walk, leaving first person). It never follows your steering, so it cannot fight it.
         let netEquipped = false;
         let netThrowPhase = "none"; // none | flying | sunk | retrieving
         let netThrowProgress = 0;
@@ -8006,6 +8204,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
             if (!dockBerth)
                 return null;
             return { x: dockX + dockBerth.side * 0.7, z: Math.max(dockStartZ + 2, Math.min(gazeboZ + 1.5, boatPos.z)) };
+        }
+        // Fishing on foot: anywhere on the dock deck or the gazebo at its end. The line goes out over the water to the side (or past the gazebo's end).
+        const DOCK_FISH_Z0 = dockStartZ + 7, DOCK_FISH_Z1 = gazeboZ + 2.0, DOCK_CAST_REACH = 3.6;
+        function onDockFishing() {
+            if (!ashoreMode)
+                return false;
+            const atEnd = ashorePos.z > gazeboZ - 2.3;
+            return ashorePos.z >= DOCK_FISH_Z0 && ashorePos.z <= DOCK_FISH_Z1 && Math.abs(ashorePos.x - dockX) <= (atEnd ? 2.3 : dockHalfW + 0.4);
+        }
+        function dockCastDir() {
+            const fx = Math.sin(ashoreHeading), fz = Math.cos(ashoreHeading);
+            if (ashorePos.z > gazeboZ - 1.8 && fz > 0.7)
+                return { dx: 0, dz: 1 };
+            return { dx: Math.abs(fx) > 0.2 ? Math.sign(fx) : (ashorePos.x >= dockX ? 1 : -1), dz: 0 };
         }
         function dockRequest() {
             const fs = fishingState;
@@ -8129,6 +8341,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 marineShowToast(byDock ? "🪵 Easy on the dock!" : "💥 Bumped the shore", "#ffb84d", 2);
             }
         }
+        let skiffGate = true; // false while the skiff has not arrived yet (a new game starts on foot): the hull is built but hidden
         function spawnBoat(index) {
             if (currentBoatGroup)
                 scene.remove(currentBoatGroup);
@@ -8151,6 +8364,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             if (helmPos)
                 walkPos.copy(helmPos);
             walkHeading = currentBoatGroup.userData.helmRotationY || 0;
+            currentBoatGroup.visible = skiffGate;
             scene.add(currentBoatGroup);
         }
         spawnBoat(stateRef.current.boatIndex);
@@ -8164,11 +8378,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // file, since buildAngler's own internal dependencies aren't fully
         // audited and this location is confirmed safe rather than assumed so.
         const npcDefs = [
-            { x: -9.0, z: 25.4, source: "quay", shirt: 0x7a4a3a, cast: "gus" }, // the shopkeeper, outside the marina store
-            { x: -9, z: 6, source: "dome", shirt: 0x3a5a7a, giver: "dana", cast: "dana" }, // near house1 — quest giver
-            { x: -19, z: -2, source: "dome", shirt: 0xc8a848, giver: "pete", cast: "pete" }, // near the beach — quest giver
-            { x: 27.5, z: 2.9, source: "ext", shirt: 0x5a7a4a }, // by the road, on the extension
-            { x: 1.0, z: 33, source: "dock", shirt: 0x8a4a5a, giver: "marlow", cast: "marlow" }, // on the dock — quest giver
+            { x: NPC_AT.gus[0], z: NPC_AT.gus[1], source: "quay", shirt: 0x7a4a3a, cast: "gus" }, // the shopkeeper, outside the marina store
+            { x: NPC_AT.dana[0], z: NPC_AT.dana[1], source: "dome", shirt: 0x3a5a7a, giver: "dana", cast: "dana" }, // near house1 — quest giver
+            { x: NPC_AT.pete[0], z: NPC_AT.pete[1], source: "dome", shirt: 0xc8a848, giver: "pete", cast: "pete" }, // near the beach — quest giver
+            { x: NPC_AT.road[0], z: NPC_AT.road[1], source: "ext", shirt: 0x5a7a4a }, // by the road, on the extension
+            { x: NPC_AT.marlow[0], z: NPC_AT.marlow[1], source: "dock", shirt: 0x8a4a5a, giver: "marlow", cast: "marlow" }, // on the dock — quest giver
         ];
         const npcs = [];
         npcDefs.forEach((def) => {
@@ -8742,6 +8956,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             sand: { center: openWaterCenter, spread: 30, depthMin: -13, depthMax: -11.8 }, // far regions only: fish hug the sandy bottom
             rocks: { center: openWaterCenter, spread: 24, depthMin: -13, depthMax: -11 },
         };
+        function spotZone(spot) { return Object.assign({}, ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef, spot.depth ? { depthMin: spot.depth[0], depthMax: spot.depth[1] } : {}); } // (a spot can keep its fish at its own depth)
         function randomSpeciesForZone(zone) {
             const list = SPECIES.filter((sp) => (sp.zones || [sp.zone]).indexOf(zone) >= 0);
             return list.length ? list[Math.floor(Math.random() * list.length)] : randomSpecies();
@@ -8753,13 +8968,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
             { id: "home-wreck", name: "Old Wreck", type: "wreck", x: wreckCenter.x, z: wreckCenter.z, cap: 1, home: true },
             { id: "home-inshore", name: "Mangrove Shore", type: "inshore", x: inshoreCenter.x, z: inshoreCenter.z, cap: 2, home: true },
             { id: "home-open", name: "Open Water", type: "openWater", x: openWaterCenter.x, z: openWaterCenter.z, cap: 1, home: true },
+            { id: "home-dock", name: "Marina Dock", type: "inshore", x: dockX - 6, z: dockStartZ + 24, cap: 3, home: true, spread: 7, hookY: -5, depth: [-7, -4], only: ["Mangrove Snapper", "Yellowtail Snapper", "Sheepshead", "Pompano", "Black Sea Bass"] }, // the water beside the dock: where the first catches are made on foot
         ].concat(REMOTE_SPOT_DATA.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, cap: sp.fish, home: false })))
             .concat(REGION_SPOTS.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, cap: sp.fish, home: false, region: sp.region })));
         FISH_SPOTS.forEach((sp) => { sp.center = new THREE.Vector3(sp.x, 0, sp.z); sp.active = false; sp.respawnT = 0; sp.n = 0; sp.found = sp.home; });
         stateRef.current.fishSpots = FISH_SPOTS.map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, home: sp.home, region: sp.region || "marina" }));
         const SPOT_ON = 300, SPOT_OFF = 380, SPOT_FOUND = 60;
         function spawnGamefish(spot) {
-            let species = randomSpeciesForZone(spot.type);
+            let species = spot.only ? (() => { const l = SPECIES.filter((sp) => spot.only.indexOf(sp.name) >= 0); return l.length ? l[Math.floor(Math.random() * l.length)] : randomSpeciesForZone(spot.type); })() : randomSpeciesForZone(spot.type);
             if (!spot.home) {
                 const alt = randomSpeciesForZone(spot.type);
                 if (alt.weightRange[1] > species.weightRange[1])
@@ -8773,7 +8989,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const bs = species.bodyScale || { x: 1, y: 1, z: 1 };
                 mesh.scale.set(species.scale * bs.x, species.scale * bs.y, species.scale * bs.z);
             }
-            const zc = ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef;
+            const zc = spotZone(spot);
             const packs = fishPacksFor(spot);
             // the new fish joins the pack with the fewest members, so the grounds fill out evenly instead of in one clump
             let packIdx = 0, packN = 1e9;
@@ -8801,7 +9017,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             return {
                 mesh, vel: new THREE.Vector3(Math.cos(h0) * 0.6, 0, Math.sin(h0) * 0.6),
                 heading: h0, pitch: 0, cruise: 0.55 + Math.random() * 0.5, pack: packIdx, orbA: Math.random() * Math.PI * 2, orbDir: Math.random() < 0.5 ? -1 : 1,
-                orbR: 2 + Math.random() * 4.5, depthGoal: y0, depthT: 2 + Math.random() * 6, dartT: 4 + Math.random() * 10, dart: 0, speedNow: 0.6,
+                orbR: 2 + Math.random() * 4.5, yD: y0, depthGoal: y0, depthT: 2 + Math.random() * 6, dartT: 4 + Math.random() * 10, dart: 0, speedNow: 0.6,
                 wanderT: Math.random() * 100, hooked: false, species, spot,
                 weightRoll: spot.home ? Math.random() * 0.7 : Math.max(Math.random(), Math.random()), // 0..1 position inside the species' weight range
                 homeCenter: spot.center, depthMin: zc.depthMin, depthMax: zc.depthMax,
@@ -8813,7 +9029,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // there is always somewhere to go and the fish never hover in place. (Old version pulled fish towards y=0, i.e. the surface, every
         // frame: they sat against the depth clamp with their noses pointing up.)
         const FISH_PITCH_MAX = 0.26;
-        function fishRoam(spot) { const zc = ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef; return zc.spread * (spot.home ? 1.5 : 2.2); }
+        function fishRoam(spot) { const zc = ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef; return (spot.spread || zc.spread) * (spot.home ? 1.5 : 2.2); }
         function fishPackWaypoint(spot, pk) {
             const zc = ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef, roam = fishRoam(spot);
             for (let tries = 0; tries < 10; tries++) {
@@ -8894,7 +9110,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 g.dart -= dt;
             let sp = g.cruise * Math.max(0.55, Math.min(1.8, dist / 5)) * (g.dart > 0 ? 2.1 : 1);
             g.speedNow += (sp - g.speedNow) * Math.min(1, dt * 1.5);
-            const zc = ZONE_CONFIG[spot.type] || ZONE_CONFIG.reef;
+            const zc = spotZone(spot);
             let nx = pos.x + Math.cos(g.heading) * g.speedNow * dt, nz = pos.z + Math.sin(g.heading) * g.speedNow * dt;
             if (marineBottomAt(nx, nz) >= zc.depthMax - 0.6) { // about to swim into the shallows: swing back towards the middle of the grounds
                 const bx = spot.x - pos.x, bz = spot.z - pos.z;
@@ -8910,14 +9126,21 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 g.depthGoal = zc.depthMin + Math.random() * (zc.depthMax - zc.depthMin);
                 g.depthT = 5 + Math.random() * 9;
             }
+            // g.yD is the depth the fish is swimming at; the fish is drawn there, but never higher than just under the wave on top of it (so a
+            // trough rolling over it, or a shallow flat, can never leave it sticking out of the water).
+            if (g.yD === undefined || (g.shownY !== undefined && Math.abs(pos.y - g.shownY) > 0.01))
+                g.yD = pos.y; // (moved by a fight since the last frame: carry on from there)
             const floor = marineBottomAt(nx, nz) + 1.0;
             const goal = Math.max(g.depthGoal, floor);
-            let vy = Math.max(-0.35, Math.min(0.35, (goal - pos.y) * 0.5));
-            let ny = pos.y + vy * dt;
+            let vy = Math.max(-0.35, Math.min(0.35, (goal - g.yD) * 0.5));
+            let ny = g.yD + vy * dt;
             ny = Math.max(floor, Math.min(-0.8, ny));
-            if (ny !== pos.y + vy * dt)
+            if (ny !== g.yD + vy * dt)
                 vy = 0;
-            pos.set(nx, ny, nz);
+            g.yD = ny;
+            const shown = Math.min(ny, splashWaveAt(nx, nz) - 0.9 - 0.12 * (g.species ? g.species.scale : 1));
+            g.shownY = shown;
+            pos.set(nx, shown, nz);
             const horiz = Math.max(0.2, g.speedNow);
             const wantPitch = Math.max(-FISH_PITCH_MAX, Math.min(FISH_PITCH_MAX, Math.atan2(vy, horiz)));
             g.pitch += (wantPitch - g.pitch) * Math.min(1, dt * 3);
@@ -8978,7 +9201,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             else if (fishingState.docked || dockAnim)
                 marineShowToast("Cast off from the dock first (Undock), then pick a destination", "#ffb84d", 4);
             else if (ashoreMode)
-                marineShowToast("Get back aboard first", "#ffb84d", 3);
+                marineShowToast(skiffGate ? "Get back aboard first" : "You have no boat yet. Earn the Tideline first", "#ffb84d", 3);
             else if (fishingState.mode !== "idle")
                 marineShowToast("Reel in your line first", "#ffb84d", 3);
             else {
@@ -9441,6 +9664,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     storyScene = null;
                     setUiStoryScene(null);
                     storyHandle({ finish: null, events: storyTick(quest) });
+                    if (!skiffOwnedNow())
+                        startOnFoot();
                     marineShowToast("Story restarted (test)", "#ffb84d", 3);
                 }
                 else if (a.op === "skip") {
@@ -9466,6 +9691,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             else if (a.type === "testmax") { // testing: level 50, infinite money, all gear owned (best of each slot worn), every region open, every fish and spot logged
                 questHandleAction({ type: "testprogress" });
+                quest.story.flags.skiff = true; // (the skiff turns up at the dock on the next frame)
                 quest.xp = Math.max(quest.xp, questXpForLevel(PROG_MAX_LEVEL));
                 quest.money = 999999999;
                 quest.testInfinite = true;
@@ -9530,6 +9756,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 FISH_SPOTS.forEach((sp) => { if (sp.home)
                     spotsFound[sp.id] = true; });
                 setUiSpotsFound({ ...spotsFound });
+                startOnFoot(); // a fresh game begins on the dock again
                 marineShowToast("Progress reset (test)", "#ff9a8a", 3);
             }
             else if (a.type === "nextday") { // testing shortcut: jump to tomorrow's missions
@@ -9641,6 +9868,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // Points just off a shore, used to place animals that live in shallow water. beach = a real island beach (hatchlings and pups need one).
         const MARINE_ANCHORS = [];
         LANDMASSES.forEach((lm) => {
+            if (lm.harbor)
+                return; // no hatchling beaches on the town's own shore
             for (let k = 0; k < 24; k++) {
                 const r = landmassCoastRadius(lm, k * 15, seafloorHeightAt);
                 if (r === null)
@@ -9939,11 +10168,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     if (a.vel.y < 0)
                         a.vel.y = 0;
                 }
-                if (pa.y > -0.8) {
-                    pa.y = -0.8;
-                    if (a.vel.y > 0)
-                        a.vel.y = 0;
-                }
+                {
+                    const ceil = Math.min(-0.8, splashWaveAt(pa.x, pa.z) - 0.6);
+                    if (pa.y > ceil) {
+                        pa.y = ceil;
+                        if (a.vel.y > 0)
+                            a.vel.y = 0;
+                    }
+                } // under the wave on top of it, never poking out
                 a.mesh.lookAt(pa.x + a.vel.x, pa.y + a.vel.y, pa.z + a.vel.z);
                 fishSwimAnim(a.mesh, dt, Math.min(1, h / (speed * 1.3)) * 0.6);
             }
@@ -9983,7 +10215,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         let prevPortUi = "none";
         let prevWalkMode = false;
         let prevAshoreMode = false;
-        let prevCanGoAshore = false;
+        let prevCanGoAshore = false, prevCastOk = false, prevSkiffUi = true;
         let prevNearShop = false;
         let prevNearGiver = null;
         let prevQuestDialog = null;
@@ -10103,6 +10335,171 @@ function DeepWaterPrototype({ onExit, newLook }) {
         window.addEventListener("pointermove", onPointerMove);
         renderer.domElement.addEventListener("wheel", onWheel, { passive: true });
         const clock = new THREE.Clock();
+        // The rod-hand animation for an angler standing still (casting, bite, fight, landed): used by the captain on the boat and by the one on the dock.
+        function animateRodAngler(an, dt, t, keysNow) {
+            const fs = fishingState;
+            an.rotation.z = Math.sin(t * 0.8) * 0.03; // subtle idle sway, always on
+            const parts = an.userData.parts;
+            const tmpQuat = new THREE.Quaternion();
+            const xAxis = new THREE.Vector3(1, 0, 0);
+            if (fs.mode === "fighting") {
+                fs.hooksetTimer += dt;
+                const strikeIntensity = Math.max(0, 1 - fs.hooksetTimer / 0.3); // decays over the first 0.3s
+                const strike = -0.6 * strikeIntensity; // sharp yank right at the moment of hookset
+                const reeling = !!keysNow[" "] || stateRef.current.reelHeld;
+                const pumpSpeed = reeling ? 3.2 : 0.6;
+                const pumpAmp = reeling ? 0.22 : 0.05;
+                const pump = Math.max(0, Math.sin(t * pumpSpeed)) * pumpAmp;
+                const tensionLean = (fs.tension / 100) * 0.45;
+                const runJolt = fs.running ? Math.sin(t * 22) * 0.1 : 0;
+                const shakeJolt = fs.shakeT > 0 ? Math.sin(t * 46) * 0.07 : 0;
+                const jumpBow = fs.jumping ? 0.2 : 0; // bowing to a leaping fish: rod tip down, lean in
+                const targetLean = -tensionLean - pump - runJolt + shakeJolt + strike + jumpBow;
+                an.rotation.x += (targetLean - an.rotation.x) * Math.min(1, dt * (strikeIntensity > 0.5 ? 16 : 5));
+                if (parts) {
+                    // The rod hand and rod itself keep their real grip orientation
+                    // (baseQuat) with a small wobble layered on top locally.
+                    const wobbleR = reeling ? Math.sin(t * pumpSpeed * 2 + 0.3) * 0.12 : 0;
+                    if (parts.armR)
+                        parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, wobbleR));
+                    if (parts.rodGroup)
+                        parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tensionLean * 0.6));
+                    // The reel hand is different: it's re-aimed every frame at the
+                    // crank knob's current position, so it visibly traces the same
+                    // small circle the crank itself is spinning through.
+                    if (reeling)
+                        parts.crankAngle += 9 * dt;
+                    parts.crankGroup.rotation.x = parts.crankAngle;
+                    const knobNow = new THREE.Vector3(parts.reelSeat.x, parts.reelSeat.y + parts.crankRadius * Math.cos(parts.crankAngle), parts.reelSeat.z + parts.crankRadius * Math.sin(parts.crankAngle));
+                    if (parts.armL) {
+                        const origin = parts.armL.userData.origin;
+                        const dist = knobNow.distanceTo(origin);
+                        const dir = knobNow.clone().sub(origin).normalize();
+                        parts.armL.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                        parts.armL.scale.y = dist / parts.armL.userData.restLength;
+                        parts.armL.position.copy(origin).add(knobNow).multiplyScalar(0.5);
+                    }
+                }
+            }
+            else if (fs.mode === "casting") {
+                // Backswing (0-0.4) then a fast forward swing (0.4-1.0) that
+                // follows through past neutral — same baseQuat-relative rotation
+                // technique as the fighting animation. A quick wrist-snap layers
+                // in right at the release point for a more dynamic follow-through.
+                const p = fs.castProgress;
+                const swingAngle = p < 0.4 ? -1.0 * (p / 0.4) : -1.0 + 1.6 * ((p - 0.4) / 0.6);
+                const wristSnap = p > 0.35 && p < 0.55 ? Math.sin((p - 0.35) / 0.2 * Math.PI) * 0.35 : 0;
+                const bodyLean = swingAngle * 0.25;
+                an.rotation.x += (bodyLean - an.rotation.x) * Math.min(1, dt * 10);
+                if (parts) {
+                    if (parts.armR)
+                        parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle)).multiply(tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), wristSnap));
+                    if (parts.rodGroup)
+                        parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle)).multiply(tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), wristSnap * 1.4));
+                    if (parts.armL) {
+                        // Support hand — follows the same swing at reduced amplitude,
+                        // like a real two-handed cast rather than one arm doing all the work.
+                        parts.armL.quaternion.copy(parts.armL.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle * 0.4));
+                        parts.armL.scale.y = 1;
+                        parts.armL.position.copy(parts.armL.userData.restPosition);
+                    }
+                }
+            }
+            else if (fs.mode === "result" && fs.resultSuccess) {
+                // Rod raised overhead with a small bounce — a real physical
+                // payoff for landing the fish, not just a text popup.
+                const bounce = Math.sin(t * 6) * 0.08;
+                an.rotation.x += (-0.15 - an.rotation.x) * Math.min(1, dt * 6);
+                if (parts) {
+                    const raiseAngle = -2.3 + bounce;
+                    if (parts.armR)
+                        parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle));
+                    if (parts.rodGroup)
+                        parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle));
+                    if (parts.armL) {
+                        // Free hand pumps up too — a little fist-pump alongside the raised rod.
+                        parts.armL.quaternion.copy(parts.armL.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle * 0.7));
+                        parts.armL.scale.y = 1;
+                        parts.armL.position.copy(parts.armL.userData.restPosition);
+                    }
+                }
+            }
+            else if (fs.mode === "bite") {
+                // Rod tip trembles during the bite window — a physical cue that
+                // something's on the line and it's time to strike, instead of
+                // this state playing no animation at all.
+                const tremble = Math.sin(t * 28) * 0.09 + Math.sin(t * 41) * 0.05 + (fs.biteStage === "strike" ? Math.sin(t * 57) * 0.12 : 0) - fs.nibbleKick * 0.22;
+                an.rotation.x += (0 - an.rotation.x) * Math.min(1, dt * 6);
+                if (parts) {
+                    if (parts.armR)
+                        parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tremble));
+                    if (parts.rodGroup)
+                        parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tremble * 1.6));
+                    if (parts.armL) {
+                        parts.armL.quaternion.copy(parts.armL.userData.baseQuat);
+                        parts.armL.scale.y = 1;
+                        parts.armL.position.copy(parts.armL.userData.restPosition);
+                    }
+                }
+            }
+            else {
+                an.rotation.x += (0 - an.rotation.x) * Math.min(1, dt * 3);
+                if (parts) {
+                    if (parts.armL) {
+                        parts.armL.quaternion.copy(parts.armL.userData.baseQuat);
+                        parts.armL.scale.y = 1;
+                        parts.armL.position.copy(parts.armL.userData.restPosition);
+                    }
+                    if (parts.armR)
+                        parts.armR.quaternion.copy(parts.armR.userData.baseQuat);
+                    if (parts.rodGroup)
+                        parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat);
+                }
+            }
+        }
+        // ---------- A new game starts on foot at the head of the dock. The skiff is still up at the yard (built, tied up at its berth, but hidden)
+        // until the first story step is done: then it appears alongside the dock, tied up. ----------
+        function skiffOwnedNow() { return !!(quest.story && quest.story.flags && quest.story.flags.skiff); }
+        function startOnFoot() {
+            skiffGate = false;
+            spawnBoat(0);
+            lastBoatIndex = 0;
+            stateRef.current.boatIndex = 0;
+            setUiBoatIndex(0); // the starter skiff (this also leaves it untied: tie it up below)
+            const hc = hullCapsule(boatDef.length, boatDef.beam);
+            let berth = planBerth(DOCK_DIMS, hc, { x: dockX + 14, z: dockStartZ + 30, heading: 0 }, (x, z, h) => hullHitsRects(x, z, h, hc, DOCK_RECTS), (x, z, h) => !hullBlockedAt(x, z, h));
+            if (!berth)
+                berth = { x: dockX + 4.5, z: dockStartZ + 24, h: 0, side: 1 };
+            boatPos.set(berth.x, 0, berth.z);
+            boatHeading = berth.h;
+            dockBerth = berth;
+            fishingState.docked = true;
+            fishingState.anchored = false;
+            fishingState.mode = "idle";
+            boatDockedPos.copy(boatPos);
+            ashorePos.set(dockX, 0, dockStartZ + 3);
+            ashoreHeading = 0; // at the land end of the dock, facing out along it towards Marlow
+            walkMode = false;
+            ashoreMode = true;
+            ashoreAngler.visible = true;
+            stateRef.current.orbitYaw = ashoreHeading + Math.PI;
+            camRecenter = false;
+        }
+        function skiffSync() {
+            const owned = skiffOwnedNow();
+            if (owned === skiffGate)
+                return;
+            skiffGate = owned;
+            if (currentBoatGroup)
+                currentBoatGroup.visible = owned;
+            if (owned) {
+                marineShowToast("⛵ The Tideline is tied up alongside the dock", "#7fe6a8", 6);
+                spawnSplash(boatPos.x, boatPos.z, 1.6);
+                fxPlay("plop");
+            }
+        }
+        if (!skiffOwnedNow())
+            startOnFoot();
         function animate() {
             try {
                 const dt = Math.min(clock.getDelta(), 0.1);
@@ -10111,6 +10508,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     lastBoatIndex = stateRef.current.boatIndex;
                     spawnBoat(lastBoatIndex);
                 }
+                skiffSync();
                 if (stateRef.current.sky !== lastSkyPreset) {
                     lastSkyPreset = stateRef.current.sky;
                     const skyPreset = SKY_PRESETS[lastSkyPreset];
@@ -10199,6 +10597,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if ((justPressed("v") || stateRef.current.walkToggleRequested) && fs.mode !== "bite" && fs.mode !== "fighting" && !ashoreMode) {
                     stateRef.current.walkToggleRequested = false;
                     walkMode = !walkMode;
+                    if (walkMode)
+                        camRecenter = true;
                     const helmPos = currentBoatGroup.userData.helmPosition;
                     if (!walkMode && helmPos) {
                         walkPos.copy(helmPos);
@@ -10236,6 +10636,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 }
                 if ((justPressed("l") || stateRef.current.ashoreToggleRequested) && fs.mode !== "bite" && fs.mode !== "fighting") {
                     stateRef.current.ashoreToggleRequested = false;
+                    if (fs.mode !== "idle")
+                        fs.mode = "idle"; // reel the line in first
                     if (!ashoreMode) {
                         const nearMangrove = Math.hypot(boatPos.x - inshoreCenter.x, boatPos.z - inshoreCenter.z) < 30;
                         if (fs.docked || (fs.anchored && nearMangrove)) {
@@ -10252,15 +10654,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                                 ashoreMode = true;
                                 ashoreAngler.visible = true;
                                 stateRef.current.orbitYaw = ashoreHeading + Math.PI; // set immediately rather than easing from whatever angle was left over from the boat, avoiding a jarring camera swing on stepping ashore
-                                cameraFollowSuspended = false;
+                                camRecenter = false;
                             }
                         }
                     }
                     else {
                         const nearBoat = Math.hypot(ashorePos.x - boatDockedPos.x, ashorePos.z - boatDockedPos.z) < 8;
-                        if (nearBoat) {
+                        if (!skiffGate)
+                            marineShowToast("Your skiff isn't here yet. Catch three fish off the dock first", "#ffb84d", 3);
+                        else if (nearBoat) {
                             ashoreMode = false;
                             ashoreAngler.visible = false;
+                            stateRef.current.orbitYaw -= boatHeading; // ashore the camera angle is a world angle; aboard it is relative to the boat: keep the same view
                         }
                     }
                 }
@@ -10270,8 +10675,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     stateRef.current.firstPerson = !wasFirstPerson;
                     if (wasFirstPerson) {
                         // Exiting: carry the look direction over so the character doesn't
-                        // snap back to whatever walkHeading was before entering.
+                        // snap back to whatever walkHeading was before entering, and swing the camera back behind them.
                         walkHeading += stateRef.current.fpYaw;
+                        camRecenter = true;
+                    }
+                    else if (!sitting) {
+                        walkHeading = stateRef.current.orbitYaw + Math.PI; // enter looking at exactly what the camera was showing
                     }
                     stateRef.current.fpYaw = 0;
                     stateRef.current.fpPitch = 0;
@@ -10414,28 +10823,52 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     stateRef.current.netThrowButtonRequested = false;
                     netThrowRequested = true;
                 }
-                if ((fs.anchored || fs.docked) && (justPressed("f") || stateRef.current.castRequested) && fs.mode === "idle") {
+                const castOkNow = ashoreMode ? onDockFishing() : (fs.anchored || fs.docked);
+                if ((justPressed("f") || stateRef.current.castRequested) && fs.mode === "idle") {
                     stateRef.current.castRequested = false;
-                    fs.mode = "casting";
-                    fs.castProgress = 0;
+                    if (castOkNow) {
+                        fs.mode = "casting";
+                        fs.castProgress = 0;
+                        if (ashoreMode) {
+                            const cd = dockCastDir();
+                            fs.castDir = cd;
+                            ashoreCastHeading = Math.atan2(cd.dx, cd.dz);
+                        } // turn to the water first
+                    }
+                    else if (ashoreMode)
+                        marineShowToast("Walk out onto the dock to fish", "#ffb84d", 2.5);
                 }
                 if (fs.mode === "casting") {
                     fs.castProgress += dt / 0.7;
                     if (fs.castProgress >= 1) {
                         fs.mode = "dropping";
                         fs.dropProgress = 0;
-                        fs.hookDropPoint.set(boatPos.x, 0, boatPos.z);
+                        // The line goes out from the boat, or from the dock a few steps out over the water beside the player.
+                        const cd = fs.castDir || { dx: 1, dz: 0 };
+                        let reach = DOCK_CAST_REACH; // (past the finger docks if one is in the way)
+                        if (ashoreMode)
+                            while (reach < 13 && pointOnRects(ashorePos.x + cd.dx * reach, ashorePos.z + cd.dz * reach, DOCK_RECTS))
+                                reach += 1.5;
+                        const ox = ashoreMode ? ashorePos.x + cd.dx * reach : boatPos.x, oz = ashoreMode ? ashorePos.z + cd.dz * reach : boatPos.z;
+                        fs.hookDropPoint.set(ox, 0, oz);
+                        if (ashoreMode)
+                            spawnSplash(ox, oz, 0.5);
                         // Near a fishing spot the line drifts toward its structure (like it always did at the reef); elsewhere it hangs straight down.
                         let hookSpot = null, hookSpotD = 40;
                         FISH_SPOTS.forEach((sp) => { if (!sp.active)
-                            return; const d = Math.hypot(boatPos.x - sp.x, boatPos.z - sp.z); if (d < hookSpotD) {
+                            return; const d = Math.hypot(ox - sp.x, oz - sp.z); if (d < hookSpotD) {
                             hookSpotD = d;
                             hookSpot = sp;
                         } });
+                        if (ashoreMode) {
+                            const dk = FISH_SPOTS.find((sp) => sp.id === "home-dock");
+                            if (dk && dk.active && Math.hypot(ox - dk.x, oz - dk.z) < 45)
+                                hookSpot = dk;
+                        } // on the dock the dock's own fish are the ones that bite
                         if (hookSpot)
-                            fs.hookPos.set(hookSpot.x + (boatPos.x - hookSpot.x) * 0.2, -12, hookSpot.z + (boatPos.z - hookSpot.z) * 0.2);
+                            fs.hookPos.set(hookSpot.x + (ox - hookSpot.x) * 0.2, hookSpot.hookY !== undefined ? hookSpot.hookY : -12, hookSpot.z + (oz - hookSpot.z) * 0.2);
                         else
-                            fs.hookPos.set(boatPos.x, Math.max(-12, Math.min(-3, marineBottomAt(boatPos.x, boatPos.z) + 2)), boatPos.z);
+                            fs.hookPos.set(ox, Math.max(-12, Math.min(-3, marineBottomAt(ox, oz) + 2)), oz);
                     }
                 }
                 if (fs.mode === "dropping") {
@@ -10500,6 +10933,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     fs.biteTimer += dt;
                     fs.nibbleKick = Math.max(0, fs.nibbleKick - dt * 3);
                     hf.mesh.position.lerp(fs.hookPos, Math.min(1, dt * 0.9)); // the fish noses in to the bait
+                    hf.mesh.position.y = Math.min(hf.mesh.position.y, splashWaveAt(hf.mesh.position.x, hf.mesh.position.z) - 0.9);
                     hf.mesh.lookAt(fs.hookPos);
                     fishSwimAnim(hf.mesh, dt, fs.biteStage === "strike" ? 0.9 : 0.35);
                     if (fs.biteStage === "nibble") {
@@ -10614,13 +11048,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         base.addScaledVector(away, fs.runPush * 2.2);
                         if (fs.shakeT > 0)
                             base.addScaledVector(side, Math.sin(t * 45) * 0.25);
-                        let y = Math.max(-13, Math.min(-1, base.y + fs.diveY + Math.sin(t * 3) * 0.25));
+                        const waveY = splashWaveAt(base.x, base.z);
+                        let y = Math.max(-13, Math.min(-1, waveY - 0.9, base.y + fs.diveY + Math.sin(t * 3) * 0.25));
                         let pitch = 0;
                         if (fs.jumping) {
                             const u = Math.min(1, fs.jumpT / FIGHT_JUMP_TIME);
                             const sm = (x) => { const c = Math.max(0, Math.min(1, x)); return c * c * (3 - 2 * c); };
                             const surf = sm(u / 0.2) * (1 - sm((u - 0.8) / 0.2)); // swims up to the surface, leaps, drops back in
-                            y = y * (1 - surf) + (-0.2 + Math.sin(Math.PI * u) * 2.4) * surf;
+                            y = y * (1 - surf) + (waveY - 0.2 + Math.sin(Math.PI * u) * 2.4) * surf;
                             pitch = Math.cos(Math.PI * u) * 0.9 * surf; // nose up on the way out, nose down on the way in
                         }
                         base.y = y;
@@ -10692,7 +11127,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     lineMesh.visible = false;
                 }
                 else {
-                    lineMesh.visible = true;
+                    lineMesh.visible = !(ashoreMode && fs.mode === "casting"); // (on the dock the line appears as the cast lets go)
                     let lurePoint;
                     if (fs.mode === "dropping")
                         lurePoint = fs.hookDropPoint.clone().lerp(fs.hookPos, fs.dropProgress);
@@ -10702,8 +11137,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         lurePoint = fs.hookPos.clone().add(new THREE.Vector3(0, -fs.nibbleKick * 0.35 - (fs.biteStage === "strike" ? 0.3 : 0), 0));
                     else
                         lurePoint = fs.hookPos;
+                    if (fs.mode !== "fighting") {
+                        lurePoint = lurePoint.clone();
+                        lurePoint.y = Math.min(lurePoint.y, splashWaveAt(lurePoint.x, lurePoint.z) - 0.3);
+                    }
                     const lp = lineGeo.attributes.position;
-                    lp.setXYZ(0, fs.hookDropPoint.x, fs.hookDropPoint.y, fs.hookDropPoint.z);
+                    const lineAn = ashoreMode ? ashoreAngler : (currentBoatGroup ? currentBoatGroup.userData.angler : null); // the line leaves the tip of the rod the player is holding
+                    const tipA = lineAn && lineAn.userData.parts ? lineAn.userData.parts.rodTipAnchor : null;
+                    if (tipA) {
+                        lineAn.updateMatrixWorld(true);
+                        tipA.getWorldPosition(lineTipPt);
+                        lp.setXYZ(0, lineTipPt.x, lineTipPt.y, lineTipPt.z);
+                    }
+                    else
+                        lp.setXYZ(0, fs.hookDropPoint.x, fs.hookDropPoint.y, fs.hookDropPoint.z);
                     lp.setXYZ(1, lurePoint.x, lurePoint.y, lurePoint.z);
                     lp.needsUpdate = true;
                 }
@@ -10729,7 +11176,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Mooring rope: visible only when actually docked (tied off at the
                 // mooring spot), distinct from the anchor — a boat can be anchored
                 // anywhere in a zone, but docked only at this one specific spot.
-                if (fs.docked && dockBerth) { // two lines from the hull to cleats on the dock edge
+                if (fs.docked && dockBerth && skiffGate) { // two lines from the hull to cleats on the dock edge
                     const hs = boatDef.length / 2, fz = Math.cos(boatHeading), hullX = boatPos.x - dockBerth.side * boatDef.beam * 0.45, cleatX = dockX + dockBerth.side * dockHalfW;
                     const zMin = dockStartZ + 1, zMax = dockStartZ + dockLength;
                     const sz = boatPos.z - fz * hs * 0.75, bz = boatPos.z + fz * hs * 0.75;
@@ -10809,6 +11256,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     if (canGoAshoreNow !== prevCanGoAshore) {
                         prevCanGoAshore = canGoAshoreNow;
                         setUiCanGoAshore(canGoAshoreNow);
+                    }
+                    const castOkUi = ashoreMode ? onDockFishing() : (fs.anchored || fs.docked);
+                    if (castOkUi !== prevCastOk) {
+                        prevCastOk = castOkUi;
+                        setUiCastOk(castOkUi);
+                    }
+                    if (skiffGate !== prevSkiffUi) {
+                        prevSkiffUi = skiffGate;
+                        setUiSkiff(skiffGate);
                     }
                 }
                 if (stateRef.current.firstPerson !== prevFirstPerson) {
@@ -10956,7 +11412,6 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         const moveLen = Math.hypot(mx, mz);
                         if (moveLen > 0 && !sitting) {
                             walkPhase += dt * 7;
-                            cameraFollowSuspended = false;
                         } // cadence tied to walk speed, not real time, so it doesn't drift oddly
                         if (moveLen > 0 && sitting) {
                             sitting = false;
@@ -10966,21 +11421,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             const prevX = walkPos.x, prevZ = walkPos.z;
                             mx /= moveLen;
                             mz /= moveLen;
-                            if (stateRef.current.firstPerson) {
-                                // Movement is relative to the ACTUAL look direction (walkHeading
-                                // + fpYaw), not a fixed boat-relative direction — otherwise "W"
-                                // walks you toward the boat's front regardless of which way
-                                // you're looking, which is completely disorienting.
-                                const viewYaw = boatHeading + walkHeading + stateRef.current.fpYaw;
-                                const rmx = mx * Math.cos(viewYaw) + mz * Math.sin(viewYaw);
-                                const rmz = -mx * Math.sin(viewYaw) + mz * Math.cos(viewYaw);
-                                walkPos.x += rmx * WALK_SPEED * dt;
-                                walkPos.z += rmz * WALK_SPEED * dt;
-                            }
-                            else {
-                                walkPos.x += mx * WALK_SPEED * dt;
-                                walkPos.z += mz * WALK_SPEED * dt;
-                            }
+                            // Movement is relative to what you SEE, in the boat's own frame (walkPos is local to the boat, so the boat's heading must
+                            // not be added): W walks away from the camera, or the way you are looking in first person. (First person used to add the
+                            // boat's heading here, so unless the boat pointed north, W walked off at an angle to the view.)
+                            const viewYaw = stateRef.current.firstPerson ? walkHeading + stateRef.current.fpYaw : stateRef.current.orbitYaw + Math.PI;
+                            const rmx = mx * Math.cos(viewYaw) + mz * Math.sin(viewYaw);
+                            const rmz = -mx * Math.sin(viewYaw) + mz * Math.cos(viewYaw);
+                            walkPos.x += rmx * WALK_SPEED * dt;
+                            walkPos.z += rmz * WALK_SPEED * dt;
                             // Stay roughly within the deck outline instead of walking off the boat.
                             const maxX = boatDef.beam * 0.36, maxZ = boatDef.length * 0.4;
                             const ex = walkPos.x / maxX, ez = walkPos.z / maxZ;
@@ -11022,10 +11470,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                                 // rotation there comes ONLY from mouse-look (fpYaw), never
                                 // from movement, exactly like a normal FPS.
                                 const facingX = Math.sin(walkHeading), facingZ = Math.cos(walkHeading);
-                                const strafeComponent = mx * facingZ - mz * facingX; // movement component perpendicular to current facing
-                                const isPureBackward = Math.abs(strafeComponent) < 0.35 && (mx * facingX + mz * facingZ) < -0.5;
+                                const strafeComponent = rmx * facingZ - rmz * facingX; // movement component perpendicular to current facing
+                                const isPureBackward = Math.abs(strafeComponent) < 0.35 && (rmx * facingX + rmz * facingZ) < -0.5;
                                 if (!isPureBackward) {
-                                    const targetHeading = Math.atan2(mx, mz);
+                                    const targetHeading = Math.atan2(rmx, rmz);
                                     let da = targetHeading - walkHeading;
                                     while (da > Math.PI)
                                         da -= Math.PI * 2;
@@ -11187,124 +11635,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         }
                     }
                     else if (angler) {
-                        angler.rotation.z = Math.sin(t * 0.8) * 0.03; // subtle idle sway, always on
-                        const parts = angler.userData.parts;
-                        const tmpQuat = new THREE.Quaternion();
-                        const xAxis = new THREE.Vector3(1, 0, 0);
-                        if (fs.mode === "fighting") {
-                            fs.hooksetTimer += dt;
-                            const strikeIntensity = Math.max(0, 1 - fs.hooksetTimer / 0.3); // decays over the first 0.3s
-                            const strike = -0.6 * strikeIntensity; // sharp yank right at the moment of hookset
-                            const reeling = !!keysNow[" "] || stateRef.current.reelHeld;
-                            const pumpSpeed = reeling ? 3.2 : 0.6;
-                            const pumpAmp = reeling ? 0.22 : 0.05;
-                            const pump = Math.max(0, Math.sin(t * pumpSpeed)) * pumpAmp;
-                            const tensionLean = (fs.tension / 100) * 0.45;
-                            const runJolt = fs.running ? Math.sin(t * 22) * 0.1 : 0;
-                            const shakeJolt = fs.shakeT > 0 ? Math.sin(t * 46) * 0.07 : 0;
-                            const jumpBow = fs.jumping ? 0.2 : 0; // bowing to a leaping fish: rod tip down, lean in
-                            const targetLean = -tensionLean - pump - runJolt + shakeJolt + strike + jumpBow;
-                            angler.rotation.x += (targetLean - angler.rotation.x) * Math.min(1, dt * (strikeIntensity > 0.5 ? 16 : 5));
-                            if (parts) {
-                                // The rod hand and rod itself keep their real grip orientation
-                                // (baseQuat) with a small wobble layered on top locally.
-                                const wobbleR = reeling ? Math.sin(t * pumpSpeed * 2 + 0.3) * 0.12 : 0;
-                                if (parts.armR)
-                                    parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, wobbleR));
-                                if (parts.rodGroup)
-                                    parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tensionLean * 0.6));
-                                // The reel hand is different: it's re-aimed every frame at the
-                                // crank knob's current position, so it visibly traces the same
-                                // small circle the crank itself is spinning through.
-                                if (reeling)
-                                    parts.crankAngle += 9 * dt;
-                                parts.crankGroup.rotation.x = parts.crankAngle;
-                                const knobNow = new THREE.Vector3(parts.reelSeat.x, parts.reelSeat.y + parts.crankRadius * Math.cos(parts.crankAngle), parts.reelSeat.z + parts.crankRadius * Math.sin(parts.crankAngle));
-                                if (parts.armL) {
-                                    const origin = parts.armL.userData.origin;
-                                    const dist = knobNow.distanceTo(origin);
-                                    const dir = knobNow.clone().sub(origin).normalize();
-                                    parts.armL.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-                                    parts.armL.scale.y = dist / parts.armL.userData.restLength;
-                                    parts.armL.position.copy(origin).add(knobNow).multiplyScalar(0.5);
-                                }
-                            }
-                        }
-                        else if (fs.mode === "casting") {
-                            // Backswing (0-0.4) then a fast forward swing (0.4-1.0) that
-                            // follows through past neutral — same baseQuat-relative rotation
-                            // technique as the fighting animation. A quick wrist-snap layers
-                            // in right at the release point for a more dynamic follow-through.
-                            const p = fs.castProgress;
-                            const swingAngle = p < 0.4 ? -1.0 * (p / 0.4) : -1.0 + 1.6 * ((p - 0.4) / 0.6);
-                            const wristSnap = p > 0.35 && p < 0.55 ? Math.sin((p - 0.35) / 0.2 * Math.PI) * 0.35 : 0;
-                            const bodyLean = swingAngle * 0.25;
-                            angler.rotation.x += (bodyLean - angler.rotation.x) * Math.min(1, dt * 10);
-                            if (parts) {
-                                if (parts.armR)
-                                    parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle)).multiply(tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), wristSnap));
-                                if (parts.rodGroup)
-                                    parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle)).multiply(tmpQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), wristSnap * 1.4));
-                                if (parts.armL) {
-                                    // Support hand — follows the same swing at reduced amplitude,
-                                    // like a real two-handed cast rather than one arm doing all the work.
-                                    parts.armL.quaternion.copy(parts.armL.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, swingAngle * 0.4));
-                                    parts.armL.scale.y = 1;
-                                    parts.armL.position.copy(parts.armL.userData.restPosition);
-                                }
-                            }
-                        }
-                        else if (fs.mode === "result" && fs.resultSuccess) {
-                            // Rod raised overhead with a small bounce — a real physical
-                            // payoff for landing the fish, not just a text popup.
-                            const bounce = Math.sin(t * 6) * 0.08;
-                            angler.rotation.x += (-0.15 - angler.rotation.x) * Math.min(1, dt * 6);
-                            if (parts) {
-                                const raiseAngle = -2.3 + bounce;
-                                if (parts.armR)
-                                    parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle));
-                                if (parts.rodGroup)
-                                    parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle));
-                                if (parts.armL) {
-                                    // Free hand pumps up too — a little fist-pump alongside the raised rod.
-                                    parts.armL.quaternion.copy(parts.armL.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, raiseAngle * 0.7));
-                                    parts.armL.scale.y = 1;
-                                    parts.armL.position.copy(parts.armL.userData.restPosition);
-                                }
-                            }
-                        }
-                        else if (fs.mode === "bite") {
-                            // Rod tip trembles during the bite window — a physical cue that
-                            // something's on the line and it's time to strike, instead of
-                            // this state playing no animation at all.
-                            const tremble = Math.sin(t * 28) * 0.09 + Math.sin(t * 41) * 0.05 + (fs.biteStage === "strike" ? Math.sin(t * 57) * 0.12 : 0) - fs.nibbleKick * 0.22;
-                            angler.rotation.x += (0 - angler.rotation.x) * Math.min(1, dt * 6);
-                            if (parts) {
-                                if (parts.armR)
-                                    parts.armR.quaternion.copy(parts.armR.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tremble));
-                                if (parts.rodGroup)
-                                    parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat).multiply(tmpQuat.setFromAxisAngle(xAxis, tremble * 1.6));
-                                if (parts.armL) {
-                                    parts.armL.quaternion.copy(parts.armL.userData.baseQuat);
-                                    parts.armL.scale.y = 1;
-                                    parts.armL.position.copy(parts.armL.userData.restPosition);
-                                }
-                            }
-                        }
-                        else {
-                            angler.rotation.x += (0 - angler.rotation.x) * Math.min(1, dt * 3);
-                            if (parts) {
-                                if (parts.armL) {
-                                    parts.armL.quaternion.copy(parts.armL.userData.baseQuat);
-                                    parts.armL.scale.y = 1;
-                                    parts.armL.position.copy(parts.armL.userData.restPosition);
-                                }
-                                if (parts.armR)
-                                    parts.armR.quaternion.copy(parts.armR.userData.baseQuat);
-                                if (parts.rodGroup)
-                                    parts.rodGroup.quaternion.copy(parts.rodGroup.userData.baseQuat);
-                            }
-                        }
+                        animateRodAngler(angler, dt, t, keysNow);
                     }
                     // Door animation — eases toward open/closed, runs regardless of walk
                     // mode since the door's state persists whether you're walking or driving.
@@ -11341,7 +11672,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         const netParts = angler.userData.parts;
                         const anglerWorld = new THREE.Vector3();
                         angler.getWorldPosition(anglerWorld);
-                        const aimYaw = boatHeading + walkHeading;
+                        // Throw where you are looking: the first-person view, or the way the camera faces (the character turns to face it).
+                        if (!stateRef.current.firstPerson && !sitting)
+                            walkHeading = stateRef.current.orbitYaw + Math.PI;
+                        const aimYaw = boatHeading + (stateRef.current.firstPerson ? walkHeading + stateRef.current.fpYaw : walkHeading);
                         netThrowStart.copy(anglerWorld);
                         netThrowTarget.set(anglerWorld.x + Math.sin(aimYaw) * 8, 0, anglerWorld.z + Math.cos(aimYaw) * 8);
                         netThrowPhase = "flying";
@@ -11436,7 +11770,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         amx -= 1;
                     amz += -stateRef.current.joyY;
                     amx += -stateRef.current.joyX;
-                    const aMoveLen = Math.hypot(amx, amz);
+                    const aMoveLen0 = Math.hypot(amx, amz);
+                    if (aMoveLen0 > 0.2 && fs.mode === "waiting") {
+                        fs.mode = "idle";
+                        marineShowToast("Reeled in", "#8fd9e6", 1.5);
+                    } // walking off with the line out brings it in
+                    const aMoveLen = fs.mode === "idle" ? aMoveLen0 : 0; // (rooted to the spot while casting, hooked, or showing off a catch)
                     if (aMoveLen > 0) {
                         ashoreWalkPhase += dt * 7;
                         amx /= aMoveLen;
@@ -11453,10 +11792,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         const intendedAX = ashorePos.x + rmx * ASHORE_WALK_SPEED * dt;
                         const intendedAZ = ashorePos.z + rmz * ASHORE_WALK_SPEED * dt;
                         let walkX = intendedAX, walkZ = intendedAZ;
-                        if (storeBlocked(walkX, walkZ)) { // the store's walls: slide along them instead of walking through
-                            if (!storeBlocked(walkX, ashorePos.z))
+                        if (walkBlocked(walkX, walkZ) && !walkBlocked(ashorePos.x, ashorePos.z)) { // walls, trunks and posts: slide along them instead of walking through (and a player already inside one can always walk out)
+                            if (!walkBlocked(walkX, ashorePos.z))
                                 walkZ = ashorePos.z;
-                            else if (!storeBlocked(ashorePos.x, walkZ))
+                            else if (!walkBlocked(ashorePos.x, walkZ))
                                 walkX = ashorePos.x;
                             else {
                                 walkX = ashorePos.x;
@@ -11475,7 +11814,22 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     ashoreWalkCycleAmount += ((aMoveLen > 0 ? 1 : 0) - ashoreWalkCycleAmount) * Math.min(1, dt * 8);
                     const ashoreGroundY = groundHeightAt(ashorePos.x, ashorePos.z);
                     ashoreAngler.position.set(ashorePos.x, (ashoreGroundY !== null ? ashoreGroundY : 0) + (ashoreWalkCycleAmount > 0.01 ? Math.abs(Math.sin(ashoreWalkPhase)) * 0.04 : 0), ashorePos.z);
-                    ashoreAngler.rotation.set(0, ashoreHeading, 0);
+                    if (fs.mode === "idle")
+                        ashoreCastHeading = null;
+                    else if (ashoreCastHeading !== null) { // face the water while the line is out
+                        let dh = ashoreCastHeading - ashoreHeading;
+                        while (dh > Math.PI)
+                            dh -= Math.PI * 2;
+                        while (dh < -Math.PI)
+                            dh += Math.PI * 2;
+                        ashoreHeading += dh * Math.min(1, dt * 9);
+                    }
+                    ashoreAngler.rotation.order = "YXZ"; // yaw first, then lean: the rod bows forward whichever way they face
+                    ashoreAngler.rotation.set(ashoreLeanX, ashoreHeading, 0);
+                    if (fs.mode !== "idle" || Math.abs(ashoreLeanX) > 0.002) {
+                        animateRodAngler(ashoreAngler, dt, t, keysNow);
+                        ashoreLeanX = ashoreAngler.rotation.x;
+                    }
                     const ashoreParts = ashoreAngler.userData.parts;
                     if (ashoreParts && ashoreParts.legs) {
                         ashoreParts.legs.forEach((leg, i) => {
@@ -11625,7 +11979,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         s.orbitYaw -= s.camJoyX * camTurnRate * dt;
                         s.orbitPitch = Math.max(0.08, Math.min(1.2, s.orbitPitch - s.camJoyY * camTurnRate * dt));
                     }
-                    cameraFollowSuspended = true;
+                    camRecenter = false; // the player is steering the camera: leave it alone
                 }
                 if (angler)
                     angler.visible = !(walkMode && s.firstPerson) && !ashoreMode;
@@ -11685,14 +12039,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         orbitTargetY = (groundHeightAt(ashorePos.x, ashorePos.z) || 0) + 1.2;
                         effectiveDist = Math.min(s.orbitDist, 7);
                         headingRef = 0;
-                        if (!s.dragging && !cameraFollowSuspended) {
-                            let targetOrbitYaw = ashoreHeading + Math.PI;
-                            let dyaw = targetOrbitYaw - s.orbitYaw;
+                        if (camRecenter) { // (steering and the camera are separate: no automatic swinging while you walk)
+                            let dyaw = ashoreHeading + Math.PI - s.orbitYaw;
                             while (dyaw > Math.PI)
                                 dyaw -= Math.PI * 2;
                             while (dyaw < -Math.PI)
                                 dyaw += Math.PI * 2;
-                            s.orbitYaw += dyaw * Math.min(1, dt * 2.5);
+                            s.orbitYaw += dyaw * Math.min(1, dt * 3);
+                            if (s.dragging || Math.abs(dyaw) < 0.03)
+                                camRecenter = false;
                         }
                     }
                     else if (walkMode && angler) {
@@ -11706,14 +12061,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         // direction while walking, so it follows where you're looking
                         // instead of staying wherever it was last left — but only when
                         // not actively dragging, so it never fights manual control.
-                        if (!s.dragging && !cameraFollowSuspended) {
-                            let targetOrbitYaw = walkHeading + Math.PI - boatHeading;
-                            let dyaw = targetOrbitYaw - s.orbitYaw;
+                        if (camRecenter) {
+                            let dyaw = walkHeading + Math.PI - s.orbitYaw; // (orbitYaw is in the boat's frame, like walkHeading)
                             while (dyaw > Math.PI)
                                 dyaw -= Math.PI * 2;
                             while (dyaw < -Math.PI)
                                 dyaw += Math.PI * 2;
-                            s.orbitYaw += dyaw * Math.min(1, dt * 2.5);
+                            s.orbitYaw += dyaw * Math.min(1, dt * 3);
+                            if (s.dragging || Math.abs(dyaw) < 0.03)
+                                camRecenter = false;
                         }
                     }
                     const camOffset = new THREE.Vector3(Math.sin(headingRef + s.orbitYaw) * Math.cos(s.orbitPitch), Math.sin(s.orbitPitch), Math.cos(headingRef + s.orbitYaw) * Math.cos(s.orbitPitch)).multiplyScalar(effectiveDist);
@@ -11978,8 +12334,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
         React.createElement("div", { ref: mountRef, style: { width: "100%", height: "100%" } }),
         (BUILD.demo || BUILD.dev) && (React.createElement("div", { style: { position: "absolute", top: 6, right: 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
             BUILD.dev ? "DEV" : "DEMO",
-            " v",
-            BUILD.version)),
+            " ",
+            BUILD_LABEL)),
         uiShowDebug && (React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, padding: "4px 10px", background: "rgba(0,0,0,0.75)", fontSize: 9, fontFamily: "monospace", color: "#8fd97a", zIndex: 999, wordBreak: "break-all" } },
             "DEBUG: ",
             uiSceneDebug || "waiting for first frame...")),
@@ -12058,7 +12414,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         " \u00B7 ",
                         todo.have)));
             })(),
-            React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: uiAnchored || uiDock === "docked" ? "#8fd97a" : "rgba(234,243,245,0.45)" } }, uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY"),
+            React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: uiAnchored || uiDock === "docked" ? "#8fd97a" : "rgba(234,243,245,0.45)" } }, !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY"),
             uiWalkMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#6fd6e8" } }, "\uD83D\uDEB6 WALKING ON DECK"),
             uiFirstPerson && React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#f0c674" } }, "\uD83D\uDC41 FIRST-PERSON \u2014 drag to look"),
             uiNearDoor && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
@@ -12331,7 +12687,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "⚓", label: uiAnchored ? "Weigh" : "Anchor", active: uiAnchored, enabled: !uiWalkMode, why: "Stop walking on deck first", run: rq("anchorToggleRequested") },
                         { icon: "⚙", label: uiGear === "high" ? "High Gear" : "Low Gear", enabled: !uiWalkMode, why: "Stop walking on deck first", run: rq("gearToggleRequested") },
                         { icon: "🚶", label: uiWalkMode ? "Stop Walk" : "Walk Deck", active: uiWalkMode, enabled: true, run: rq("walkToggleRequested") },
-                        { icon: "🏝️", label: uiAshoreMode ? "To Boat" : "Go Ashore", active: uiAshoreMode, enabled: uiCanGoAshore || uiAshoreMode, why: "Dock the boat or pull up next to land first", run: rq("ashoreToggleRequested") },
+                        { icon: "🏝️", label: uiAshoreMode ? "To Boat" : "Go Ashore", active: uiAshoreMode, enabled: uiCanGoAshore || (uiAshoreMode && uiSkiff), why: uiAshoreMode ? "Your skiff arrives once you have caught three fish off the dock" : "Dock the boat or pull up next to land first", run: rq("ashoreToggleRequested") },
                         { icon: "🧭", label: "Travel", enabled: true, run: () => setUiTravelOpen(true) },
                         { icon: "🎣", label: "Tackle", sub: "tackle" },
                         { icon: "🚤", label: "Boat", sub: "hull" },
@@ -12441,13 +12797,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("line", { x1: "22", y1: "22", x2: "22", y2: "6", stroke: "#6fd6e8", strokeWidth: "3", strokeLinecap: "round", transform: `rotate(${uiWheel * 80} 22 22)` }),
                     React.createElement("circle", { cx: "22", cy: "22", r: "2.5", fill: "#6fd6e8" }))),
             uiShowHelp && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S throttle lever \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
-        uiAnchored || uiDock === "docked" ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: 300, textAlign: "center" } },
+        uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: 300, textAlign: "center" } },
             uiMode === "idle" && (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } },
-                    uiDock === "docked" ? "Tied up at the dock." : "Anchored.",
+                    uiAshoreMode ? "Fishing off the dock." : uiDock === "docked" ? "Tied up at the dock." : "Anchored.",
                     " ",
                     React.createElement("span", { style: { color: "#ffb84d" } }, "Press F"),
-                    " to drop your line."),
+                    " to drop your line.",
+                    uiAshoreMode && React.createElement("span", { style: { display: "block", fontSize: 10, opacity: 0.55, marginTop: 3 } }, "Face the water you want. Walk away to reel in.")),
                 React.createElement("button", { onClick: () => { stateRef.current.castRequested = true; }, style: { fontSize: 13, padding: "6px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(255,184,77,0.15)", color: "#ffb84d", fontWeight: 600 } }, "\uD83C\uDFA3 Cast Line"))),
             uiMode === "dropping" && React.createElement("div", { style: { fontSize: 13, opacity: 0.8 } }, "Dropping line..."),
             uiMode === "waiting" && React.createElement("div", { style: { fontSize: 13, opacity: 0.8 } }, "Waiting for a bite..."),
@@ -13665,8 +14022,8 @@ function CharterLife() {
         React.createElement(LauncherScene, null),
         (BUILD.demo || BUILD.dev) && React.createElement("div", { className: "cl-badge" },
             BUILD.dev ? "DEV" : "DEMO",
-            " v",
-            BUILD.version),
+            " ",
+            BUILD_LABEL),
         React.createElement("div", { className: "cl-stack" },
             React.createElement("h1", { className: "cl-title" },
                 React.createElement("span", { className: "a" }, BUILD.title.split(" ")[0]),
@@ -13700,17 +14057,58 @@ function CharterLife() {
                     soundOn ? "on" : "off"),
                 React.createElement("span", null,
                     BUILD.title,
-                    " v",
-                    BUILD.version,
+                    " ",
+                    BUILD_LABEL,
                     BUILD.demo ? " demo" : BUILD.dev ? " dev" : "")))));
 }
 
+return CharterLife;
+}
+</script>
+<script>
 (function () {
-  var boot = document.getElementById("boot");
-  if (!window.THREE || !window.React || !window.ReactDOM) { boot.textContent = "Could not load the game libraries. Check your connection and reload."; return; }
-  boot.style.display = "none";
-  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(CharterLife));
+  var LIBS = [["vendor/three.min.js", "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"], ["vendor/react.production.min.js", "https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"], ["vendor/react-dom.production.min.js", "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"]];
+  function add(src) {
+    return new Promise(function (ok, no) {
+      var s = document.createElement("script");
+      s.src = src; s.onload = ok; s.onerror = function () { s.remove(); no(new Error(src)); };
+      document.head.appendChild(s);
+    });
+  }
+  // vendor/ copy first (works offline from the first run), CDN second (the service worker then caches it).
+  function lib(l) { return add(l[0]).catch(function () { return add(l[1]); }); }
+  var msg = document.getElementById("bootmsg");
+  function fail() {
+    msg.innerHTML = "Could not load the game libraries.<br>The first launch needs an internet connection.<br><br><button id=\"retry\">Try again</button>";
+    document.getElementById("retry").onclick = function () { location.reload(); };
+  }
+  LIBS.reduce(function (p, l) { return p.then(function () { return lib(l); }); }, Promise.resolve())
+    .then(function () {
+      if (!window.THREE || !window.React || !window.ReactDOM) throw new Error("libraries missing");
+      document.getElementById("boot").style.display = "none";
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(__makeGame()));
+    })
+    .catch(function (e) { console.error(e); fail(); });
+  // "Install app" pill: Android/Chrome gets the real install prompt, iPhone/iPad Safari gets the Add to Home Screen steps. Never shown once installed.
+  (function () {
+    var pill = document.getElementById("inst"), txt = document.getElementById("insttxt"), go = document.getElementById("instgo"), x = document.getElementById("instx"), ev = null, hid = null;
+    var standalone = (window.matchMedia && matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches) || navigator.standalone;
+    var KEY = "charterlife.installpill.dismissed";
+    try { if (localStorage.getItem(KEY)) return; } catch (e) {}
+    if (standalone || !/^https?:$/.test(location.protocol) || location.hostname === "localhost") return;
+    function show(t, btn) { txt.textContent = t; go.style.display = btn ? "" : "none"; pill.style.display = "flex"; clearTimeout(hid); hid = setTimeout(function () { pill.style.display = "none"; }, 20000); }
+    x.onclick = function () { pill.style.display = "none"; try { localStorage.setItem(KEY, "1"); } catch (e) {} };
+    window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); ev = e; show("Install CL Demo as an app", true); });
+    window.addEventListener("appinstalled", function () { pill.style.display = "none"; });
+    go.onclick = function () { if (!ev) return; ev.prompt(); ev.userChoice.then(function () { ev = null; pill.style.display = "none"; }); };
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (ios) setTimeout(function () { show("To install: tap Share, then Add to Home Screen", false); }, 4000);
+  })();
+  if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) {} }  // ask the browser not to evict the save
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
 })();
 </script>
-
-</body></html>
+</body>
+</html>
