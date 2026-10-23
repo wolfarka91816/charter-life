@@ -50,7 +50,7 @@ const BUILD = {
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
     version: "0.20", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
@@ -5540,6 +5540,7 @@ try {
         fx.on = false;
 }
 catch (e) { /* storage blocked: stay on */ }
+const HOOKSET_EASE = 2.0; // multiplies every fish's strike window (species biteWindow x gear), so the hookset gives about twice the time to answer; tune here
 const WHEEL_SEEN_KEY = "deepwater.wheelSeen"; // set once the command wheel has been opened (the new-player hint stops pulsing)
 const WHEEL_HINT_UNTIL_LEVEL = 10; // the little "boat menu" hint beside the wheel button shows until the player reaches this level
 function fxSetOn(v) { fx.on = !!v; try {
@@ -11501,6 +11502,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 fxPlay("wind");
         }
         let lastCatchFlags = { first: false, best: false };
+        let catchDisplay = null; // the fish just landed, held up where the player can see it: { mesh, t, dur, k } (see the result block in the frame loop)
+        const catchTmp = new THREE.Vector3(), catchBox = new THREE.Box3(), catchSize = new THREE.Vector3();
         const spotsFound = {};
         FISH_SPOTS.forEach((sp) => { if (sp.found)
             spotsFound[sp.id] = true; });
@@ -13542,7 +13545,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                     else {
                         fs.strikeT += dt;
-                        const sp = hf.species, win = sp.biteWindow * gearNow.window, frac = fs.strikeT / win;
+                        const sp = hf.species, win = sp.biteWindow * gearNow.window * HOOKSET_EASE, frac = fs.strikeT / win;
                         if (hookNow) {
                             const quality = frac < 0.45 ? "clean" : frac > 0.7 ? "late" : "normal"; // the earlier in the window, the better the hookset
                             fs.mode = "fighting";
@@ -13685,11 +13688,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         });
                         spawnSplash(fs.hookDropPoint.x, fs.hookDropPoint.z, 0.9);
                         if (hf) {
-                            scene.remove(hf.mesh);
                             const idx = gamefish.indexOf(hf);
                             if (idx >= 0)
                                 gamefish.splice(idx, 1);
                             fs.hookedFish = null;
+                            // keep the fish in the scene and hold it up for a moment so the player sees what they caught (it is removed when the catch card goes)
+                            hf.mesh.visible = true;
+                            hf.mesh.rotation.set(0, 0, 0);
+                            catchBox.setFromObject(hf.mesh);
+                            catchBox.getSize(catchSize);
+                            const len = Math.max(0.1, catchSize.x, catchSize.y, catchSize.z), k = Math.max(0.15, Math.min(1.6, 2.6 / len)); // shown about 1-3 ft long whatever its real size
+                            catchDisplay = { mesh: hf.mesh, t: 0, dur: 3.2, k, s0: hf.mesh.scale.clone() };
+                            hf.mesh.scale.copy(catchDisplay.s0).multiplyScalar(k);
                         }
                     }
                 }
@@ -13698,6 +13708,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     if (fs.resultTimer <= 0) {
                         fs.mode = "idle";
                         fs.resultText = "";
+                    }
+                }
+                if (catchDisplay) {
+                    const cd = catchDisplay, m = cd.mesh, an = ashoreMode ? ashoreAngler : (currentBoatGroup ? currentBoatGroup.userData.angler : null);
+                    cd.t += dt;
+                    if (!an || cd.t >= cd.dur || fs.mode !== "result") {
+                        scene.remove(m);
+                        catchDisplay = null;
+                    }
+                    else {
+                        an.getWorldPosition(catchTmp);
+                        const dx = camera.position.x - catchTmp.x, dz = camera.position.z - catchTmp.z, dl = Math.hypot(dx, dz) || 1, ux = dx / dl, uz = dz / dl;
+                        const rise = Math.min(1, cd.t / 0.35), bob = Math.sin(cd.t * 3.2) * 0.12; // lifts out of the water, then hangs and sways
+                        m.position.set(catchTmp.x + ux * 1.6, catchTmp.y + 1.6 + 1.6 * rise + bob, catchTmp.z + uz * 1.6);
+                        m.lookAt(m.position.x - uz, m.position.y + 0.5, m.position.z + ux); // broadside to the camera, nose up a little
+                        fishSwimAnim(m, dt, cd.t < 1.2 ? 0.9 : 0.35);
+                        m.scale.copy(cd.s0).multiplyScalar(cd.k * (cd.t > cd.dur - 0.35 ? Math.max(0.01, (cd.dur - cd.t) / 0.35) : 1)); // shrinks away at the end
+                        if (!m.parent)
+                            scene.add(m);
                     }
                 }
                 updateFishingSpots(dt);
@@ -13789,7 +13818,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 fightUiT -= dt;
                 if ((fs.mode === "bite" || fs.mode === "fighting") && fightUiT <= 0) {
                     fightUiT = 0.09;
-                    const stk = fs.mode === "bite" && fs.hookedFish ? Math.min(1, fs.strikeT / Math.max(0.1, fs.hookedFish.species.biteWindow * gearNow.window)) : 0;
+                    const stk = fs.mode === "bite" && fs.hookedFish ? Math.min(1, fs.strikeT / Math.max(0.1, fs.hookedFish.species.biteWindow * gearNow.window * HOOKSET_EASE)) : 0;
                     const fsp = fs.mode === "fighting" ? fs.species : null;
                     setUiFight({
                         stage: fs.mode === "bite" ? fs.biteStage : "fight", tug: fs.nibbleKick > 0.45, strike: stk,
@@ -15558,7 +15587,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("button", { onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); stateRef.current.reelHeld = true; }, onPointerUp: () => { stateRef.current.reelHeld = false; }, onPointerCancel: () => { stateRef.current.reelHeld = false; }, style: { fontSize: 14, padding: "12px 28px", borderRadius: 6, cursor: "pointer", border: "1px solid #6fd6e8", background: "rgba(111,214,232,0.15)", color: "#6fd6e8", fontWeight: 700, touchAction: "none", userSelect: "none" } }, "HOLD TO REEL")));
             })(),
             uiMode === "result" && (uiResultSuccess && uiCatch ? (React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center", textAlign: "left" } },
-                React.createElement("div", { style: { width: 46, height: 46, borderRadius: "50%", background: uiCatch.color, border: "2px solid rgba(255,255,255,0.3)", flexShrink: 0 } }),
+                React.createElement("svg", { width: "64", height: "40", viewBox: "0 0 64 40", "aria-label": "A " + uiCatch.name, style: { flexShrink: 0 } },
+                    React.createElement("path", { d: "M4 20 C14 5 38 4 50 18 L62 8 L58 20 L62 32 L50 22 C38 36 14 35 4 20 Z", fill: uiCatch.color, stroke: "rgba(255,255,255,0.55)", strokeWidth: "1.5", strokeLinejoin: "round" }),
+                    React.createElement("path", { d: "M26 9 C30 14 30 26 26 31", fill: "none", stroke: "rgba(0,0,0,0.25)", strokeWidth: "1.5" }),
+                    React.createElement("circle", { cx: "13", cy: "18", r: "2.2", fill: "#0e1f28" }),
+                    React.createElement("circle", { cx: "12.4", cy: "17.4", r: "0.8", fill: "#fff" })),
                 React.createElement("div", { style: { flex: 1 } },
                     (uiCatch.first || uiCatch.best) && React.createElement("div", { style: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: "#ffd36b" } }, uiCatch.first ? "NEW SPECIES" : "PERSONAL BEST"),
                     React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#8fd97a" } }, uiCatch.name),
