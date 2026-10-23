@@ -4168,7 +4168,7 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
     const small = (color) => ({ fontSize: 12, padding: "6px 12px", borderRadius: 5, cursor: "pointer", border: `1px solid ${color}`, background: "rgba(255,255,255,0.06)", color });
     const slot = GEAR_SLOTS.find((s) => s.id === tab) || GEAR_SLOTS[0];
     const newCount = (id) => GEAR_ITEMS.filter((g) => g.slot === id && !qs.gear.owned[g.id] && gearUnlocked(qs, g)).length; // items ready to buy
-    return (React.createElement("div", null,
+    return (React.createElement("div", { style: { color: "#eaf3f5" } },
         React.createElement("div", { style: { fontSize: 12, marginBottom: 8, color: "#8fd97a" } },
             "\uD83D\uDCB0 $",
             qs.money),
@@ -4180,7 +4180,7 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
                 s.label,
                 n > 0 ? " 🔓" : ""));
         })),
-        React.createElement("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 8 } },
+        React.createElement("div", { style: { fontSize: 11, color: "#b4c3c8", marginBottom: 8 } },
             "Equipped: ",
             (gearItem(qs.gear.equipped[slot.id]) || {}).name),
         GEAR_ITEMS.filter((g) => g.slot === slot.id).map((item, idx, arr) => {
@@ -4188,25 +4188,29 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
             const reqs = gearReqLines(qs, item), unlocked = reqs.every((l) => l.met);
             const stat = item.slot === "hull" ? [gearHullLine(item)] : gearStatsLines(item), cost = gearPrice(qs, item);
             const chips = equipped ? [] : gearDeltaChips(item, curItem), newTier = idx === 0 || arr[idx - 1].tier !== item.tier;
+            const locked = !owned && !unlocked, tooPoor = !owned && unlocked && qs.money < cost; // greyed out: not yet earned (level or other requirement) / earned but not affordable yet
+            const nameColor = locked ? "#9aa8ad" : tooPoor ? "#cfd9dc" : "#f6fafb", soft = locked ? "#7f8d92" : "#b4c3c8";
             return (React.createElement(React.Fragment, { key: item.id },
-                newTier && React.createElement("div", { style: { fontSize: 9, letterSpacing: 1.5, opacity: 0.45, margin: "10px 0 4px" } },
+                newTier && React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.5, color: "#8fa3aa", margin: "10px 0 4px" } },
                     "TIER ",
                     item.tier),
-                React.createElement("div", { style: { padding: "8px 10px", marginBottom: 6, borderRadius: 6, background: equipped ? "rgba(127,230,168,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${equipped ? "rgba(127,230,168,0.5)" : "rgba(255,255,255,0.1)"}`, opacity: owned || unlocked ? 1 : 0.8 } },
+                React.createElement("div", { style: { padding: "8px 10px", marginBottom: 6, borderRadius: 6, background: equipped ? "rgba(127,230,168,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${equipped ? "rgba(127,230,168,0.5)" : "rgba(255,255,255,0.1)"}`, opacity: locked ? 0.7 : tooPoor ? 0.85 : 1 } },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
                         React.createElement("div", { style: { width: 12, height: 12, borderRadius: 3, background: hex(item.color), border: "1px solid rgba(255,255,255,0.4)", flexShrink: 0 } }),
-                        React.createElement("div", { style: { flex: 1, fontSize: 13, fontWeight: 600 } }, item.name),
+                        React.createElement("div", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: nameColor } },
+                            locked && React.createElement("span", { "aria-hidden": "true" }, "\uD83D\uDD12 "),
+                            item.name),
                         item.tag && React.createElement("div", { style: { fontSize: 9, letterSpacing: 0.5, padding: "1px 6px", borderRadius: 8, background: "rgba(240,198,116,0.18)", color: "#f0c674" } }, item.tag)),
-                    React.createElement("div", { style: { fontSize: 11, opacity: 0.7, marginTop: 3 } }, item.blurb),
-                    stat.length > 0 && React.createElement("div", { style: { fontSize: 11, color: "#6fd6e8", marginTop: 3 } }, stat.join(" · ")),
+                    React.createElement("div", { style: { fontSize: 11, color: soft, marginTop: 3 } }, item.blurb),
+                    stat.length > 0 && React.createElement("div", { style: { fontSize: 11, color: locked ? "#6f9aa3" : "#6fd6e8", marginTop: 3 } }, stat.join(" · ")),
                     chips.length > 0 && (React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 } },
-                        React.createElement("span", { style: { fontSize: 9, opacity: 0.5, alignSelf: "center" } }, "vs equipped"),
+                        React.createElement("span", { style: { fontSize: 10, color: "#8fa3aa", alignSelf: "center" } }, "vs equipped"),
                         chips.map((c, i) => React.createElement("span", { key: i, style: { fontSize: 10, padding: "1px 6px", borderRadius: 8, background: c.good ? "rgba(127,230,168,0.14)" : "rgba(255,138,122,0.14)", color: c.good ? "#7fe6a8" : "#ff9a8a" } },
                             c.label,
                             " ",
                             c.text)))),
                     !owned && !unlocked && (React.createElement("div", { style: { marginTop: 5 } },
-                        React.createElement("div", { style: { fontSize: 10, opacity: 0.6 } }, "\uD83D\uDD12 Needs:"),
+                        React.createElement("div", { style: { fontSize: 11, color: "#b4c3c8" } }, "Needs:"),
                         reqs.map((l, i) => (React.createElement("div", { key: i, style: { fontSize: 11, color: l.met ? "#7fe6a8" : "#e8c27a" } },
                             l.met ? "✔" : "•",
                             " ",
@@ -4216,7 +4220,7 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
                                 "(",
                                 l.have,
                                 ")")))),
-                        React.createElement("div", { style: { fontSize: 10, opacity: 0.55, marginTop: 2 } },
+                        React.createElement("div", { style: { fontSize: 11, color: "#8fa3aa", marginTop: 2 } },
                             "Price when unlocked: $",
                             cost))),
                     React.createElement("div", { style: { marginTop: 6, display: "flex", alignItems: "center", gap: 10 } },
@@ -4229,7 +4233,7 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
                             React.createElement("button", { disabled: !canBuy || qs.money < cost, style: { ...small("#ffb84d"), opacity: !canBuy || qs.money < cost ? 0.45 : 1, cursor: !canBuy || qs.money < cost ? "default" : "pointer" }, onClick: () => send({ type: "gearbuy", id: item.id }) },
                                 "Buy \u00B7 $",
                                 cost),
-                            React.createElement("span", { style: { fontSize: 10, opacity: 0.6 } }, !canBuy ? "Buy at the marina shop" : qs.money < cost ? "Not enough money yet" : "")))))));
+                            React.createElement("span", { style: { fontSize: 11, color: qs.money < cost ? "#ff9a8a" : "#b4c3c8" } }, qs.money < cost ? "Need $" + (cost - qs.money) + " more" + (canBuy ? "" : " · buy at the marina shop") : !canBuy ? "Buy at the marina shop" : "")))))));
         }),
         showTesting && (React.createElement("div", { style: { marginTop: 10 } },
             React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginBottom: 4 } }, "Testing shortcuts"),
@@ -14932,9 +14936,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const tapPrompt = !TOUCH_UI ? "" : uiNearGiver && !uiQuestDialog ? "Tap " + ((QUEST_GIVERS.find((g) => g.id === uiNearGiver) || STORY_CAST[uiNearGiver] || {}).name || "them") + " to talk" + (uiQuest && storyMarkFor(uiQuest, uiNearGiver) ? " ★" : "")
         : uiNearShop && !uiShopOpen && !uiNearGiver ? "Tap the store to go in" : uiNearDoor ? "Tap the door to " + (uiDoorOpen ? "close" : "open") : uiNearSeat ? "Tap the seat to sit"
             : uiNearCooler && uiCarriedCount > 0 ? "Tap the cooler to store your catch" : uiSitting ? "🪑 Sitting · move to stand" : "";
-    return (React.createElement("div", { style: { position: "relative", width: "100%", height: STAGE_HEIGHT, background: "#08161c", borderRadius: 10, overflow: "hidden", fontFamily: "system-ui, sans-serif" } },
+    return (React.createElement("div", { style: { position: "relative", width: "100%", height: STAGE_HEIGHT, background: "#08161c", color: "#eaf3f5", borderRadius: 10, overflow: "hidden", fontFamily: "system-ui, sans-serif" } },
         React.createElement("div", { ref: mountRef, style: { width: "100%", height: "100%" } }),
-        (BUILD.demo || BUILD.dev) && !(TOUCH_UI && uiMarineToast && !uiHudOpen) && (React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 68 : 6, right: TOUCH_UI ? 12 : 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
+        (BUILD.demo || BUILD.dev) && !(TOUCH_UI && uiMarineToast && !uiHudOpen) && !(uiGearOpen || uiShopOpen || uiBoatYardOpen || uiWardrobeOpen || uiProgressOpen || uiStoryOpen || uiMissionsOpen || uiHomeOpen) && (React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 68 : 6, right: TOUCH_UI ? 12 : 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
             BUILD.dev ? "DEV" : "DEMO",
             " ",
             BUILD_LABEL)),
@@ -15126,7 +15130,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         uiMarineToast && TOUCH_UI && !uiHudOpen && (React.createElement("div", { onClick: () => setUiMarineToast(null), style: { position: "absolute", top: 58, left: 14, maxWidth: "calc(100% - 82px)", boxSizing: "border-box", ...panelStyle, padding: "6px 10px", border: `1px solid ${uiMarineToast.color}`, borderTop: `3px solid ${uiMarineToast.color}`, borderRadius: "0 0 6px 6px", color: uiMarineToast.color, fontSize: 11, lineHeight: 1.3, fontWeight: 600, zIndex: 62 } },
             React.createElement("div", { style: { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, uiMarineToast.text))),
         uiStoryScene && uiQuest && (React.createElement(StoryScene, { key: uiStoryScene.id, scene: uiStoryScene, qs: uiQuest, onDone: (flags, played) => { stateRef.current.questAction = { type: "storydone", flags, played }; } })),
-        uiStoryOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiStoryOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 560, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\u2605 The Story"),
                 React.createElement("button", { onClick: () => setUiStoryOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
@@ -15139,7 +15143,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 return null;
             const line = g.say[m.status === "offered" ? "offer" : m.status === "active" ? "active" : m.status === "ready" ? "ready" : "done"];
             const btn = (color) => ({ fontSize: 13, padding: "9px 18px", borderRadius: 6, cursor: "pointer", border: `1px solid ${color}`, background: "rgba(255,255,255,0.06)", color });
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
+            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 500, overflowY: "auto", padding: 16 } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 10 } },
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } },
                         STORY_CAST[g.id] && React.createElement("div", { style: { borderRadius: 10, overflow: "hidden", border: "2px solid " + (STORY_ACCENT[g.id] || "#ffb84d"), flex: "0 0 auto" } },
@@ -15159,34 +15163,34 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("button", { style: btn("rgba(255,255,255,0.4)"), onClick: () => { stateRef.current.questCloseRequested = true; } }, m.status === "offered" ? "Not now" : "Close")),
                 m.status === "offered" && React.createElement("div", { style: { fontSize: 10, opacity: 0.55, marginTop: 10 } }, "Only fish landed after you accept count toward a mission.")));
         })(),
-        uiGearOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiGearOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83E\uDDF0 Tackle"),
                 React.createElement("button", { onClick: () => setUiGearOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
             React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 12 } }, "Swap what you own here (not while a fish is on). New gear is bought at the marina shop. Your hull's own tackle class still applies on top of this."),
             React.createElement(GearPanel, { qs: uiQuest, canBuy: false, send: (a) => { stateRef.current.questAction = a; }, showTesting: BUILD.dev, hullSwapOk: uiDock === "docked" && !uiAshoreMode }))),
-        uiBoatYardOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiBoatYardOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83C\uDFA8 Boat Yard"),
                     React.createElement("button", { onClick: () => setUiBoatYardOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 10 } }, "Make each boat your own. Changes show on the water as soon as you close this. Paid paints, flags and fittings are bought at the marina boat yard."),
                 React.createElement(BoatYardPanel, { qs: uiQuest, canBuy: false, boatIndex: uiBoatIndex, send: (a) => { stateRef.current.questAction = a; } })))),
-        uiWardrobeOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiWardrobeOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDC54 Wardrobe"),
                     React.createElement("button", { onClick: () => setUiWardrobeOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 10 } }, "Change your look any time. New clothes are bought at the marina outfitter. Hats, glasses, gloves and boots are tackle gear, so they stay in Gear."),
                 React.createElement(WardrobePanel, { qs: uiQuest, canBuy: false, send: (a) => { stateRef.current.questAction = a; } })))),
-        uiProgressOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiProgressOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f0c674" } }, "\u2B50 Captain's Progress"),
                 React.createElement("button", { onClick: () => setUiProgressOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
             React.createElement(ProgressPanel, { qs: uiQuest, send: (a) => { stateRef.current.questAction = a; }, showTesting: BUILD.dev }))),
         uiMissionsOpen && uiQuest && (() => {
             const lvl = questLevelForXp(uiQuest.xp);
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCCB Daily Missions"),
                     React.createElement("button", { onClick: () => setUiMissionsOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
@@ -15222,7 +15226,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const tr = (uiQuest && uiQuest.travel) || { unlocked: {} }, lvl = uiQuest ? questLevelForXp(uiQuest.xp) : 1, money = uiQuest ? uiQuest.money : 0;
             const caught = (uiQuest && uiQuest.stats && uiQuest.stats.caught) || {};
             const btn = (color, on) => ({ fontSize: 13, padding: "8px 16px", borderRadius: 6, cursor: on ? "pointer" : "default", border: "1px solid " + color, background: on ? color.replace(/[\d.]+\)$/, "0.18)") : "rgba(255,255,255,0.04)", color: on ? color : "rgba(234,243,245,0.4)", fontWeight: 700 });
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#7fe6a8" } }, "\uD83E\uDDED Travel"),
                     React.createElement("button", { onClick: () => setUiTravelOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
@@ -15272,7 +15276,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 return { sp, dist: Math.hypot(dx, dz), dir: compassFrom(dx, dz), found: !!uiSpotsFound[sp.id] };
             }).sort((a, b) => (a.found === b.found ? a.dist - b.dist : a.found ? -1 : 1));
             const foundN = rows.filter((r) => r.found && !r.sp.home).length, remoteN = rows.filter((r) => !r.sp.home).length;
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#7fe6a8" } },
                         "\uD83D\uDDFA\uFE0F Fishing Spots \u00B7 ",
@@ -15300,7 +15304,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         rows.filter((r) => !r.found).length,
                         " more grounds are still unexplored. Sail the open water, look for landmarks and circling birds, and watch the sonar.")))));
         })(),
-        uiWildlifeOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        uiWildlifeOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#6fd6e8" } }, "\uD83D\uDC2C Wildlife Log"),
                 React.createElement("button", { onClick: () => setUiWildlifeOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
@@ -15578,7 +15582,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             " to anchor. Pull up to the marina dock for a ",
             React.createElement("span", { style: { color: "#7fe6a8" } }, "Dock boat"),
             " button."))),
-        uiJournalOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
+        uiJournalOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 500, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
                 React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCD6 Fish Journal"),
                 React.createElement("button", { onClick: () => { setUiJournalOpen(false); setUiJournalSelected(null); }, style: { fontSize: 13, padding: "4px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.05)", color: "#eaf3f5" } }, "Close")),
@@ -15625,7 +15629,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             JOURNAL_LEVELS.howTo - count,
                             " more to learn how to target it"))))));
             }))),
-        uiShopOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
+        uiShopOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 500, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
                     !uiPort && React.createElement("div", { style: { borderRadius: 10, overflow: "hidden", border: "2px solid " + STORY_ACCENT.gus, flex: "0 0 auto" } },
@@ -15680,7 +15684,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const btn = (color, on = true) => ({ fontSize: 12, padding: "6px 14px", borderRadius: 5, cursor: on ? "pointer" : "default", border: "1px solid " + color, background: "rgba(255,255,255,0.06)", color, opacity: on ? 1 : 0.4, fontWeight: 600 });
             const send = (a) => { stateRef.current.questAction = a; };
             const clock = (sec) => Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
+            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 500, overflowY: "auto", padding: 16 } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
                     React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#ffb84d" } },
                         "\uD83C\uDFE1 ",
@@ -15817,7 +15821,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             h.bunks,
                             " empty bunks, ready for crew. Crew members and friends joining your boat are not built yet; this is where they will sleep."))))));
         })(),
-        uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 500, overflowY: "auto", padding: 16 } },
+        uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 500, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
                 React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#ffb84d" } }, "\uD83E\uDDCA Cooler Contents"),
                 React.createElement("button", { onClick: () => setUiCoolerOpen(false), style: { fontSize: 13, padding: "4px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.05)", color: "#eaf3f5" } }, "Close")),
