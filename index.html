@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.18", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.19", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -70,10 +70,857 @@ catch (e) {
 const BUILD_LABEL = "v" + BUILD.version + (BUILD.build ? " \u00b7 " + BUILD.build : ""); // e.g. "v0.13 \u00b7 22 Oct 2026"
 const STAGE_HEIGHT = BUILD.fullscreen ? "100dvh" : "640px"; // the game and the title screen share one stage size
 const BOATS = [
-    { name: "Tideline 16", tier: "Skiff", length: 17, beam: 5.3, freeboardRatio: 0.088, gunwaleHeight: 0.45, hullColor: 0xf2f0e6, accent: 0x1c5d7a, maxSpeed: 9, turnRate: 0.85, rockFactor: 1.6, yawInertia: 0.3, rodStiffness: 1.4, tensionMult: 1.25, rodButtWidth: 3.4, tackleLabel: "12 LB CLASS SPIN" },
-    { name: "Horizon 32 CC", tier: "Center Console", length: 17, beam: 5.4, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xffffff, accent: 0x0a3d62, maxSpeed: 14, turnRate: 0.55, rockFactor: 1.0, yawInertia: 0.6, rodStiffness: 1.0, tensionMult: 1.0, rodButtWidth: 4.4, tackleLabel: "20 LB CLASS" },
-    { name: "Canyon Chaser 40", tier: "Sportfisher", length: 22, beam: 6.5, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xf5f5f0, accent: 0x7a1c1c, maxSpeed: 12, turnRate: 0.35, rockFactor: 0.65, yawInertia: 1.1, rodStiffness: 0.6, tensionMult: 0.78, rodButtWidth: 6.2, tackleLabel: "50 LB CLASS STAND-UP" },
+    { name: "Tideline 16", tier: "Skiff", length: 17, beam: 5.3, freeboardRatio: 0.088, gunwaleHeight: 0.45, hullColor: 0xf2f0e6, accent: 0x1c5d7a, maxSpeed: 9, turnRate: 0.85, rockFactor: 1.6, yawInertia: 0.3, rodStiffness: 1.4, tensionMult: 1.25, rodButtWidth: 3.4, tackleLabel: "12 LB CLASS SPIN", family: "skiff", kind: "Flats skiff", stripe: "boot", bottom: "red", hs: { keel: 0.32, chineW: 0.8, chineY: 0.3, bowRise: 0.3, flat: 0.5, rake: 0.06 }, fit: { ttop: false, twin: false, platform: false } },
+    { name: "Horizon 32 CC", tier: "Center Console", length: 17, beam: 5.4, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xffffff, accent: 0x0a3d62, maxSpeed: 14, turnRate: 0.55, rockFactor: 1.0, yawInertia: 0.6, rodStiffness: 1.0, tensionMult: 1.0, rodButtWidth: 4.4, tackleLabel: "20 LB CLASS", family: "cc", kind: "Center console", stripe: "boot", bottom: "red", hs: { keel: 0.62, chineW: 0.6, bowRise: 0.4 }, fit: { ttop: true, twin: true, platform: true } },
+    { name: "Canyon Chaser 40", tier: "Sportfisher", length: 22, beam: 6.5, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xf5f5f0, accent: 0x7a1c1c, maxSpeed: 12, turnRate: 0.35, rockFactor: 0.65, yawInertia: 1.1, rodStiffness: 0.6, tensionMult: 0.78, rodButtWidth: 6.2, tackleLabel: "50 LB CLASS STAND-UP", family: "sport", kind: "Sportfisher", stripe: "double", bottom: "red", hs: { keel: 0.85, chineW: 0.56, bowRise: 0.5, rake: 0.09 }, fit: {}, ad: ["outrig"] },
+    { name: "Backwater 19", tier: "Skiff", family: "cc", kind: "Bay boat", length: 16, beam: 5.7, freeboardRatio: 0.125, gunwaleHeight: 0.6, hullColor: 0xe9e4d2, accent: 0x2f6b4f, maxSpeed: 10.5, turnRate: 0.7, rockFactor: 1.3, yawInertia: 0.42, rodStiffness: 1.25, tensionMult: 1.15, rodButtWidth: 3.8, tackleLabel: "15 LB CLASS SPIN", stripe: "cove", bottom: "teal", hs: { keel: 0.4, chineW: 0.72, chineY: 0.32, bowRise: 0.36, flat: 0.25, rake: 0.07 }, fit: { ttop: false, twin: false, platform: false, motor: "standard" } },
+    { name: "Reef Runner 24", tier: "Center Console", family: "cc", kind: "Open console", length: 18.5, beam: 6, freeboardRatio: 0.135, gunwaleHeight: 0.7, hullColor: 0xf1f3f4, accent: 0x1b4965, maxSpeed: 12.5, turnRate: 0.62, rockFactor: 1.12, yawInertia: 0.5, rodStiffness: 1.1, tensionMult: 1.07, rodButtWidth: 4.2, tackleLabel: "20 LB CLASS", stripe: "double", bottom: "navy", hs: { keel: 0.55, chineW: 0.64, bowRise: 0.42 }, fit: { ttop: true, twin: false, platform: true, motor: "premium" } },
+    { name: "Stormbreaker 36 Cat", tier: "Center Console", family: "cc", kind: "Power catamaran", length: 20.5, beam: 6.8, freeboardRatio: 0.12, gunwaleHeight: 0.7, hullColor: 0xdde4e8, accent: 0x20404b, maxSpeed: 15, turnRate: 0.48, rockFactor: 0.52, yawInertia: 0.85, rodStiffness: 0.8, tensionMult: 0.86, rodButtWidth: 5.2, tackleLabel: "30 LB CLASS", stripe: "band", bottom: "grey", hs: { keel: 0.7, chineW: 0.92, chineY: 0.95, bowRise: 0.45, cat: 1, rake: 0.08 }, fit: { ttop: true, twin: true, platform: true } },
 ];
+// <<BOATLOOK-BEGIN>>
+// ======================= BOATS: looks and lofted hulls (v19) =======================
+// A boat's LOOK is one small record (colours, stripe, name, flag, fittings) that is saved per hull and can be sent to another player as a short
+// string; the hull itself is a smooth lofted shell built from it. Pure data and geometry: nothing here reads the game state.
+const BOAT_PAINTS = [
+    { id: "white", name: "Gelcoat White", color: 0xf4f4ef, price: 0, level: 1 }, { id: "ivory", name: "Ivory", color: 0xeadfc4, price: 0, level: 1 },
+    { id: "sand", name: "Dune Sand", color: 0xd3c298, price: 0, level: 1 }, { id: "grey", name: "Shark Grey", color: 0x8b959c, price: 0, level: 1 },
+    { id: "charcoal", name: "Charcoal", color: 0x363c43, price: 0, level: 1 }, { id: "navy", name: "Navy", color: 0x14335c, price: 0, level: 1 },
+    { id: "sea", name: "Sea Blue", color: 0x2a6f9e, price: 0, level: 1 }, { id: "red", name: "Signal Red", color: 0xb3262d, price: 0, level: 1 },
+    { id: "sky", name: "Sky Blue", color: 0x8dbde0, price: 60, level: 2 }, { id: "seafoam", name: "Seafoam", color: 0x8fd0bd, price: 60, level: 2 },
+    { id: "teal", name: "Lagoon Teal", color: 0x1d8785, price: 80, level: 3 }, { id: "forest", name: "Forest Green", color: 0x21523b, price: 80, level: 3 },
+    { id: "orange", name: "Sunset Orange", color: 0xe0722a, price: 120, level: 5 }, { id: "yellow", name: "Dorado Yellow", color: 0xefc531, price: 120, level: 5 },
+    { id: "burgundy", name: "Burgundy", color: 0x6a1c2c, price: 120, level: 5 }, { id: "black", name: "Jet Black", color: 0x15181b, price: 150, level: 6 },
+    { id: "gunmetal", name: "Gunmetal", color: 0x586068, price: 250, level: 9 }, { id: "gold", name: "Champagne", color: 0xbf9f55, price: 400, level: 12 },
+];
+const BOAT_STRIPES = [
+    { id: "none", name: "Plain", price: 0, level: 1 }, { id: "boot", name: "Boot stripe", price: 0, level: 1 }, { id: "cove", name: "Cove stripe", price: 0, level: 1 },
+    { id: "double", name: "Boot + cove", price: 40, level: 2 }, { id: "band", name: "Tournament band", price: 90, level: 4 },
+    { id: "twotone", name: "Two-tone", price: 120, level: 6 }, { id: "fade", name: "Sunset fade", price: 200, level: 9 },
+];
+const BOAT_BOTTOMS = [
+    { id: "red", name: "Red", color: 0x8c2f27 }, { id: "black", name: "Black", color: 0x1b1f23 }, { id: "navy", name: "Navy", color: 0x1c3558 },
+    { id: "teal", name: "Teal", color: 0x1d6a6a }, { id: "grey", name: "Grey", color: 0x6b747b }, { id: "white", name: "White", color: 0xe9e9e2 },
+];
+const BOAT_DECKS = [
+    { id: "cream", name: "Cream non-skid", color: 0xe9e3d1, price: 0, level: 1 }, { id: "grey", name: "Grey non-skid", color: 0xb7bcbf, price: 0, level: 1 },
+    { id: "sand", name: "Sand", color: 0xd8c9a2, price: 0, level: 1 }, { id: "teak", name: "Teak", color: 0xa97c4a, price: 80, level: 4 },
+    { id: "dark", name: "Graphite", color: 0x4a5057, price: 80, level: 4 }, { id: "seafoam", name: "Seafoam", color: 0xbddccf, price: 80, level: 4 },
+];
+const BOAT_FLAGS = [
+    { id: "none", name: "No flag", price: 0, level: 1 }, { id: "pennant", name: "Pennant", price: 0, level: 1 }, { id: "burgee", name: "Burgee", price: 20, level: 2 },
+    { id: "fish", name: "Fish flag", price: 30, level: 3 }, { id: "anchor", name: "Anchor", price: 30, level: 3 }, { id: "check", name: "Chequered", price: 60, level: 5 },
+    { id: "jolly", name: "Skull and bones", price: 60, level: 5 }, { id: "star", name: "Star", price: 60, level: 5 },
+];
+const BOAT_DECALS = [
+    { id: "none", name: "None", price: 0, level: 1 }, { id: "marlin", name: "Marlin", price: 90, level: 6 }, { id: "tuna", name: "Tuna", price: 90, level: 6 },
+    { id: "dolphin", name: "Mahi", price: 90, level: 6 }, { id: "tarpon", name: "Tarpon", price: 90, level: 6 }, { id: "shark", name: "Shark", price: 120, level: 8 },
+];
+const BOAT_FONTS = [{ id: "block", name: "Block" }, { id: "serif", name: "Classic" }, { id: "script", name: "Script" }];
+const BOAT_ADDONS = [
+    { id: "holders", name: "Gunwale rod holders", blurb: "A row of stainless rod holders along both gunwales.", price: 0, level: 1, fits: ["skiff", "cc", "sport"] },
+    { id: "bimini", name: "Bimini top", blurb: "Canvas shade over the cockpit, on a stainless frame.", price: 60, level: 2, fits: ["skiff", "cc"] },
+    { id: "spots", name: "Spreader lights", blurb: "Bright spotlights on the top or the cabin roof.", price: 80, level: 4, fits: ["cc", "sport"] },
+    { id: "rocket", name: "Rocket launcher", blurb: "A rod rack across the back of the T-top or cabin roof.", price: 120, level: 5, fits: ["cc", "sport"] },
+    { id: "outrig", name: "Outriggers", blurb: "Long poles that spread the trolling lines.", price: 240, level: 8, fits: ["cc", "sport"] },
+    { id: "bowrail", name: "Anchor roller", blurb: "A stainless roller and pulpit on the bow.", price: 40, level: 3, fits: ["skiff", "cc", "sport"] },
+    { id: "bumpers", name: "Fender flags", blurb: "A set of fenders hung along the dock side.", price: 30, level: 2, fits: ["skiff", "cc", "sport"] },
+];
+const BOAT_PAINT_BY_ID = {};
+BOAT_PAINTS.forEach((p) => { BOAT_PAINT_BY_ID[p.id] = p; });
+function boatHexOk(s) { return typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s); }
+function boatColor(id, fallback) {
+    if (BOAT_PAINT_BY_ID[id])
+        return BOAT_PAINT_BY_ID[id].color;
+    if (boatHexOk(id))
+        return parseInt(id.slice(1), 16);
+    return fallback;
+}
+function boatHexStr(n) { return "#" + ("000000" + (n >>> 0).toString(16)).slice(-6); }
+function boatOptId(list, id, def) { return list.some((o) => o.id === id) ? id : def; }
+function boatText(s, n) { return String(s === undefined || s === null ? "" : s).replace(/[^A-Za-z0-9 '&.\-]/g, "").replace(/\s+/g, " ").trim().slice(0, n); }
+function boatLookDefault(def) {
+    return { v: 1, h: boatHexStr(def.hullColor), a: boatHexStr(def.accent), st: def.stripe || "boot", sc: "", bt: def.bottom || "red", dk: "cream", cp: "hull", cv: "", sk: "", nm: "", pt: "", nf: "block", fl: "none", fc: "", dc: "none", dcc: "", ad: (def.ad || []).slice() };
+}
+function boatAddonOk(def, id) {
+    const a = BOAT_ADDONS.find((x) => x.id === id);
+    if (!a)
+        return false;
+    if (a.fits.indexOf(boatFamily(def)) < 0)
+        return false;
+    if (id === "bimini" && boatFit(def).ttop)
+        return false;
+    return true;
+}
+function boatLookSanitize(l, def) {
+    const d = boatLookDefault(def), o = l && typeof l === "object" ? l : {};
+    const col = (v, f) => (BOAT_PAINT_BY_ID[v] || boatHexOk(v) ? v : f);
+    const colOrBlank = (v) => (v === "" ? "" : col(v, ""));
+    const fits = BOAT_ADDONS.filter((a) => boatAddonOk(def, a.id)).map((a) => a.id);
+    const ad = Array.isArray(o.ad) ? o.ad.filter((x, i, a) => fits.indexOf(x) >= 0 && a.indexOf(x) === i).slice(0, 8) : d.ad;
+    return { v: 1, h: col(o.h, d.h), a: col(o.a, d.a), st: boatOptId(BOAT_STRIPES, o.st, d.st), sc: colOrBlank(o.sc), bt: boatOptId(BOAT_BOTTOMS, o.bt, d.bt), dk: boatOptId(BOAT_DECKS, o.dk, d.dk), cp: o.cp === "accent" ? "accent" : "hull", cv: colOrBlank(o.cv), sk: colOrBlank(o.sk), nm: boatText(o.nm, 22), pt: boatText(o.pt, 18), nf: boatOptId(BOAT_FONTS, o.nf, d.nf), fl: boatOptId(BOAT_FLAGS, o.fl, "none"), fc: colOrBlank(o.fc), dc: boatOptId(BOAT_DECALS, o.dc, "none"), dcc: colOrBlank(o.dcc), ad };
+}
+function boatLookResolve(look, def) {
+    const hull = boatColor(look.h, def.hullColor), accent = boatColor(look.a, def.accent);
+    return {
+        hull, accent, stripe: look.st, stripeCol: look.sc ? boatColor(look.sc, accent) : accent,
+        bottom: (BOAT_BOTTOMS.find((b) => b.id === look.bt) || BOAT_BOTTOMS[0]).color, deck: (BOAT_DECKS.find((b) => b.id === look.dk) || BOAT_DECKS[0]).color,
+        cap: look.cp === "accent" ? accent : hull, canvas: look.cv ? boatColor(look.cv, accent) : null, seat: look.sk ? boatColor(look.sk, accent) : null,
+        name: look.nm, port: look.pt, font: look.nf, flag: look.fl, flagCol: look.fc ? boatColor(look.fc, accent) : accent, decal: look.dc, decalCol: look.dcc ? boatColor(look.dcc, accent) : accent, addons: look.ad.slice(),
+    };
+}
+// A look travels as a short string (base64url of the compact JSON): what another player's game needs to draw this boat.
+function boatLookEncode(look, hullIndex) {
+    try {
+        const s = JSON.stringify({ i: hullIndex, ...look });
+        const b = typeof btoa === "function" ? btoa(unescape(encodeURIComponent(s))) : Buffer.from(s, "utf8").toString("base64");
+        return b.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+    catch (e) {
+        return "";
+    }
+}
+function boatLookDecode(str) {
+    try {
+        const b = String(str).replace(/-/g, "+").replace(/_/g, "/");
+        const j = typeof atob === "function" ? decodeURIComponent(escape(atob(b))) : Buffer.from(b, "base64").toString("utf8");
+        const o = JSON.parse(j);
+        return o && typeof o === "object" ? o : null;
+    }
+    catch (e) {
+        return null;
+    }
+}
+function boatFamily(def) { return def.family || ({ Skiff: "skiff", "Center Console": "cc", Sportfisher: "sport" })[def.tier] || "cc"; } // which builder dresses the hull
+function boatFit(def) { const f = boatFamily(def); return Object.assign({ ttop: f === "cc", twin: f === "cc", platform: f === "cc", motor: "premium" }, def.fit || {}); } // the fittings this hull has
+// ---------- the lofted hull ----------
+// Plan outline: the same five points the superstructure builders already fit to (hullHalfWidthAt), joined by a smooth monotone curve that is
+// never narrower than the old straight-edged outline, so everything that was fitted to the old outline still sits inside the new hull.
+function boatPolyHalfWidth(z, L, B) {
+    const pts = [[L, 0], [0.55 * L, 0.55 * B], [0.05 * L, B], [-0.55 * L, B], [-L, 0.85 * B]];
+    if (z > pts[0][0])
+        return 0;
+    if (z < pts[4][0])
+        return pts[4][1];
+    for (let i = 0; i < 4; i++) {
+        const [z1, w1] = pts[i], [z2, w2] = pts[i + 1];
+        if (z <= z1 && z >= z2)
+            return w1 + (w2 - w1) * ((z1 - z) / (z1 - z2));
+    }
+    return 0;
+}
+function boatPlanner(L, B) {
+    const xs = [-L, -0.55 * L, -0.05 * L, 0.55 * L, 0.86 * L, L], ys = [0.85 * B, B, B, 0.55 * B, 0.27 * B, 0];
+    const n = xs.length, h = [], d = [], m = new Array(n).fill(0);
+    for (let i = 0; i < n - 1; i++) {
+        h[i] = xs[i + 1] - xs[i];
+        d[i] = (ys[i + 1] - ys[i]) / h[i];
+    }
+    for (let i = 1; i < n - 1; i++) {
+        if (d[i - 1] * d[i] <= 0)
+            m[i] = 0;
+        else {
+            const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1];
+            m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
+        }
+    }
+    m[0] = d[0];
+    m[n - 1] = d[n - 2] * 1.0;
+    return function (z) {
+        if (z <= xs[0])
+            return ys[0];
+        if (z >= xs[n - 1])
+            return 0;
+        let i = 0;
+        while (i < n - 2 && z > xs[i + 1])
+            i++;
+        const t = (z - xs[i]) / h[i], t2 = t * t, t3 = t2 * t;
+        const w = (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1];
+        return Math.max(w, boatPolyHalfWidth(z, L, B), 0);
+    };
+}
+function boatMix(a, b, t) { const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255, br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255; return ((Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t)) >>> 0; }
+function boatShade(c, k) { return boatMix(c, k < 1 ? 0x000000 : 0xffffff, k < 1 ? 1 - k : k - 1); }
+const BOAT_WATER_Y = 0.15; // the waterline in hull coordinates (the game floats the hull group 0.15 below the mean wave height)
+// Paint bands up the topsides from y0 (chine) to y1 (sheer) at one station: [{ a, b, col }] with absolute heights.
+function boatHullBands(r, y0, y1, depth) {
+    const hull = r.hull, sc = r.stripeCol, out = [], add = (a, b, col) => { a = Math.max(y0, Math.min(y1, a)); b = Math.max(a, Math.min(y1, b)); out.push({ a, b, col }); }; // always the same bands per style, clipped to the station (never dropped)
+    const boot = [y0, y0 + 0.30], cove = [y1 - 0.40, y1 - 0.24];
+    switch (r.stripe) {
+        case "boot":
+            add(y0, y0, hull);
+            add(boot[0], boot[1], sc);
+            add(boot[1], y1, hull);
+            break;
+        case "cove":
+            add(y0, cove[0], hull);
+            add(cove[0], cove[1], sc);
+            add(cove[1], y1, hull);
+            break;
+        case "double":
+            add(y0, y0, hull);
+            add(boot[0], boot[1], sc);
+            add(boot[1], cove[0], hull);
+            add(cove[0], cove[1], sc);
+            add(cove[1], y1, hull);
+            break;
+        case "band":
+            add(y0, y1 - 1.05, hull);
+            add(y1 - 1.05, y1 - 0.98, hull);
+            add(y1 - 0.98, y1 - 0.38, sc);
+            add(y1 - 0.38, y1 - 0.31, hull);
+            add(y1 - 0.31, y1, hull);
+            break;
+        case "twotone": {
+            const cut = Math.min(y1 - 0.5, depth * 0.62);
+            add(y0, cut, sc);
+            add(cut, cut + 0.07, boatShade(hull, 0.7));
+            add(cut + 0.07, y1, hull);
+            break;
+        }
+        case "fade": {
+            const top = y1 - 0.2, N = 8;
+            for (let k = 0; k < N; k++)
+                add(y0 + (top - y0) * k / N, y0 + (top - y0) * (k + 1) / N, boatMix(sc, hull, k / (N - 1)));
+            add(top, y1, hull);
+            break;
+        }
+        default: add(y0, y1, hull);
+    }
+    return out;
+}
+// One hull shell. def: { length, beam, freeboardRatio, gunwaleHeight, hs: hull-style numbers }; r: resolved look. Returns a Group; userData.hull has the key heights.
+// Forward is +Z, y = 0 is the old hull bottom (the deck is still at length * freeboardRatio, so every builder keeps working), the keel now reaches below that.
+function buildHullShell(def, r) {
+    const L = def.length / 2, B = def.beam / 2, depth = def.length * def.freeboardRatio, gw = def.gunwaleHeight;
+    const hs = Object.assign({ keel: 0.55, chineW: 0.62, chineY: 0.34, bowRise: 0.34, sternRise: 0.06, bowKeel: 0.6, flat: 0, cat: 0, rake: 0.075 }, def.hs || {});
+    const plan = boatPlanner(L, B), wallT = 0.1, N = 50, rm = hs.rake * L, topY = depth + gw + hs.bowRise;
+    // the stem leans forward with height (a raked bow): the outline at height y is the plan outline pushed forward by rake(z, y)
+    const rakeAt = (z, y) => rm * Math.pow(Math.max(0, Math.min(1, y / topY)), 1.25) * Math.max(0, Math.min(1, (z - 0.05 * L) / (0.55 * L)));
+    const pw = (z, y) => plan(z - rakeAt(z, y));
+    const zs = [];
+    for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        zs.push(-L + (2 * L + rm) * (1 - Math.pow(1 - u, 1.65)));
+    }
+    const sheerAt = (z) => { const u = Math.min(1, (z + L) / (2 * L)); return depth + gw + hs.bowRise * Math.pow(Math.max(0, u - 0.3) / 0.7, 2.2) + hs.sternRise * Math.pow(1 - u, 2); };
+    const keelAt = (z) => { const u = Math.min(1, (z + L) / (2 * L)); const k = -hs.keel * (u < 0.12 ? 0.72 + 2.3 * u : 1); const bowY = depth * hs.bowKeel; const s = Math.max(0, (u - 0.46) / 0.54); return k + (bowY - k) * Math.pow(s, 2.1); };
+    const chineAt = (z) => { const yk = keelAt(z), y = Math.max(yk + 0.1, hs.chineY); return Math.min(y, sheerAt(z) - 0.9); };
+    const tunGeo = { pos: [], idx: [] }, topGeo = { pos: [], col: [], idx: [] }, botGeo = { pos: [], idx: [] }, deckGeo = { pos: [], idx: [] }, inGeo = { pos: [], idx: [] }, capGeo = { pos: [], idx: [] };
+    const pushV = (g, x, y, z, c) => { g.pos.push(x, y, z); if (c !== undefined && g.col) {
+        g.col.push(((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255);
+    } return g.pos.length / 3 - 1; };
+    // generic strip between two lists of vertex indices (a: station i, b: station i+1), orientation by `flip`
+    const quad = (g, a0, a1, b0, b1, flip) => { if (flip)
+        g.idx.push(a0, b0, a1, a1, b0, b1);
+    else
+        g.idx.push(a0, a1, b0, a1, b1, b0); };
+    const topRings = [], botRings = [], tunRings = [];
+    zs.forEach((z) => {
+        const yk = keelAt(z), yc = chineAt(z), ys = sheerAt(z), w = pw(z, ys);
+        const wcAt = (y) => { const wy = pw(z, y); return wy * hs.chineW + (hs.flat ? (wy - wy * hs.chineW) * hs.flat : 0); };
+        const wc = wcAt(yc);
+        const topX = (y) => { const t = Math.max(0, Math.min(1, (y - yc) / Math.max(1e-6, ys - yc))); const wy = pw(z, y); return wc + (wy - wc) * (1 - Math.pow(1 - t, 1.9)); };
+        const bands = boatHullBands(r, yc, ys, depth);
+        topRings.push({ z, w, bands: bands.map((b) => ({ ...b, pts: [b.a, (b.a + b.b) / 2, b.b].map((y) => [topX(y), y]) })) });
+        // bottom: keel -> chine, bulging a little downward
+        const nb = 5;
+        let pts = [];
+        for (let k = 0; k <= nb; k++) {
+            const t = k / nb, x = wc * t, y = yk + (yc - yk) * (Math.pow(t, 1.35) * 0.92 + 0.08 * t);
+            pts.push([x, y]);
+        }
+        if (hs.cat) { // two sponsons: a V under each side, the tunnel between them closed by a vaulted ceiling at chine height
+            const xo = wc, xi = xo * 0.5, xk = (xo + xi) / 2, sw = (xo - xi) / 2, dy = yc - yk;
+            pts = [[xi, yc], [xi + 0.1 * sw, yk + 0.4 * dy], [xk - 0.5 * sw, yk + 0.1 * dy], [xk, yk], [xk + 0.5 * sw, yk + 0.1 * dy], [xo - 0.1 * sw, yk + 0.4 * dy], [xo, yc]];
+            tunRings.push({ z, pts: [[-xi, yc], [0, yc + 0.14], [xi, yc]] });
+        }
+        botRings.push({ z, pts });
+    });
+    // ---- topsides (both sides), vertex-coloured bands
+    const nBands = Math.max(...topRings.map((t) => t.bands.length));
+    [1, -1].forEach((sd) => {
+        for (let bi = 0; bi < nBands; bi++) {
+            const idxRows = [];
+            topRings.forEach((t) => { const b = t.bands[Math.min(bi, t.bands.length - 1)]; if (!b) {
+                idxRows.push(null);
+                return;
+            } idxRows.push(b.pts.map((p) => pushV(topGeo, sd * p[0], p[1], t.z, b.col))); });
+            for (let i = 0; i < idxRows.length - 1; i++) {
+                const A = idxRows[i], Bn = idxRows[i + 1];
+                if (!A || !Bn)
+                    continue;
+                for (let k = 0; k < A.length - 1; k++)
+                    quad(topGeo, A[k], A[k + 1], Bn[k], Bn[k + 1], sd > 0);
+            }
+        }
+    });
+    // ---- bottom
+    [1, -1].forEach((sd) => { const rows = botRings.map((t) => t.pts.map((p) => pushV(botGeo, sd * p[0], p[1], t.z))); for (let i = 0; i < rows.length - 1; i++)
+        for (let k = 0; k < rows[i].length - 1; k++)
+            quad(botGeo, rows[i][k], rows[i][k + 1], rows[i + 1][k], rows[i + 1][k + 1], sd < 0); });
+    if (hs.cat) {
+        const rows = tunRings.map((t) => t.pts.map((p) => pushV(tunGeo, p[0], p[1], t.z)));
+        for (let i = 0; i < rows.length - 1; i++)
+            for (let k = 0; k < 2; k++)
+                quad(tunGeo, rows[i][k], rows[i][k + 1], rows[i + 1][k], rows[i + 1][k + 1], true);
+    }
+    // ---- transom (outer face, vertex coloured like the topsides, bottom paint below the chine)
+    {
+        const t = topRings[0], b = botRings[0];
+        const ring = (sd) => { const out = []; if (!hs.cat)
+            b.pts.forEach((p) => out.push([sd * p[0], p[1], r.bottom])); t.bands.forEach((bd) => bd.pts.forEach((p, k) => { if (k === 0 && out.length && Math.abs(out[out.length - 1][1] - p[1]) < 1e-6 && false)
+            return; out.push([sd * p[0], p[1], bd.col]); })); return out; };
+        const S = ring(1), P = ring(-1);
+        const ia = S.map((p) => pushV(topGeo, p[0], p[1], t.z, p[2])), ib = P.map((p) => pushV(topGeo, p[0], p[1], t.z, p[2]));
+        for (let k = 0; k < ia.length - 1; k++)
+            topGeo.idx.push(ia[k], ib[k], ia[k + 1], ia[k + 1], ib[k], ib[k + 1]);
+        if (hs.cat)
+            [1, -1].forEach((sd) => { const f = b.pts.map((p) => pushV(botGeo, sd * p[0], p[1], t.z)); for (let k = 1; k < f.length - 1; k++) {
+                if (sd > 0)
+                    botGeo.idx.push(f[0], f[k], f[k + 1]);
+                else
+                    botGeo.idx.push(f[0], f[k + 1], f[k]);
+            } });
+    }
+    // ---- deck (flat, at the old deck height), inner walls and the cap
+    const wi = (z) => Math.max(0.0, pw(z, depth) - wallT);
+    {
+        const rows = zs.map((z) => [pushV(deckGeo, -wi(z), depth, z), pushV(deckGeo, 0, depth, z), pushV(deckGeo, wi(z), depth, z)]);
+        for (let i = 0; i < rows.length - 1; i++)
+            for (let k = 0; k < 2; k++)
+                deckGeo.idx.push(rows[i][k], rows[i + 1][k], rows[i][k + 1], rows[i][k + 1], rows[i + 1][k], rows[i + 1][k + 1]);
+    }
+    [1, -1].forEach((sd) => { const rows = zs.map((z) => [pushV(inGeo, sd * wi(z), depth, z), pushV(inGeo, sd * Math.max(0, pw(z, sheerAt(z)) - wallT), sheerAt(z) - 0.005, z)]); for (let i = 0; i < rows.length - 1; i++) {
+        const a = rows[i], b = rows[i + 1];
+        if (sd > 0)
+            inGeo.idx.push(a[0], b[0], a[1], a[1], b[0], b[1]);
+        else
+            inGeo.idx.push(a[0], a[1], b[0], a[1], b[1], b[0]);
+    } });
+    {
+        const z0 = zs[0] + wallT;
+        const wt0 = Math.max(0, pw(zs[0], sheerAt(zs[0])) - wallT);
+        const a = [pushV(inGeo, -wi(zs[0]), depth, z0), pushV(inGeo, wi(zs[0]), depth, z0), pushV(inGeo, -wt0, sheerAt(zs[0]), z0), pushV(inGeo, wt0, sheerAt(zs[0]), z0)];
+        inGeo.idx.push(a[0], a[1], a[2], a[2], a[1], a[3]);
+    }
+    // cap: a closed loop of quads between the outer and inner edge of the gunwale (over the transom too)
+    {
+        const outer = [], inner = [];
+        const side = (sd, order) => order.forEach((z) => { outer.push([sd * pw(z, sheerAt(z)), sheerAt(z), z]); inner.push([sd * Math.max(0, pw(z, sheerAt(z)) - wallT), sheerAt(z), z]); });
+        const fwd = zs.slice(), back = zs.slice().reverse();
+        side(1, fwd);
+        side(-1, back);
+        const last = zs[0];
+        outer.push([pw(last, sheerAt(last)), sheerAt(last), last]);
+        inner.push([Math.max(0, pw(last, sheerAt(last)) - wallT), sheerAt(last), last + wallT]); // close over the transom
+        // transom top bar: outer edge at z = last, inner edge at last + wallT
+        const o = outer.map((p) => pushV(capGeo, p[0], p[1], p[2])), n = inner.map((p, i) => pushV(capGeo, p[0], p[1], p[2]));
+        for (let i = 0; i < o.length - 1; i++) {
+            if (Math.abs(outer[i][2] - outer[i + 1][2]) < 1e-9 && Math.abs(outer[i][0] - outer[i + 1][0]) < 1e-9)
+                continue;
+            capGeo.idx.push(o[i], o[i + 1], n[i], o[i + 1], n[i + 1], n[i]);
+        }
+        // the stern bar across: from starboard stern to port stern
+        const sS = [pw(last, sheerAt(last)), sheerAt(last), last], sP = [-pw(last, sheerAt(last)), sheerAt(last), last];
+        const q = [pushV(capGeo, sS[0], sS[1], sS[2]), pushV(capGeo, sP[0], sP[1], sP[2]), pushV(capGeo, Math.max(0, pw(last, sheerAt(last)) - wallT), sheerAt(last), last + wallT), pushV(capGeo, -Math.max(0, pw(last, sheerAt(last)) - wallT), sheerAt(last), last + wallT)];
+        capGeo.idx.push(q[0], q[2], q[1], q[1], q[2], q[3]);
+    }
+    const group = new THREE.Group();
+    group.name = "hullShell";
+    const mk = (g, mat, name, smooth) => { const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(g.pos), 3)); if (g.col)
+        geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(g.col), 3)); geo.setIndex(g.idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.name = name; group.add(m); return m; };
+    const gloss = { shininess: 70, specular: 0x555555 };
+    mk(topGeo, new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide, ...gloss }), "topsides");
+    mk(botGeo, new THREE.MeshPhongMaterial({ color: r.bottom, side: THREE.DoubleSide }), "bottom");
+    if (hs.cat)
+        mk(tunGeo, new THREE.MeshPhongMaterial({ color: boatShade(r.hull, 0.72), side: THREE.DoubleSide }), "tunnel");
+    mk(deckGeo, new THREE.MeshPhongMaterial({ color: r.deck, side: THREE.DoubleSide }), "deck");
+    mk(inGeo, new THREE.MeshPhongMaterial({ color: boatMix(r.hull, 0xffffff, 0.35), side: THREE.DoubleSide }), "inner");
+    mk(capGeo, new THREE.MeshPhongMaterial({ color: r.cap, side: THREE.DoubleSide, ...gloss }), "cap");
+    group.userData.hull = { L, B, depth, gw, plan, pw, sheerAt, keelAt, wallT, rm, topY };
+    return group;
+}
+// ---------- trim: the name, the flag, the bow decals (painted in 2D, hung on the hull as flat panels) ----------
+function boatCanvas(w, h) { try {
+    if (typeof document === "undefined")
+        return null;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    return c;
+}
+catch (e) {
+    return null;
+} }
+function boatLum(c) { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f((c >> 16) & 255) + 0.7152 * f((c >> 8) & 255) + 0.0722 * f(c & 255); }
+function boatContrast(a, b) { const x = boatLum(a), y = boatLum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+function boatInk(bg, prefer) {
+    const c = [prefer, 0xffffff, 0x14202c].filter((v) => v !== undefined);
+    for (const k of c)
+        if (boatContrast(bg, k) >= 3.2)
+            return k;
+    return boatLum(bg) > 0.4 ? 0x14202c : 0xffffff;
+}
+function boatCss(c) { return "#" + ("000000" + (c >>> 0).toString(16)).slice(-6); }
+function boatFlagDraw(ctx, w, h, id, col) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = boatCss(col);
+    const dark = boatLum(col) < 0.35, ink = dark ? "#f4f4ef" : "#14202c";
+    if (id === "pennant") {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(w, h / 2);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.4);
+        ctx.lineTo(w * 0.5, h / 2);
+        ctx.lineTo(0, h * 0.6);
+        ctx.closePath();
+        ctx.fill();
+        return;
+    }
+    if (id === "burgee") {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(w, 0);
+        ctx.lineTo(w * 0.78, h / 2);
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#f4f4ef";
+        ctx.fillRect(0, h * 0.42, w * 0.9, h * 0.16);
+        return;
+    }
+    ctx.fillRect(0, 0, w, h);
+    if (id === "fish") {
+        ctx.fillStyle = "#f4f4ef";
+        ctx.beginPath();
+        ctx.ellipse(w * 0.46, h / 2, w * 0.28, h * 0.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(w * 0.7, h / 2);
+        ctx.lineTo(w * 0.9, h * 0.28);
+        ctx.lineTo(w * 0.9, h * 0.72);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = boatCss(col);
+        ctx.beginPath();
+        ctx.arc(w * 0.28, h * 0.46, h * 0.04, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    else if (id === "anchor") {
+        ctx.strokeStyle = "#f4f4ef";
+        ctx.fillStyle = "#f4f4ef";
+        ctx.lineWidth = h * 0.07;
+        ctx.lineCap = "round";
+        const cx = w / 2;
+        ctx.beginPath();
+        ctx.arc(cx, h * 0.2, h * 0.07, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, h * 0.27);
+        ctx.lineTo(cx, h * 0.8);
+        ctx.moveTo(cx - w * 0.14, h * 0.4);
+        ctx.lineTo(cx + w * 0.14, h * 0.4);
+        ctx.moveTo(cx - w * 0.25, h * 0.6);
+        ctx.quadraticCurveTo(cx - w * 0.22, h * 0.84, cx, h * 0.82);
+        ctx.quadraticCurveTo(cx + w * 0.22, h * 0.84, cx + w * 0.25, h * 0.6);
+        ctx.stroke();
+    }
+    else if (id === "check") {
+        const cw = w / 6, ch = h / 4;
+        for (let y = 0; y < 4; y++)
+            for (let x = 0; x < 6; x++) {
+                ctx.fillStyle = (x + y) % 2 ? "#f4f4ef" : "#14181c";
+                ctx.fillRect(x * cw, y * ch, cw + 0.5, ch + 0.5);
+            }
+    }
+    else if (id === "jolly") {
+        ctx.fillStyle = "#14181c";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#f4f4ef";
+        ctx.beginPath();
+        ctx.arc(w / 2, h * 0.4, h * 0.19, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(w / 2 - h * 0.11, h * 0.5, h * 0.22, h * 0.13);
+        ctx.fillStyle = "#14181c";
+        ctx.beginPath();
+        ctx.arc(w / 2 - h * 0.075, h * 0.4, h * 0.045, 0, Math.PI * 2);
+        ctx.arc(w / 2 + h * 0.075, h * 0.4, h * 0.045, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#f4f4ef";
+        ctx.lineWidth = h * 0.06;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(w / 2 - h * 0.32, h * 0.72);
+        ctx.lineTo(w / 2 + h * 0.32, h * 0.9);
+        ctx.moveTo(w / 2 + h * 0.32, h * 0.72);
+        ctx.lineTo(w / 2 - h * 0.32, h * 0.9);
+        ctx.stroke();
+    }
+    else if (id === "star") {
+        ctx.fillStyle = "#f4f4ef";
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? h * 0.18 : h * 0.4;
+            ctx.lineTo(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+function boatFishDraw(ctx, w, h, id, col) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = boatCss(col);
+    ctx.strokeStyle = boatCss(col);
+    ctx.lineJoin = "round";
+    const body = (x0, x1, top, bot) => { ctx.beginPath(); ctx.moveTo(x0, h * 0.5); ctx.bezierCurveTo(x0 + (x1 - x0) * 0.2, h * top, x0 + (x1 - x0) * 0.7, h * top, x1, h * 0.5); ctx.bezierCurveTo(x0 + (x1 - x0) * 0.7, h * bot, x0 + (x1 - x0) * 0.2, h * bot, x0, h * 0.5); ctx.fill(); };
+    const tail = (x, spread) => { ctx.beginPath(); ctx.moveTo(x, h * 0.5); ctx.lineTo(x - w * 0.14, h * (0.5 - spread)); ctx.lineTo(x - w * 0.09, h * 0.5); ctx.lineTo(x - w * 0.14, h * (0.5 + spread)); ctx.closePath(); ctx.fill(); };
+    if (id === "marlin") {
+        body(w * 0.2, w * 0.74, 0.3, 0.7);
+        tail(w * 0.2, 0.32);
+        ctx.lineWidth = h * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.74, h * 0.5);
+        ctx.lineTo(w * 0.97, h * 0.48);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(w * 0.36, h * 0.36);
+        ctx.lineTo(w * 0.52, h * 0.06);
+        ctx.lineTo(w * 0.62, h * 0.4);
+        ctx.fill();
+    }
+    else if (id === "tuna") {
+        body(w * 0.22, w * 0.86, 0.18, 0.82);
+        tail(w * 0.22, 0.34);
+        ctx.beginPath();
+        ctx.moveTo(w * 0.4, h * 0.26);
+        ctx.lineTo(w * 0.5, h * 0.1);
+        ctx.lineTo(w * 0.58, h * 0.28);
+        ctx.fill();
+    }
+    else if (id === "dolphin") {
+        ctx.beginPath();
+        ctx.moveTo(w * 0.2, h * 0.5);
+        ctx.bezierCurveTo(w * 0.3, h * 0.2, w * 0.6, h * 0.12, w * 0.9, h * 0.32);
+        ctx.lineTo(w * 0.9, h * 0.52);
+        ctx.bezierCurveTo(w * 0.62, h * 0.82, w * 0.3, h * 0.78, w * 0.2, h * 0.5);
+        ctx.fill();
+        tail(w * 0.2, 0.3);
+        ctx.beginPath();
+        ctx.moveTo(w * 0.35, h * 0.24);
+        ctx.lineTo(w * 0.7, h * 0.14);
+        ctx.lineTo(w * 0.7, h * 0.3);
+        ctx.fill();
+    }
+    else if (id === "tarpon") {
+        body(w * 0.18, w * 0.88, 0.16, 0.84);
+        tail(w * 0.18, 0.36);
+        ctx.beginPath();
+        ctx.moveTo(w * 0.5, h * 0.22);
+        ctx.lineTo(w * 0.62, h * 0.06);
+        ctx.lineTo(w * 0.66, h * 0.26);
+        ctx.fill();
+    }
+    else if (id === "shark") {
+        ctx.beginPath();
+        ctx.moveTo(w * 0.1, h * 0.5);
+        ctx.bezierCurveTo(w * 0.3, h * 0.36, w * 0.6, h * 0.34, w * 0.95, h * 0.54);
+        ctx.bezierCurveTo(w * 0.6, h * 0.68, w * 0.3, h * 0.64, w * 0.1, h * 0.5);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(w * 0.42, h * 0.38);
+        ctx.lineTo(w * 0.52, h * 0.08);
+        ctx.lineTo(w * 0.62, h * 0.4);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(w * 0.1, h * 0.5);
+        ctx.lineTo(w * 0.02, h * 0.22);
+        ctx.lineTo(w * 0.2, h * 0.46);
+        ctx.fill();
+    }
+}
+function boatNameDraw(ctx, w, h, name, port, font, ink) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = boatCss(ink);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const fam = font === "serif" ? "Georgia, 'Times New Roman', serif" : font === "script" ? "'Brush Script MT', 'Segoe Script', 'Comic Sans MS', cursive" : "'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif";
+    const wt = font === "serif" ? "italic bold " : font === "script" ? "italic " : "bold ";
+    const rows = port ? 2 : 1;
+    const nameH = rows === 2 ? h * 0.62 : h * 0.8;
+    let px = nameH;
+    const fit = (txt, size, style) => { ctx.font = style + size + "px " + fam; const m = ctx.measureText(txt).width; return m > w * 0.94 ? size * w * 0.94 / m : size; };
+    const label = font === "script" ? name : name.toUpperCase();
+    px = fit(label, px, wt);
+    ctx.font = wt + px + "px " + fam;
+    ctx.fillText(label, w / 2, rows === 2 ? h * 0.34 : h * 0.5);
+    if (port) {
+        const pl = port.toUpperCase();
+        let ps = fit(pl, h * 0.24, "bold ");
+        ctx.font = "bold " + ps + "px " + fam;
+        ctx.fillText(pl, w / 2, h * 0.82);
+    }
+}
+function boatPanel(w, h, tex, flip) {
+    const geo = new THREE.PlaneGeometry(w, h);
+    const mat = new THREE.MeshPhongMaterial({ map: tex, transparent: true, depthWrite: false, side: flip ? THREE.DoubleSide : THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    return new THREE.Mesh(geo, mat);
+}
+// The trim for a hull: name + port on the transom, the name on both bows, an optional fish decal on both bows, a flag on a staff at the stern.
+function buildBoatTrim(def, R, shell) {
+    const g = new THREE.Group();
+    g.name = "boatTrim";
+    const H = shell.userData.hull, L = H.L, pw = H.pw, sheerAt = H.sheerAt;
+    const hullCol = R.hull, ink = boatInk(hullCol, R.accent);
+    const mkTex = (w, h, draw) => { const c = boatCanvas(w, h); if (!c)
+        return null; const ctx = c.getContext("2d"); draw(ctx, w, h); const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t; };
+    if (R.name || R.port) {
+        const zt = -L - 0.02, yMid = sheerAt(-L) - 1.05, wT = Math.min(pw(-L, yMid) * 1.5, 3.4), hT = Math.min(0.95, wT * 0.3);
+        const t = mkTex(512, Math.round(512 * hT / wT), (ctx, w, h) => boatNameDraw(ctx, w, h, R.name || " ", R.name ? R.port : R.port, R.font, ink));
+        if (t) {
+            const p = boatPanel(wT, hT, t);
+            p.rotation.y = Math.PI;
+            p.position.set(0, yMid, zt);
+            g.add(p);
+        }
+        if (R.name) { // on the bow sides, reading forward on both
+            const zb = L * 0.3, yb = sheerAt(zb) - 0.95, wb = Math.min(2.6, R.name.length * 0.26 + 0.5), hb = Math.max(0.34, Math.min(0.5, wb * 0.2));
+            const tb = mkTex(512, Math.round(512 * hb / wb), (ctx, w, h) => boatNameDraw(ctx, w, h, R.name, "", R.font, ink));
+            if (tb)
+                [1, -1].forEach((sd) => { const x = pw(zb, yb) + 0.02; const slope = (pw(zb + 0.3, yb) - pw(zb - 0.3, yb)) / 0.6; const p = boatPanel(wb, hb, tb); p.position.set(sd * x, yb, zb); p.rotation.y = Math.atan2(sd, -slope); g.add(p); });
+        }
+    }
+    if (R.decal && R.decal !== "none") {
+        const zb = L * 0.66, yb = sheerAt(zb) - 1.0, wd = 2.0, hd = 0.86;
+        const td = mkTex(256, 110, (ctx, w, h) => boatFishDraw(ctx, w, h, R.decal, R.decalCol));
+        if (td)
+            [1, -1].forEach((sd) => { const x = pw(zb, yb) + 0.02; const slope = (pw(zb + 0.3, yb) - pw(zb - 0.3, yb)) / 0.6; const p = boatPanel(wd, hd, td); p.position.set(sd * x, yb, zb); p.rotation.y = Math.atan2(sd, -slope); g.add(p); });
+    }
+    if (R.flag && R.flag !== "none") {
+        const fx = pw(-L, H.depth) * 0.62, zf = -L + 0.35, y0 = sheerAt(-L) + 0.02, mastH = 1.9;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, mastH, 6), new THREE.MeshPhongMaterial({ color: 0xd8d8d8, shininess: 60 }));
+        pole.position.set(fx, y0 + mastH / 2, zf);
+        g.add(pole);
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), new THREE.MeshPhongMaterial({ color: 0xd8b84a }));
+        tip.position.set(fx, y0 + mastH + 0.04, zf);
+        g.add(tip);
+        const fw = 1.15, fh = 0.72, tf = mkTex(256, 160, (ctx, w, h) => boatFlagDraw(ctx, w, h, R.flag, R.flagCol));
+        const cloth = tf ? boatPanel(fw, fh, tf, true) : new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), new THREE.MeshPhongMaterial({ color: R.flagCol, side: THREE.DoubleSide }));
+        const pivot = new THREE.Group();
+        pivot.position.set(fx, y0 + mastH - fh / 2 - 0.08, zf);
+        cloth.position.set(0, 0, -fw / 2 - 0.03);
+        cloth.rotation.y = Math.PI / 2 + 0;
+        pivot.add(cloth);
+        g.add(pivot);
+        g.userData.flagPivot = pivot;
+    }
+    return g;
+}
+// ---------- add-on fittings (rod holders, bimini, lights, rocket launcher, outriggers, anchor roller, fenders) ----------
+// anch: where the hull builder says the roof / cockpit are: { roofY, roofZ, roofHalfW, roofD, hasTop, rigX, rigY, rigZ, cock: { z0, z1, halfW, floorY, roofY } }
+function buildBoatAddons(def, R, anch, shell) {
+    const g = new THREE.Group();
+    g.name = "boatAddons";
+    const ad = R.addons || [], has = (id) => ad.indexOf(id) >= 0 && boatAddonOk(def, id);
+    const H = shell.userData.hull, L = H.L, pw = H.pw, sheerAt = H.sheerAt, a = anch || {};
+    const S = 1.8, V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const steel = new THREE.MeshPhongMaterial({ color: 0xc9ced2, shininess: 80, flatShading: true }), dark = new THREE.MeshPhongMaterial({ color: 0x24282c, flatShading: true });
+    const rod = (p, q, r, mat) => { const d = V(q.x - p.x, q.y - p.y, q.z - p.z), len = d.length(); const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat); m.position.set((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2); m.quaternion.setFromUnitVectors(V(0, 1, 0), V(d.x / len, d.y / len, d.z / len)); return m; };
+    if (has("holders")) { // four holders a side along the gunwale cap, leaning out
+        const z0 = a.holderZ0 !== undefined ? a.holderZ0 : -0.5 * L, z1 = a.holderZ1 !== undefined ? a.holderZ1 : 0.1 * L, geo = new THREE.CylinderGeometry(0.075, 0.06, 0.55, 8);
+        for (let i = 0; i < 4; i++) {
+            const z = z0 + (z1 - z0) * (i / 3), sh = sheerAt(z);
+            [1, -1].forEach((sd) => { const m = new THREE.Mesh(geo, dark); m.position.set(sd * (pw(z, sh) - 0.26), sh + 0.22, z); m.rotation.z = -sd * 0.32; g.add(m); const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 8), steel); ring.position.set(sd * (pw(z, sh) - 0.27 + 0.0), sh + 0.46, z); ring.position.x += sd * 0.07; g.add(ring); });
+        }
+    }
+    if (has("bimini") && a.cock) { // canvas shade over the cockpit on a stainless frame
+        const c = a.cock, w = c.halfW * 2, d = c.z1 - c.z0, zc = (c.z0 + c.z1) / 2, y = c.roofY;
+        const mat = new THREE.MeshPhongMaterial({ color: R.canvas === null ? R.accent : R.canvas, flatShading: true, side: THREE.DoubleSide });
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), mat);
+        top.position.set(0, y, zc);
+        g.add(top);
+        const lip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.28, 0.04), mat);
+        lip.position.set(0, y - 0.13, c.z1);
+        g.add(lip);
+        [[-1, c.z0], [1, c.z0], [-1, c.z1], [1, c.z1]].forEach(([sd, z]) => g.add(rod(V(sd * c.halfW * 0.96, c.floorY, z), V(sd * c.halfW * 0.96, y, z), 0.035, steel)));
+        [-1, 1].forEach((sd) => g.add(rod(V(sd * c.halfW * 0.96, y - 0.02, c.z0), V(sd * c.halfW * 0.96, y - 0.02, c.z1), 0.03, steel)));
+    }
+    if (has("spots") && a.hasTop) { // a pair of spreader lights on the front edge of the roof
+        const lens = new THREE.MeshBasicMaterial({ color: 0xfff0b8 });
+        [-1, 1].forEach((sd) => { const b = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.3), dark); b.position.set(sd * a.roofHalfW * 0.72, a.roofY + 0.14, a.roofZ + a.roofD / 2 - 0.1); b.rotation.x = 0.3; g.add(b); const l = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.14), lens); l.position.set(0, 0, 0.152); b.add(l); });
+    }
+    if (has("rocket") && a.hasTop) { // a rack of rod tubes across the back of the roof
+        const n = 7, w = a.roofHalfW * 1.8, zb = a.roofZ - a.roofD / 2 + 0.12, geo = new THREE.CylinderGeometry(0.06, 0.05, 0.85, 8);
+        for (let i = 0; i < n; i++) {
+            const t = new THREE.Mesh(geo, dark);
+            t.position.set(-w / 2 + w * (i / (n - 1)), a.roofY + 0.5, zb);
+            t.rotation.x = -0.28;
+            g.add(t);
+        }
+        g.add(rod(V(-w / 2, a.roofY + 0.32, zb - 0.04), V(w / 2, a.roofY + 0.32, zb - 0.04), 0.03, steel));
+    }
+    if (has("outrig") && a.hasTop) { // two poles swung out and up from the roof corners
+        const len = 3.4 * S;
+        [1, -1].forEach((sd) => { const p = V(sd * (a.rigX || a.roofHalfW), a.rigY !== undefined ? a.rigY : a.roofY, a.rigZ !== undefined ? a.rigZ : a.roofZ); const dx = sd * 0.66, dy = 0.62, dz = -0.42, n = Math.sqrt(dx * dx + dy * dy + dz * dz); const q = V(p.x + dx / n * len, p.y + dy / n * len, p.z + dz / n * len); g.add(rod(p, q, 0.04, steel)); const foot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), dark); foot.position.copy(p); g.add(foot); });
+    }
+    if (has("bowrail")) { // a stainless roller and pulpit that reach past the stem
+        const zr = L * 0.86, y = sheerAt(zr) + 0.06, zt = L + 0.38;
+        [-0.16, 0.16].forEach((x) => g.add(rod(V(x, y, zr), V(x, y + 0.02, zt), 0.04, steel)));
+        const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 10), dark);
+        roller.rotation.z = Math.PI / 2;
+        roller.position.set(0, y + 0.04, zt);
+        g.add(roller);
+        g.add(rod(V(-0.16, y, zt), V(0.16, y, zt), 0.04, steel));
+    }
+    if (has("bumpers")) { // fenders hung on short lines along both sides
+        const fm = new THREE.MeshPhongMaterial({ color: 0xe9ecee, flatShading: true }), cm = new THREE.MeshPhongMaterial({ color: R.accent, flatShading: true }), geo = new THREE.CylinderGeometry(0.15, 0.15, 0.62, 10), cap = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 8);
+        [-0.2, 0.18, 0.5].forEach((f) => { const z = L * f, sh = sheerAt(z), y = sh - 0.85; [1, -1].forEach((sd) => { const x = sd * (pw(z, y) + 0.17); const m = new THREE.Mesh(geo, fm); m.position.set(x, y, z); g.add(m); const c = new THREE.Mesh(cap, cm); c.position.set(x, y + 0.34, z); g.add(c); g.add(rod(V(sd * (pw(z, sh) - 0.05), sh, z), V(x, y + 0.36, z), 0.012, steel)); }); });
+    }
+    return g;
+}
+// ---------- the Boat Yard: what a player owns, and the one function that changes a boat's look ----------
+// qs.boats = { v, rev, looks: { hullIndex: look }, own: { paint: {id:1}, stripe: {}, deck: {}, flag: {}, decal: {}, addon: {} } }
+// Everything with price 0 is free from the start; the rest is bought once (account-wide) and then used on any hull. No networking: a look is
+// just data, and boatLookEncode / boatLookDecode turn it into the short string a future multiplayer game would send.
+const BOAT_KIND_LISTS = { paint: BOAT_PAINTS, stripe: BOAT_STRIPES, deck: BOAT_DECKS, flag: BOAT_FLAGS, decal: BOAT_DECALS, addon: BOAT_ADDONS };
+const BOAT_FIELD_KIND = { h: "paint", a: "paint", sc: "paint", cv: "paint", sk: "paint", fc: "paint", dcc: "paint", st: "stripe", dk: "deck", fl: "flag", dc: "decal" };
+const BOAT_BLANK_OK = { sc: 1, cv: 1, sk: 1, fc: 1, dcc: 1 }; // fields where "" means "use the default"
+function boatsFresh() { const own = {}; Object.keys(BOAT_KIND_LISTS).forEach((k) => { own[k] = {}; }); return { v: 1, rev: 0, looks: {}, own }; }
+function boatsSanitize(b) {
+    const o = boatsFresh();
+    if (!b || typeof b !== "object")
+        return o;
+    if (Number.isFinite(b.rev))
+        o.rev = Math.max(0, Math.floor(b.rev));
+    if (b.own && typeof b.own === "object")
+        Object.keys(BOAT_KIND_LISTS).forEach((k) => { const src = b.own[k]; if (src && typeof src === "object")
+            BOAT_KIND_LISTS[k].forEach((it) => { if (src[it.id])
+                o.own[k][it.id] = 1; }); });
+    if (b.looks && typeof b.looks === "object")
+        Object.keys(b.looks).forEach((k) => { const i = Number(k); if (Number.isInteger(i) && BOATS[i])
+            o.looks[i] = boatLookSanitize(b.looks[k], BOATS[i]); });
+    return o;
+}
+function boatLookFor(qs, idx) { const def = BOATS[idx]; if (!def)
+    return null; const l = qs && qs.boats && qs.boats.looks ? qs.boats.looks[idx] : null; return boatLookSanitize(l || null, def); } // the look this hull is wearing now
+function boatItem(kind, id) { const l = BOAT_KIND_LISTS[kind]; return l ? l.find((x) => x.id === id) || null : null; }
+function boatOwns(qs, kind, id) { const it = boatItem(kind, id); if (!it)
+    return false; return !(it.price > 0) || !!(qs.boats && qs.boats.own[kind] && qs.boats.own[kind][id]); }
+function boatOptState(qs, kind, id, level) {
+    const it = boatItem(kind, id);
+    if (!it)
+        return { ok: false };
+    const owned = boatOwns(qs, kind, id), lv = it.level || 1;
+    return { ok: true, owned, price: it.price || 0, level: lv, locked: !owned && level < lv, afford: qs.money >= (it.price || 0), free: !(it.price > 0) };
+}
+function boatPlate(qs, idx) { return boatLookEncode(boatLookFor(qs, idx), idx); } // the short string another player's game would need to draw this boat
+// a = { type: boatset | boataddon | boatbuy | boatreset, ... }, o = { canBuy, level, owns(idx) }. Returns { ok, msg, bought }.
+function boatYardApply(qs, a, o) {
+    o = o || {};
+    if (!qs.boats)
+        qs.boats = boatsFresh();
+    const B = qs.boats, level = o.level || 1, bump = (r) => { B.rev = (B.rev || 0) + 1; return r || { ok: true }; };
+    if (a.type === "boatbuy") {
+        const it = boatItem(a.kind, a.id);
+        if (!it)
+            return { ok: false, msg: "No such item" };
+        if (!(it.price > 0))
+            return { ok: false, msg: "That one is free" };
+        if (boatOwns(qs, a.kind, a.id))
+            return { ok: false, msg: "You already own that" };
+        if (!o.canBuy)
+            return { ok: false, msg: "Boat fittings are bought at the marina boat yard" };
+        if (level < (it.level || 1))
+            return { ok: false, msg: "Needs level " + it.level };
+        if (qs.money < it.price)
+            return { ok: false, msg: "Not enough money" };
+        qs.money -= it.price;
+        B.own[a.kind][a.id] = 1;
+        if (a.hull !== undefined && (a.kind === "addon" || BOAT_FIELD_KIND[a.field] === a.kind))
+            boatYardApply(qs, a.kind === "addon" ? { type: "boataddon", hull: a.hull, id: a.id, on: true } : { type: "boatset", hull: a.hull, field: a.field, value: a.id }, o); // buying also puts it on
+        return bump({ ok: true, bought: it.name, price: it.price });
+    }
+    const idx = Number(a.hull), def = BOATS[idx];
+    if (!Number.isInteger(idx) || !def)
+        return { ok: false, msg: "No such boat" };
+    if (o.owns && !o.owns(idx))
+        return { ok: false, msg: "You do not own that boat" };
+    const look = boatLookFor(qs, idx);
+    if (a.type === "boatreset") {
+        delete B.looks[idx];
+        return bump();
+    }
+    if (a.type === "boataddon") {
+        if (!boatAddonOk(def, a.id))
+            return { ok: false, msg: "That does not fit this boat" };
+        const has = look.ad.indexOf(a.id) >= 0, want = a.on === undefined ? !has : !!a.on;
+        if (want && !boatOwns(qs, "addon", a.id))
+            return { ok: false, msg: "Buy it at the marina boat yard first" };
+        look.ad = want ? look.ad.concat(has ? [] : [a.id]) : look.ad.filter((x) => x !== a.id);
+        B.looks[idx] = boatLookSanitize(look, def);
+        return bump();
+    }
+    if (a.type !== "boatset")
+        return { ok: false, msg: "Unknown action" };
+    const f = a.field, v = a.value, kind = BOAT_FIELD_KIND[f];
+    if (kind) {
+        if (v === "" && BOAT_BLANK_OK[f])
+            look[f] = "";
+        else if (kind === "paint") {
+            if (boatHexOk(v)) {
+                if (v.toLowerCase() !== boatHexStr(def.hullColor) && v.toLowerCase() !== boatHexStr(def.accent))
+                    return { ok: false, msg: "Pick a paint from the list" };
+                look[f] = v.toLowerCase();
+            }
+            else if (!BOAT_PAINT_BY_ID[v])
+                return { ok: false, msg: "Not an option" };
+            else if (!boatOwns(qs, "paint", v))
+                return { ok: false, msg: "Buy that paint at the marina boat yard first" };
+            else
+                look[f] = v;
+        }
+        else {
+            if (!boatItem(kind, v))
+                return { ok: false, msg: "Not an option" };
+            if (!boatOwns(qs, kind, v))
+                return { ok: false, msg: "Buy that at the marina boat yard first" };
+            look[f] = v;
+        }
+    }
+    else if (f === "bt") {
+        if (!BOAT_BOTTOMS.some((x) => x.id === v))
+            return { ok: false, msg: "Not an option" };
+        look.bt = v;
+    }
+    else if (f === "cp")
+        look.cp = v === "accent" ? "accent" : "hull";
+    else if (f === "nf") {
+        if (!BOAT_FONTS.some((x) => x.id === v))
+            return { ok: false, msg: "Not an option" };
+        look.nf = v;
+    }
+    else if (f === "nm")
+        look.nm = boatText(v, 18);
+    else if (f === "pt")
+        look.pt = boatText(v, 18);
+    else
+        return { ok: false, msg: "Not an option" };
+    B.looks[idx] = boatLookSanitize(look, def);
+    return bump();
+}
+// frees the geometry, materials and painted textures of a boat that is being replaced (the Boat Yard rebuilds the boat on every change)
+function boatDispose(root) { if (!root)
+    return; root.traverse((o) => { if (o.geometry && o.geometry.dispose)
+    o.geometry.dispose(); const m = o.material; (Array.isArray(m) ? m : m ? [m] : []).forEach((x) => { if (x.map && x.map.dispose)
+    x.map.dispose(); if (x.dispose)
+    x.dispose(); }); }); }
+// ===== end of the boat looks, hull and trim =====
+// <<BOATLOOK-END>>
 const SHOP_BAIT_OPTIONS = ["Menhaden", "Pilchard", "Pinfish", "Mullet", "Glass Minnow"]; // matches BAIT_SPECIES names exactly — kept as a separate module-level list since BAIT_SPECIES itself lives inside the useEffect and isn't reachable from JSX render
 // <<TEXTURES-BEGIN>> (procedural sand / wood / water — generated, tileable, cached)
 // ---------- Procedural textures: seeded, tileable pixel generators ----------
@@ -2268,7 +3115,7 @@ function storyHud(qs) {
 }
 // ---------- end of the story section ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), skiffRule: 1 };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1 };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -2294,7 +3141,7 @@ function questLoad(speciesInfo) {
         if (raw) {
             const p = JSON.parse(raw);
             if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught) {
-                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story) };
+                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), boats: boatsSanitize(p.boats) };
                 if (!p.skiffRule && (p.xp > 0 || p.stats.totalCaught > 0 || (p.story && p.story.i > 0)))
                     qs.story.flags.skiff = true; // a save from before the dock start already has the skiff
                 qs.skiffRule = 1;
@@ -2481,6 +3328,9 @@ const GEAR_ITEMS = [
     { id: "hull1", slot: "hull", tier: 1, name: "Tideline 16 (skiff)", price: 0, hullIndex: 0, req: {}, color: 0xf2f0e6, stats: {}, blurb: "Your starter skiff. Nimble and cheap to run." },
     { id: "hull2", slot: "hull", tier: 3, name: "Horizon 32 CC (center console)", price: 14000, hullIndex: 1, req: { level: 12, total: 150 }, color: 0xffffff, stats: {}, blurb: "A fast, stable center console with a proper helm. Top speed 14, against the skiff's 9." },
     { id: "hull3", slot: "hull", tier: 5, name: "Canyon Chaser 40 (sportfisher)", price: 48000, hullIndex: 2, req: { level: 26, spots: 8, total: 400 }, color: 0xf5f5f0, stats: {}, blurb: "A 40-foot sportfisher with a cabin, galley and a hull that shrugs off the swell. Slower to turn, steadier to fish from." },
+    { id: "hull4", slot: "hull", tier: 2, name: "Backwater 19 (bay boat)", price: 5500, hullIndex: 3, req: { level: 7, total: 60 }, color: 0xe9e4d2, stats: {}, blurb: "A dry, stable bay boat with a console and a wide casting deck. Roomier than the skiff and still shallow enough for the flats." },
+    { id: "hull5", slot: "hull", tier: 4, name: "Reef Runner 24 (open console)", price: 26000, hullIndex: 4, req: { level: 18, total: 250 }, color: 0xf1f3f4, stats: {}, blurb: "A deep-V open console with a T-top, a swim platform and a premium outboard. A bit livelier than the Horizon, easier on the nerves in a chop." },
+    { id: "hull6", slot: "hull", tier: 6, name: "Stormbreaker 36 Cat (power catamaran)", price: 95000, hullIndex: 5, req: { level: 36, spots: 10, total: 600 }, color: 0xdde4e8, stats: {}, blurb: "Twin hulls and twin outboards: the steadiest, fastest deck you can buy, but it turns like a barge. Built for long runs to the blue water." },
 ];
 const GEAR_AFFINITY_TEXT = { reef: "reefs", wreck: "wrecks", inshore: "the flats", openWater: "open water", sand: "sand flats", rocks: "rocky ground" };
 const gearPct = (v) => Math.abs(Math.round((v - 1) * 100));
@@ -2496,7 +3346,7 @@ const GEAR_STAT_TEXT = {
 const GEAR_STAT_SHORT = { window: "Strike window", drain: "Tiring", speed: "Retrieve", drag: "Line lost", strength: "Line strength", bite: "Bite speed", range: "Sonar range", topSpeed: "Top speed", accel: "Accel", rock: "Boat roll", turn: "Turning", xpMult: "XP", missionMult: "Mission pay", sellMult: "Fish value", discoverR: "Spot radius" };
 const GEAR_LOWER_IS_BETTER = { drag: true, rock: true };
 function gearHullStats(item) { const b = BOATS[item.hullIndex]; return b ? { stats: { topSpeed: b.maxSpeed, rock: b.rockFactor, turn: b.turnRate } } : item; } // a hull compared like any other item
-function gearHullLine(item) { const b = BOATS[item.hullIndex]; return b ? b.tier + " · top speed " + b.maxSpeed + " · " + (b.rockFactor <= 0.7 ? "very steady" : b.rockFactor <= 1.05 ? "steady" : "lively in a swell") + " · " + (b.turnRate >= 0.8 ? "very nimble" : b.turnRate >= 0.5 ? "handles well" : "slow to turn") : ""; }
+function gearHullLine(item) { const b = BOATS[item.hullIndex]; return b ? b.kind + " · " + b.length + " ft · top speed " + b.maxSpeed + " · " + (b.rockFactor <= 0.7 ? "very steady" : b.rockFactor <= 1.05 ? "steady" : "lively in a swell") + " · " + (b.turnRate >= 0.8 ? "very nimble" : b.turnRate >= 0.5 ? "handles well" : "slow to turn") : ""; }
 function gearDeltaChips(item, cur) {
     if (item.slot === "hull") {
         item = gearHullStats(item);
@@ -5319,6 +6169,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiStoryScene, setUiStoryScene] = useState(null); // the scene being played: { id, kind, who, how, lines }
     const [uiSpotHint, setUiSpotHint] = useState(""); // radar hint toward the nearest unexplored fishing ground (top-tier sonar only)
     const [uiGearOpen, setUiGearOpen] = useState(false); // tackle (rod / reel / line) panel opened from the wheel
+    const [uiBoatYardOpen, setUiBoatYardOpen] = useState(false); // boat colours, name, flag and fittings (wheel > Boat > Boat Yard)
     const [uiWardrobeOpen, setUiWardrobeOpen] = useState(false); // look and clothes panel (wheel > Tackle > Wardrobe)
     const [uiSightings, setUiSightings] = useState({}); // encounter id -> times seen
     const [uiMarineToast, setUiMarineToast] = useState(null); // { text, color } shown briefly when an animal group comes into view
@@ -8147,15 +8998,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // cockpit, raised on the bow/stern/side decks. Other tiers are still a
         // flat deck for now; they get the same treatment in their own pass.
         function deckHeightAt(def, localX, localZ) {
-            const deckY = def.length * def.freeboardRatio;
-            if (def.tier === "Skiff") {
+            const deckY = def.length * def.freeboardRatio, family = boatFamily(def);
+            if (family === "skiff") {
                 const p = getSkiffCockpitParams(def);
                 if (Math.abs(localX) < p.cockpitHalfWidth && localZ < p.cockpitFrontZ && localZ > p.cockpitBackZ) {
                     return p.deckY;
                 }
                 return p.raisedY;
             }
-            if (def.tier === "Center Console") {
+            if (family === "cc") {
                 const p = getCCBowDeckParams(def);
                 let allowedHalfWidth = 0;
                 if (localZ > p.bowDeckBackZ && localZ <= p.bowVertexZ) {
@@ -8357,15 +9208,29 @@ function DeepWaterPrototype({ onExit, newLook }) {
             });
             return group;
         }
-        function buildBoat(def) {
+        function buildBoat(def0, lookIn) {
+            const look = boatLookSanitize(lookIn || def0.look || boatLookDefault(def0), def0); // the saved look of this hull (colours, stripe, name, flag, fittings)
+            const R = boatLookResolve(look, def0);
+            const def = Object.assign({}, def0, { hullColor: R.hull, accent: R.accent }); // every builder below paints from these two
+            const family = boatFamily(def), FIT = boatFit(def); // which hull family builds the deck and house, and which of its fittings this hull has
             const group = new THREE.Group();
-            group.add(buildHull(def.length, def.beam, def.hullColor, def.freeboardRatio, def.gunwaleHeight));
+            const shell = buildHullShell(def, R);
+            group.add(shell);
+            const trim = buildBoatTrim(def, R, shell);
+            group.add(trim);
+            group.userData.flagPivot = trim.userData.flagPivot || null; // name, flag and bow decals
+            group.userData.look = look;
+            group.userData.R = R;
             const consoleMat = new THREE.MeshPhongMaterial({ color: def.accent, flatShading: true });
             const S = 1.8; // superstructure scale, matched to the boat length/beam bump above
             const deckY = def.length * def.freeboardRatio;
-            if (def.tier === "Skiff") {
+            if (family === "skiff") {
                 const p = getSkiffCockpitParams(def);
                 const L = def.length / 2;
+                {
+                    const cz0 = p.cockpitBackZ + 0.5, cz1 = p.cockpitBackZ + (p.cockpitFrontZ - p.cockpitBackZ) * 0.62;
+                    group.userData.anchors = { hasTop: false, holderZ0: -0.62 * L, holderZ1: 0.18 * L, cock: { z0: cz0, z1: cz1, halfW: p.cockpitHalfWidth * 0.92, floorY: p.deckY, roofY: p.deckY + 1.6 * S } };
+                } // where the fittings go (read by buildBoatAddons)
                 const deckMat = new THREE.MeshPhongMaterial({ color: 0xd6d2c4, flatShading: true });
                 // Raised bow deck — stops well before the bow's sharp point instead of
                 // trying to cover the full taper, so it never overhangs past the hull.
@@ -8407,11 +9272,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             const angler = buildAngler(def.accent);
             angler.scale.setScalar(1.35); // stays real human size regardless of hull scale
-            if (def.tier === "Skiff") {
+            if (family === "skiff") {
                 angler.position.set(0, deckY, -0.5 * S);
                 angler.rotation.y = Math.PI / 2;
             }
-            else if (def.tier === "Center Console") {
+            else if (family === "cc") {
                 angler.position.set(0, deckY, 0.1 * S);
                 angler.rotation.y = -Math.PI / 2;
             }
@@ -8489,12 +9354,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
             // console-mounted rather than floor pedestals — only the sportfisher
             // still uses the floor-pedestal style here.
             let wheel;
-            if (def.tier !== "Skiff" && def.tier !== "Center Console") {
+            if (family === "sport") {
                 wheel = buildWheel(0.38 * S, 1.15 * S);
                 wheel.position.set(0.4 * S, deckY, def.length * 0.32 - 0.55 * S);
                 group.add(wheel);
             }
-            if (def.tier === "Skiff") {
+            if (family === "skiff") {
                 const p = getSkiffCockpitParams(def);
                 // Block-style console, same technique as the CC but scaled down for a
                 // minimal flats skiff — smaller block, smaller wheel, no chartplotter
@@ -8570,7 +9435,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // the aft side, same orientation principle as the CC's companion
                 // seats), positioned well clear of the poling platform, rod holders,
                 // and the cockpit's own back boundary.
-                const skiffSeatMat = new THREE.MeshPhongMaterial({ color: 0xe4e1d6, flatShading: true });
+                const skiffSeatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat, flatShading: true });
                 const rearSeatZ = -3.6, rearSeatDepth = 0.35 * S;
                 [-1, 1].forEach((side) => {
                     const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.34 * S, 0.1 * S, rearSeatDepth), skiffSeatMat);
@@ -8654,7 +9519,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 sternLight.position.set(0, p.raisedY + sternLightPoleH, -def.length * 0.4);
                 group.add(sternLight);
             }
-            else if (def.tier === "Center Console") {
+            else if (family === "cc") {
                 // Block-style console — sized as a proper human-scale unit (not the
                 // old undersized helm stand), with every gadget mounted directly onto
                 // it: dash, wheel, throttle pod. Front face position is deliberately
@@ -8669,42 +9534,46 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), consoleMat);
                 c.position.set(0, deckY + ch / 2, consoleCenterZ);
                 group.add(c);
-                const toppMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true });
-                const legX = 0.72;
-                const legHeight = 1.6 * S;
-                const legFrontZ = consoleFrontZ - 0.1 * S;
-                const legBackZ = consoleBackZ + 0.05 * S;
-                const legGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, legHeight, 8);
-                [[-legX, legBackZ], [legX, legBackZ], [-legX, legFrontZ], [legX, legFrontZ]].forEach(([dx, z]) => {
-                    const leg = new THREE.Mesh(legGeo, toppMat);
-                    leg.position.set(dx * S, deckY + legHeight / 2, z);
-                    group.add(leg);
-                });
-                const topY = deckY + legHeight;
-                const topCenterZ = (legFrontZ + legBackZ) / 2;
-                const cFL = new THREE.Vector3(-legX * S, topY, legBackZ);
-                const cFR = new THREE.Vector3(legX * S, topY, legBackZ);
-                const cBL = new THREE.Vector3(-legX * S, topY, legFrontZ);
-                const cBR = new THREE.Vector3(legX * S, topY, legFrontZ);
-                const railR = 0.045 * S;
-                [[cFL, cFR], [cBL, cBR], [cFL, cBL], [cFR, cBR]].forEach(([a, b]) => {
-                    group.add(limbBetween(a, b, railR, railR, toppMat));
-                });
-                const top = new THREE.Mesh(new THREE.BoxGeometry(1.6 * S, 0.08 * S, 1.4 * S), toppMat);
-                top.position.set(0, topY, topCenterZ);
-                group.add(top);
-                // Electronics box on top of the T-top — houses radar/antenna mounts,
-                // standard on a boat this size, absent on the small skiff.
-                const boxMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5, flatShading: true });
-                const electronicsBox = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 0.22 * S, 0.5 * S), boxMat);
-                electronicsBox.position.set(0, topY + 0.15 * S, topCenterZ);
-                group.add(electronicsBox);
-                const antennaGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 6);
-                [-0.3, 0.3].forEach((dx) => {
-                    const antenna = new THREE.Mesh(antennaGeo, boxMat);
-                    antenna.position.set(dx * S, topY + 0.26 * S + 0.27 * S, topCenterZ);
-                    group.add(antenna);
-                });
+                const ttopZ = ((consoleFrontZ - 0.1 * S) + (consoleBackZ + 0.05 * S)) / 2, ttopY = deckY + 1.6 * S; // where the T-top is (or would be): the anchor for the roof fittings
+                group.userData.anchors = { roofY: FIT.ttop ? ttopY + 0.04 * S : deckY + ch + 0.25, roofZ: ttopZ, roofD: 1.4 * S, roofHalfW: 0.8 * S, hasTop: FIT.ttop, rigX: 0.8 * S, rigY: ttopY, rigZ: ttopZ, holderZ0: -0.5 * def.length / 2, holderZ1: 0.1 * def.length / 2, cock: { z0: ttopZ - 2.3 * S, z1: ttopZ + 0.5 * S, halfW: Math.min(1.0 * S, hullHalfWidthAt(ttopZ - 2.3 * S, def.length / 2, def.beam / 2) - 0.5), floorY: deckY, roofY: deckY + 1.6 * S } };
+                if (FIT.ttop) {
+                    const toppMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true });
+                    const legX = 0.72;
+                    const legHeight = 1.6 * S;
+                    const legFrontZ = consoleFrontZ - 0.1 * S;
+                    const legBackZ = consoleBackZ + 0.05 * S;
+                    const legGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, legHeight, 8);
+                    [[-legX, legBackZ], [legX, legBackZ], [-legX, legFrontZ], [legX, legFrontZ]].forEach(([dx, z]) => {
+                        const leg = new THREE.Mesh(legGeo, toppMat);
+                        leg.position.set(dx * S, deckY + legHeight / 2, z);
+                        group.add(leg);
+                    });
+                    const topY = deckY + legHeight;
+                    const topCenterZ = (legFrontZ + legBackZ) / 2;
+                    const cFL = new THREE.Vector3(-legX * S, topY, legBackZ);
+                    const cFR = new THREE.Vector3(legX * S, topY, legBackZ);
+                    const cBL = new THREE.Vector3(-legX * S, topY, legFrontZ);
+                    const cBR = new THREE.Vector3(legX * S, topY, legFrontZ);
+                    const railR = 0.045 * S;
+                    [[cFL, cFR], [cBL, cBR], [cFL, cBL], [cFR, cBR]].forEach(([a, b]) => {
+                        group.add(limbBetween(a, b, railR, railR, toppMat));
+                    });
+                    const top = new THREE.Mesh(new THREE.BoxGeometry(1.6 * S, 0.08 * S, 1.4 * S), R.canvas === null ? toppMat : new THREE.MeshPhongMaterial({ color: R.canvas, flatShading: true })); // the roof takes the canvas colour when one is chosen
+                    top.position.set(0, topY, topCenterZ);
+                    group.add(top);
+                    // Electronics box on top of the T-top — houses radar/antenna mounts,
+                    // standard on a boat this size, absent on the small skiff.
+                    const boxMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5, flatShading: true });
+                    const electronicsBox = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 0.22 * S, 0.5 * S), boxMat);
+                    electronicsBox.position.set(0, topY + 0.15 * S, topCenterZ);
+                    group.add(electronicsBox);
+                    const antennaGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 6);
+                    [-0.3, 0.3].forEach((dx) => {
+                        const antenna = new THREE.Mesh(antennaGeo, boxMat);
+                        antenna.position.set(dx * S, topY + 0.26 * S + 0.27 * S, topCenterZ);
+                        group.add(antenna);
+                    });
+                }
                 // Console door — lower on the front face, well below the wheel
                 // (Y-separated, verified clear by 0.055 units) rather than beside it,
                 // which would have overlapped the wheel's lower edge.
@@ -8790,7 +9659,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // console's far face by 1.3 units and stays well short of the bow
                 // deck's start. Same forward-facing, backrest-toward-console
                 // orientation as the corrected bow seats.
-                const seatMat = new THREE.MeshPhongMaterial({ color: 0xe4e1d6, flatShading: true });
+                const seatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat, flatShading: true });
                 const companionDepth = 0.5 * S;
                 const companionZ = 1.4 * S; // pulled back slightly from console for more legroom toward the bow deck
                 [-1, 1].forEach((side) => {
@@ -8907,23 +9776,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const platformDepth = def.length * 0.08;
                 const platformY = deckY * 0.35;
                 const sternZ = -(def.length / 2);
-                const platform = new THREE.Mesh(new THREE.BoxGeometry(platformHalfWidth * 2, 0.08 * S, platformDepth), platformMat);
-                platform.position.set(0, platformY, sternZ - platformDepth / 2);
-                group.add(platform);
-                const ladderMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
-                const ladderRailGeo = new THREE.CylinderGeometry(0.02 * S, 0.02 * S, 0.5 * S, 6);
-                [-0.25, 0.25].forEach((dx) => {
-                    const rail = new THREE.Mesh(ladderRailGeo, ladderMat);
-                    rail.rotation.x = 0.5;
-                    rail.position.set(dx * S, platformY - 0.18 * S, sternZ - platformDepth - 0.15 * S);
-                    group.add(rail);
-                });
-                [0.1, 0.28].forEach((ry) => {
-                    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.45 * S, 6), ladderMat);
-                    rung.rotation.z = Math.PI / 2;
-                    rung.position.set(0, platformY - 0.18 * S - ry * S, sternZ - platformDepth - 0.15 * S + ry * S * 0.8);
-                    group.add(rung);
-                });
+                if (FIT.platform) {
+                    const platform = new THREE.Mesh(new THREE.BoxGeometry(platformHalfWidth * 2, 0.08 * S, platformDepth), platformMat);
+                    platform.position.set(0, platformY, sternZ - platformDepth / 2);
+                    group.add(platform);
+                    const ladderMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
+                    const ladderRailGeo = new THREE.CylinderGeometry(0.02 * S, 0.02 * S, 0.5 * S, 6);
+                    [-0.25, 0.25].forEach((dx) => {
+                        const rail = new THREE.Mesh(ladderRailGeo, ladderMat);
+                        rail.rotation.x = 0.5;
+                        rail.position.set(dx * S, platformY - 0.18 * S, sternZ - platformDepth - 0.15 * S);
+                        group.add(rail);
+                    });
+                    [0.1, 0.28].forEach((ry) => {
+                        const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.45 * S, 6), ladderMat);
+                        rung.rotation.z = Math.PI / 2;
+                        rung.position.set(0, platformY - 0.18 * S - ry * S, sternZ - platformDepth - 0.15 * S + ry * S * 0.8);
+                        group.add(rung);
+                    });
+                }
                 // Twin outboards — every reference for a boat this size confirms
                 // twin (or triple) engine packages, and this boat had zero motors.
                 // Uses the nicer premium motor (taller two-tone cowl, trim ram),
@@ -8931,16 +9802,23 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // tie-bar linking them — real on any twin-engine setup.
                 const motorX = platformHalfWidth * 1.3;
                 const motorZ = sternZ - 0.15 * S;
-                [-1, 1].forEach((side) => {
-                    const motor = buildOutboardMotorPremium(S);
-                    motor.position.set(side * motorX, deckY, motorZ);
+                if (!FIT.twin) { // one big outboard on the centre line
+                    const motor = FIT.motor === "standard" ? buildOutboardMotor(S) : buildOutboardMotorPremium(S);
+                    motor.position.set(0, deckY, motorZ);
                     group.add(motor);
-                });
-                const tieBarMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
-                const tieBar = limbBetween(new THREE.Vector3(-motorX, deckY + 0.05 * S, motorZ - 0.3 * S), new THREE.Vector3(motorX, deckY + 0.05 * S, motorZ - 0.3 * S), 0.025 * S, 0.025 * S, tieBarMat);
-                group.add(tieBar);
+                }
+                if (FIT.twin) {
+                    [-1, 1].forEach((side) => {
+                        const motor = buildOutboardMotorPremium(S);
+                        motor.position.set(side * motorX, deckY, motorZ);
+                        group.add(motor);
+                    });
+                    const tieBarMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
+                    const tieBar = limbBetween(new THREE.Vector3(-motorX, deckY + 0.05 * S, motorZ - 0.3 * S), new THREE.Vector3(motorX, deckY + 0.05 * S, motorZ - 0.3 * S), 0.025 * S, 0.025 * S, tieBarMat);
+                    group.add(tieBar);
+                }
             }
-            else if (def.tier === "Sportfisher") {
+            else if (family === "sport") {
                 // Anchor geometry — cabin connects directly to the lower helm
                 // position instead of floating disconnected from it, and everything
                 // above (flybridge floor, tower, helm console) derives from these
@@ -9153,7 +10031,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const interiorFloorY = cabinCenterY - cabinHeight / 2 + floorThickness;
                 // Settee (bench seat) along the port side wall, in the back section
                 // where the cabin is widest and most consistent.
-                const setteeMat = new THREE.MeshPhongMaterial({ color: 0x2c4a5e, flatShading: true }); // navy upholstery
+                const setteeMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0x2c4a5e : R.seat, flatShading: true }); // navy upholstery
                 const setteeDepth = 0.55 * S;
                 const setteeLen = (mid1Z - 0.3) - (backZ + 0.3);
                 const setteeCenterZ = backZ + 0.3 + setteeLen / 2;
@@ -9319,6 +10197,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const radarDome = new THREE.Mesh(new THREE.SphereGeometry(0.16 * S, 8, 6), radarMat);
                 radarDome.position.set(0, towerLegTopY + 0.44 * S, (towerFrontZ + towerBackZ) / 2);
                 group.add(radarDome);
+                group.userData.anchors = { hasTop: true, roofY: towerLegTopY + 0.04 * S, roofZ: (towerFrontZ + towerBackZ) / 2, roofD: 1.2 * S, roofHalfW: 0.8 * S, rigX: 0.8 * S, rigY: towerLegTopY, rigZ: (towerFrontZ + towerBackZ) / 2, holderZ0: -0.88 * L, holderZ1: cabinBackZ - 0.3, cock: null };
                 // Flybridge helm console — same console-mounted-wheel technique as
                 // the CC and skiff, sized for a flybridge dash.
                 const flyConsoleHalfWidth = 0.55 * S, flyConsoleHeight = 0.5 * S, flyConsoleDepth = 0.35 * S;
@@ -9348,14 +10227,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 companionChair.position.set(0.5 * S, flyFloorTopY, flyConsoleCenterZ - 0.9 * S);
                 companionChair.rotation.y = 0;
                 group.add(companionChair);
-                const riggerGeo = new THREE.CylinderGeometry(0.04 * S, 0.04 * S, 3.2 * S, 6);
-                [-1, 1].forEach((side) => {
-                    const rigger = new THREE.Mesh(riggerGeo, towerMat);
-                    rigger.position.set(side * 0.9 * S, deckY + 2.0 * S, cabinFrontZ);
-                    rigger.rotation.z = side * 0.9;
-                    rigger.rotation.x = 0.5;
-                    group.add(rigger);
-                });
+                // (the outrigger poles are now an add-on: see buildBoatAddons)
                 // Cockpit fighting chair — the single most iconic sportfisher
                 // feature, and it was completely missing. Pedestal-mounted, centered
                 // in the cockpit, with a footrest and rod holder in the base.
@@ -9412,6 +10284,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     group.add(holder);
                 });
             }
+            const addons = buildBoatAddons(def, R, group.userData.anchors, shell);
+            group.add(addons); // the fittings this look has switched on
             return group;
         }
         let boatPos = new THREE.Vector3(0, 0, 0);
@@ -9605,10 +10479,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         let skiffGate = true; // false while the skiff has not arrived yet (a new game starts on foot): the hull is built but hidden
         function spawnBoat(index) {
-            if (currentBoatGroup)
+            if (currentBoatGroup) {
                 scene.remove(currentBoatGroup);
+                boatDispose(currentBoatGroup);
+            }
             boatDef = BOATS[index];
-            currentBoatGroup = buildBoat(boatDef);
+            currentBoatGroup = buildBoat(boatDef, stateRef.current.quest ? boatLookFor(stateRef.current.quest, index) : null); // the look saved for this hull
             boatPos.set(0, 0, 0);
             boatHeading = 0;
             boatSpeed = 0;
@@ -9630,7 +10506,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
             scene.add(currentBoatGroup);
         }
         spawnBoat(stateRef.current.boatIndex);
-        let lastBoatIndex = stateRef.current.boatIndex;
+        let lastBoatIndex = stateRef.current.boatIndex, lastBoatRev = -1;
+        function rebuildBoatModel() {
+            const old = currentBoatGroup;
+            if (!old)
+                return;
+            const g = buildBoat(boatDef, boatLookFor(stateRef.current.quest, stateRef.current.boatIndex));
+            g.position.copy(old.position);
+            g.rotation.copy(old.rotation);
+            g.visible = old.visible;
+            scene.remove(old);
+            boatDispose(old);
+            scene.add(g);
+            currentBoatGroup = g;
+        }
         let lastSkyPreset = stateRef.current.sky;
         // ---------- NPCs — gives the town a lived-in feel. Positions verified
         // against the actual terrain height functions before placement (not
@@ -11208,6 +12097,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 else
                     marineShowToast(r.msg, "#ffb84d", 3);
             }
+            else if (/^boat(set|addon|buy|reset)$/.test(a.type)) { // the Boat Yard: paint, stripe, name, flag, decal, deck, seats and fittings
+                const r = boatYardApply(quest, a, { canBuy: shopOpen, level: questLevelForXp(quest.xp), owns: (i) => { const it = GEAR_ITEMS.find((g) => g.slot === "hull" && g.hullIndex === i); return !!(it && quest.gear.owned[it.id]); } });
+                if (r.ok) {
+                    questSave(quest);
+                    questPush();
+                    if (r.bought)
+                        marineShowToast("🎨 Bought: " + r.bought + " ($" + r.price + ")", "#8fd9e6", 3);
+                }
+                else
+                    marineShowToast(r.msg, "#ffb84d", 3);
+            }
             else if (a.type === "travelunlock") {
                 const r = travelUnlock(quest, a.id);
                 if (r.ok) {
@@ -11302,6 +12202,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         gearEquip(quest, best.id);
                 });
                 wardrobeApply(quest, { type: "testwardrobe" });
+                Object.keys(BOAT_KIND_LISTS).forEach((k) => BOAT_KIND_LISTS[k].forEach((it) => { quest.boats.own[k][it.id] = 1; }));
+                quest.boats.rev++; // every paint, stripe, flag and fitting
                 gearAfterChange();
                 gearAvailPrev = new Set(gearUnlockedIds(quest));
                 questSave(quest);
@@ -12111,6 +13013,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if (stateRef.current.boatIndex !== lastBoatIndex) {
                     lastBoatIndex = stateRef.current.boatIndex;
                     spawnBoat(lastBoatIndex);
+                    lastBoatRev = quest.boats.rev;
+                }
+                else if (lastBoatRev < 0)
+                    lastBoatRev = quest.boats.rev; // (the first frame: the boat was just built from this look)
+                else if (quest.boats.rev !== lastBoatRev) {
+                    lastBoatRev = quest.boats.rev;
+                    rebuildBoatModel();
                 }
                 skiffSync();
                 if (stateRef.current.sky !== lastSkyPreset) {
@@ -12991,6 +13900,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         currentBoatGroup.rotation.z += Math.sin(t * 26) * 0.06 * boatBump;
                         boatBump = Math.max(0, boatBump - dt * 1.6);
                     } // hull knock
+                    {
+                        const fp = currentBoatGroup.userData.flagPivot;
+                        if (fp) {
+                            const wind = 0.25 + Math.min(1, Math.abs(boatSpeed) / 8) * 0.55;
+                            fp.rotation.y = Math.sin(t * 3.1) * 0.12 * wind;
+                            fp.rotation.z = Math.sin(t * 4.3 + 1) * 0.05 * wind;
+                        }
+                    } // the stern flag flutters
                     angler = currentBoatGroup.userData.angler;
                     {
                         const gsig = gearLookSig(); // repaint after a gear change or a boat swap
@@ -14130,12 +15047,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 sonarSpec.showsBaitfish || (uiQuest && playStats(uiQuest).flags.baitfish) ? " · bait + game" : " · game only"),
             uiSpotHint && React.createElement("div", { style: { fontSize: 9, color: "#7fe6a8", marginTop: 2 } }, uiSpotHint)),
         uiNetEquipped && uiWalkMode && !uiWheelOpen && (React.createElement("button", { onClick: () => { stateRef.current.netThrowButtonRequested = true; }, style: { position: "absolute", bottom: 150, left: "50%", transform: "translateX(-50%)", fontSize: 13, padding: "8px 18px", borderRadius: 6, cursor: "pointer", border: "1px solid #8fd97a", background: "rgba(14,31,40,0.9)", color: "#8fd97a", fontWeight: 600, zIndex: 60 } }, "\uD83E\uDD45 Throw Net")),
-        !uiAshoreMode && uiPort && uiDock === "none" && uiMode !== "bite" && uiMode !== "fighting" && !uiWheelOpen && !uiShopOpen && !uiHomeOpen && !uiGearOpen && !uiWardrobeOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiTravelOpen && !uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
+        !uiAshoreMode && uiPort && uiDock === "none" && uiMode !== "bite" && uiMode !== "fighting" && !uiWheelOpen && !uiShopOpen && !uiHomeOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiTravelOpen && !uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
             React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } },
                 "\u2693 ",
                 uiPort.name),
             React.createElement("button", { disabled: uiPort.fast, onClick: () => { stateRef.current.portServicesRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: uiPort.fast ? "default" : "pointer", border: "1px solid " + (uiPort.fast ? "rgba(255,255,255,0.3)" : "#ffb84d"), background: "rgba(14,31,40,0.92)", color: uiPort.fast ? "rgba(255,255,255,0.5)" : "#ffb84d", fontWeight: 600 } }, uiPort.fast ? "Slow down for services" : uiPort.kind === "home" ? (uiQuest && uiQuest.homes && uiQuest.homes.owned[uiPort.id] ? "🏡 Go home" : "🏡 View the house for sale") : "🏪 Harbor services"))),
-        !uiAshoreMode && uiDock !== "none" && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
+        !uiAshoreMode && uiDock !== "none" && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
             uiDock === "docked" && React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } }, TOUCH_UI ? "Tied up" : React.createElement(React.Fragment, null,
                 "Tied up \u00B7 ",
                 React.createElement("b", null, "L"),
@@ -14188,6 +15105,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 React.createElement("button", { onClick: () => setUiGearOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
             React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 12 } }, "Swap what you own here (not while a fish is on). New gear is bought at the marina shop. Your hull's own tackle class still applies on top of this."),
             React.createElement(GearPanel, { qs: uiQuest, canBuy: false, send: (a) => { stateRef.current.questAction = a; }, showTesting: BUILD.dev, hullSwapOk: uiDock === "docked" && !uiAshoreMode }))),
+        uiBoatYardOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
+            React.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+                    React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83C\uDFA8 Boat Yard"),
+                    React.createElement("button", { onClick: () => setUiBoatYardOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 10 } }, "Make each boat your own. Changes show on the water as soon as you close this. Paid paints, flags and fittings are bought at the marina boat yard."),
+                React.createElement(BoatYardPanel, { qs: uiQuest, canBuy: false, boatIndex: uiBoatIndex, send: (a) => { stateRef.current.questAction = a; } })))),
         uiWardrobeOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.96)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
@@ -14364,12 +15288,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "📖", label: "Journal", enabled: true, run: () => setUiJournalOpen(true) },
                         { icon: "🧊", label: "Cooler", enabled: uiNearCooler, why: "Get near the cooler on deck", run: () => setUiCoolerOpen(true) },
                     ] },
-                hull: { title: "SWITCH BOAT", items: GEAR_ITEMS.filter((g) => g.slot === "hull").map((h) => {
+                hull: { title: "BOAT", items: [{ icon: "🎨", label: "Boat Yard", enabled: true, run: () => setUiBoatYardOpen(true) }].concat(GEAR_ITEMS.filter((g) => g.slot === "hull").map((h) => {
                         const owned = !!(uiQuest && uiQuest.gear.owned[h.id]), canSwap = owned && uiDock === "docked" && !uiAshoreMode && !boatLocked;
-                        return { icon: ["🛶", "🚤", "🛥️"][h.hullIndex] || "🚢", label: BOATS[h.hullIndex].tier, active: h.hullIndex === uiBoatIndex, enabled: canSwap || h.hullIndex === uiBoatIndex,
+                        return { icon: boatIcon(BOATS[h.hullIndex]), label: BOATS[h.hullIndex].kind.replace("Power catamaran", "Catamaran"), active: h.hullIndex === uiBoatIndex, enabled: canSwap || h.hullIndex === uiBoatIndex,
                             why: !owned ? "Buy it at the marina shop (Gear)" : "Tie up at the dock and stay aboard to swap boats", keepOpen: true, run: () => { if (h.hullIndex !== uiBoatIndex)
                                 stateRef.current.questAction = { type: "gearequip", id: h.id }; } };
-                    }) },
+                    })) },
                 world: { title: "SKY & SEA", items: Object.entries(SKY_PRESETS).map(([key, val]) => ({
                         icon: { clear: "☀️", overcast: "☁️", sunset: "🌅", storm: "⛈️" }[key] || "🌤️", label: val.label, active: key === uiSky, enabled: true, keepOpen: true, run: () => setUiSky(key),
                     })).concat(Object.entries(SEA_STATES).map(([key, val]) => ({
@@ -14664,6 +15588,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ffb84d", marginBottom: 4 } }, "\uD83E\uDDF0 Tackle counter"),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.55, marginBottom: 10 } }, "Better tackle needs money, level, and a track record: catch enough of the right fish and the shop will sell you the good stuff."),
                 React.createElement(GearPanel, { qs: uiQuest, canBuy: true, send: (a) => { stateRef.current.questAction = a; }, showTesting: false, hullSwapOk: uiDock === "docked" && !uiAshoreMode }))),
+            uiQuest && (React.createElement("div", { style: { marginBottom: 18 } },
+                React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ffb84d", marginBottom: 4 } }, "\uD83C\uDFA8 Boat yard"),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.55, marginBottom: 10 } }, "Paints, stripes, flags, fish decals, deck finishes and fittings for every boat you own. Once bought, an item is yours for every boat. Change your look any time from the wheel (Boat > Boat Yard)."),
+                React.createElement(BoatYardPanel, { qs: uiQuest, canBuy: true, boatIndex: uiBoatIndex, send: (a) => { stateRef.current.questAction = a; } }))),
             uiQuest && (React.createElement("div", { style: { marginBottom: 18 } },
                 React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ffb84d", marginBottom: 4 } }, "\uD83D\uDC54 Outfitter"),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.55, marginBottom: 10 } }, "Shirts, trousers, vests and sets. You can dye anything you own in any colour, and wear it from the Wardrobe in the wheel."),
@@ -15000,6 +15928,249 @@ function CharacterPreview({ look, gear, height }) {
             React.createElement("rect", { x: cx - 28, y: "32", width: "56", height: "6", fill: "#d9b84a" }),
             React.createElement("rect", { x: cx - 20, y: "38", width: "40", height: "5", rx: "2", fill: "#15181b" }))));
 }
+// ---------- Boat Yard: a flat side-view card of the boat, and the panel that edits its look ----------
+// BoatCard redraws the saved look as a 2D picture, so the panel can show every change at once without a second 3D scene. The real 3D boat is rebuilt from the same look.
+function BoatCard({ look, def, height }) {
+    const R = boatLookResolve(look, def), fam = boatFamily(def), FIT = boatFit(def), css = (n) => boatHexStr(n);
+    const ad = R.addons, has = (id) => ad.indexOf(id) >= 0;
+    const lum = (n) => (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    const ink = lum(R.hull) > 0.55 ? "#1b2a33" : "#f4f6f7", hullC = css(R.hull), accC = css(R.accent), strC = css(R.stripeCol), botC = css(R.bottom), capC = css(R.cap);
+    const canvasC = css(R.canvas === null ? R.accent : R.canvas), roofC = R.canvas === null ? "#f4f4f2" : css(R.canvas);
+    const hull = "M28 58 Q150 64 284 42 Q278 72 256 86 Q150 102 38 90 Z";
+    const wl = "M20 82 L300 74"; // the waterline
+    const fontFam = R.font === "serif" ? "Georgia, 'Times New Roman', serif" : R.font === "script" ? "'Brush Script MT', 'Segoe Script', cursive" : "system-ui, -apple-system, 'Segoe UI', sans-serif";
+    const id = "bc" + def.name.replace(/\W/g, "") + (look.h || "") + (look.st || "");
+    const st = R.stripe;
+    const motor = (React.createElement("g", null,
+        React.createElement("rect", { x: "12", y: "50", width: "20", height: "34", rx: "4", fill: FIT.motor === "premium" ? "#e8ecee" : "#2a2e32", stroke: "#0003" }),
+        FIT.twin && React.createElement("rect", { x: "8", y: "54", width: "20", height: "34", rx: "4", fill: FIT.motor === "premium" ? "#dfe4e6" : "#33383c", stroke: "#0003" }),
+        React.createElement("rect", { x: "16", y: "84", width: "8", height: "12", fill: "#23272b" })));
+    return (React.createElement("svg", { viewBox: "-4 -14 328 124", role: "img", "aria-label": "Side view of " + def.name, style: { width: "100%", maxWidth: 520, height: height || "auto", display: "block", margin: "0 auto" } },
+        React.createElement("defs", null,
+            React.createElement("clipPath", { id: id },
+                React.createElement("path", { d: hull })),
+            React.createElement("linearGradient", { id: id + "f", x1: "0", y1: "0", x2: "0", y2: "1" },
+                React.createElement("stop", { offset: "0.35", stopColor: hullC }),
+                React.createElement("stop", { offset: "1", stopColor: strC })),
+            React.createElement("linearGradient", { id: id + "w", x1: "0", y1: "0", x2: "0", y2: "1" },
+                React.createElement("stop", { offset: "0", stopColor: "#9fd0e8" }),
+                React.createElement("stop", { offset: "1", stopColor: "#2a6f9e" }))),
+        React.createElement("rect", { x: "-4", y: "76", width: "328", height: "34", fill: "url(#" + id + "w)", opacity: "0.55" }),
+        fam === "skiff" && !has("bimini") && React.createElement("g", { stroke: "#9aa4aa", strokeWidth: "2" },
+            React.createElement("line", { x1: "44", y1: "58", x2: "44", y2: "30" }),
+            React.createElement("line", { x1: "76", y1: "58", x2: "76", y2: "30" }),
+            React.createElement("rect", { x: "40", y: "26", width: "40", height: "5", fill: "#cfd5d8" })),
+        has("bimini") && React.createElement("g", null,
+            React.createElement("line", { x1: "70", y1: "58", x2: "70", y2: "20", stroke: "#aab2b7", strokeWidth: "2" }),
+            React.createElement("line", { x1: "150", y1: "55", x2: "150", y2: "20", stroke: "#aab2b7", strokeWidth: "2" }),
+            React.createElement("path", { d: "M62 22 Q110 8 158 20 L158 25 Q110 14 62 27 Z", fill: canvasC })),
+        fam === "cc" && React.createElement("g", null,
+            React.createElement("rect", { x: "150", y: "34", width: "26", height: "26", rx: "2", fill: accC }),
+            React.createElement("path", { d: "M152 34 L168 22 L172 34 Z", fill: "#bfe3f0", opacity: "0.8" }),
+            FIT.ttop && React.createElement("g", null,
+                React.createElement("line", { x1: "146", y1: "58", x2: "146", y2: "14", stroke: "#e5e8ea", strokeWidth: "2.4" }),
+                React.createElement("line", { x1: "186", y1: "58", x2: "186", y2: "14", stroke: "#e5e8ea", strokeWidth: "2.4" }),
+                React.createElement("rect", { x: "140", y: "9", width: "52", height: "6", rx: "1.5", fill: roofC, stroke: "#0002" }))),
+        fam === "sport" && React.createElement("g", null,
+            React.createElement("path", { d: "M96 58 L106 30 L232 30 L240 58 Z", fill: hullC, stroke: "#0003" }),
+            [0, 1, 2, 3].map((k) => React.createElement("rect", { key: k, x: 116 + k * 28, y: "38", width: "18", height: "8", rx: "1.5", fill: "#6a8fa3" })),
+            React.createElement("rect", { x: "140", y: "16", width: "70", height: "14", rx: "2", fill: hullC, stroke: "#0003" }),
+            React.createElement("rect", { x: "146", y: "19", width: "58", height: "7", fill: "#6a8fa3" }),
+            React.createElement("line", { x1: "148", y1: "16", x2: "148", y2: "2", stroke: "#dcdcdc", strokeWidth: "2" }),
+            React.createElement("line", { x1: "204", y1: "16", x2: "204", y2: "2", stroke: "#dcdcdc", strokeWidth: "2" }),
+            React.createElement("rect", { x: "142", y: "-2", width: "68", height: "5", fill: "#e6e6e6", stroke: "#0002" })),
+        fam === "skiff" && React.createElement("g", null,
+            React.createElement("rect", { x: "150", y: "42", width: "18", height: "16", rx: "2", fill: accC })),
+        has("rocket") && (FIT.ttop || fam === "sport") && React.createElement("g", { stroke: "#23272b", strokeWidth: "2.4" }, [0, 1, 2, 3, 4].map((k) => React.createElement("line", { key: k, x1: fam === "sport" ? 146 + k * 3 : 144 + k * 2.5, y1: fam === "sport" ? -2 : 9, x2: fam === "sport" ? 140 + k * 3 : 138 + k * 2.5, y2: fam === "sport" ? -14 : -6 }))),
+        has("spots") && (FIT.ttop || fam === "sport") && React.createElement("rect", { x: fam === "sport" ? 202 : 184, y: fam === "sport" ? -4 : 8, width: "7", height: "5", fill: "#fff0b8", stroke: "#23272b" }),
+        has("outrig") && (FIT.ttop || fam === "sport") && React.createElement("g", { stroke: "#cfd5d8", strokeWidth: "1.6" },
+            React.createElement("line", { x1: fam === "sport" ? 176 : 166, y1: fam === "sport" ? 0 : 11, x2: fam === "sport" ? 96 : 92, y2: "-13" })),
+        React.createElement("g", { clipPath: "url(#" + id + ")" },
+            React.createElement("rect", { x: "0", y: "0", width: "320", height: "100", fill: st === "fade" ? "url(#" + id + "f)" : hullC }),
+            st === "twotone" && React.createElement("path", { d: "M0 0 H320 V54 L0 64 Z", fill: accC, opacity: "0.95" }),
+            (st === "boot" || st === "double") && React.createElement("path", { d: "M20 74 L300 66 L300 72 L20 80 Z", fill: strC }),
+            (st === "cove" || st === "double") && React.createElement("path", { d: "M24 71 Q150 77 288 55 L288 60 Q150 82 24 76 Z", fill: strC }),
+            st === "band" && React.createElement("path", { d: "M24 68 Q150 74 288 52 L288 63 Q150 85 24 79 Z", fill: strC }),
+            React.createElement("path", { d: "M20 82 L300 74 L300 120 L20 120 Z", fill: botC })),
+        React.createElement("path", { d: hull, fill: "none", stroke: "#00000033", strokeWidth: "1" }),
+        React.createElement("path", { d: "M28 58 Q150 64 284 42", fill: "none", stroke: capC, strokeWidth: "3", strokeLinecap: "round" }),
+        R.decal !== "none" && React.createElement("g", { transform: "translate(212 55)", fill: css(R.decalCol) },
+            React.createElement("ellipse", { cx: "0", cy: "0", rx: "13", ry: "4.5" }),
+            React.createElement("path", { d: "M-12 0 L-21 -5 L-21 5 Z" }),
+            React.createElement("path", { d: "M-2 -4 L2 -9 L5 -3 Z" })),
+        R.name && React.createElement("text", { x: "64", y: "76", fontSize: "11", fontWeight: R.font === "block" ? 800 : 600, fontStyle: R.font === "script" ? "italic" : "normal", fill: ink, fontFamily: fontFam, letterSpacing: R.font === "block" ? 0.6 : 0 }, R.name.slice(0, 18)),
+        has("bowrail") && React.createElement("g", null,
+            React.createElement("line", { x1: "272", y1: "42", x2: "293", y2: "40", stroke: "#c9ced2", strokeWidth: "2.4" }),
+            React.createElement("circle", { cx: "293", cy: "40", r: "3", fill: "#23272b" })),
+        has("bumpers") && [90, 150, 210].map((x) => React.createElement("g", { key: x },
+            React.createElement("line", { x1: x, y1: "60", x2: x, y2: "63", stroke: "#c9ced2" }),
+            React.createElement("rect", { x: x - 3, y: "63", width: "6", height: "14", rx: "3", fill: "#eceff1", stroke: "#0003" }))),
+        has("holders") && React.createElement("g", { stroke: "#23272b", strokeWidth: "2.4" }, [70, 96, 122, 148].map((x) => React.createElement("line", { key: x, x1: x, y1: 58, x2: x - 3, y2: 50 }))),
+        R.flag !== "none" && React.createElement("g", null,
+            React.createElement("line", { x1: "38", y1: "58", x2: "38", y2: "30", stroke: "#d8d8d8", strokeWidth: "1.6" }),
+            React.createElement("path", { d: "M38 31 L58 36 L38 42 Z", fill: css(R.flagCol), stroke: "#0003", strokeWidth: "0.5" })),
+        motor));
+}
+function BoatYardPanel({ qs, send, canBuy, boatIndex }) {
+    const level = questLevelForXp(qs.xp);
+    const hullItems = GEAR_ITEMS.filter((g) => g.slot === "hull" && qs.gear.owned[g.id]);
+    const [hull, setHull] = useState(hullItems.some((g) => g.hullIndex === boatIndex) ? boatIndex : hullItems.length ? hullItems[0].hullIndex : 0);
+    const [tab, setTab] = useState("paint");
+    const [pick, setPick] = useState(null); // something the player tapped that is not theirs yet: { kind, id, field }
+    const def = BOATS[hull] || BOATS[0], look = boatLookFor(qs, hull) || boatLookFor(qs, 0), FIT = boatFit(def);
+    const [nm, setNm] = useState(look.nm), [pt, setPt] = useState(look.pt);
+    useEffect(() => { setNm(look.nm); setPt(look.pt); }, [hull, look.nm, look.pt]);
+    useEffect(() => { setPick(null); }, [hull, tab]);
+    const chip = (on) => ({ fontSize: 12, padding: "5px 10px", borderRadius: 14, cursor: "pointer", border: "1px solid " + (on ? "#ffb84d" : "rgba(255,255,255,0.2)"), background: on ? "rgba(255,184,77,0.18)" : "rgba(255,255,255,0.05)", color: on ? "#ffd8a0" : "#eaf3f5", whiteSpace: "nowrap" });
+    const small = (color) => ({ fontSize: 12, padding: "5px 11px", borderRadius: 5, cursor: "pointer", border: "1px solid " + color, background: "rgba(255,255,255,0.06)", color });
+    const label = (t) => React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.3, textTransform: "uppercase", opacity: 0.55, margin: "12px 0 6px" } }, t);
+    const inputStyle = { fontSize: 14, padding: "7px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.07)", color: "#eaf3f5", width: "100%", boxSizing: "border-box" };
+    const tap = (kind, id, field) => {
+        const s = boatOptState(qs, kind, id, level);
+        if (s.owned) {
+            setPick(null);
+            send(kind === "addon" ? { type: "boataddon", hull, id } : { type: "boatset", hull, field, value: id });
+        }
+        else
+            setPick({ kind, id, field });
+    };
+    const tag = (kind, id) => { const s = boatOptState(qs, kind, id, level); return s.owned ? "" : s.locked ? " 🔒" : " $" + s.price; };
+    const paintRow = (field, factory, blank) => {
+        const cur = look[field];
+        const dot = (key, title, bg, on, onClick, lock, extra) => React.createElement("button", { key: key, title: title, "aria-label": title, "aria-pressed": on, onClick: onClick, style: { position: "relative", width: 30, height: 30, borderRadius: 15, cursor: "pointer", padding: 0, background: bg, border: on ? "3px solid #ffb84d" : "2px solid rgba(255,255,255,0.35)", boxSizing: "border-box", ...(extra || {}) } }, lock && React.createElement("span", { style: { position: "absolute", right: -5, bottom: -5, minWidth: 14, height: 14, borderRadius: 7, background: "#0b1a21", border: "1px solid rgba(255,211,107,0.7)", color: "#ffd36b", fontSize: 9, fontWeight: 700, lineHeight: "12px", textAlign: "center" } }, lock));
+        return (React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } },
+            factory && dot("f", "Factory colour", boatHexStr(factory), cur === boatHexStr(factory), () => { setPick(null); send({ type: "boatset", hull, field, value: boatHexStr(factory) }); }),
+            blank && dot("b", blank, "repeating-linear-gradient(45deg, #5a6b73 0 4px, #2c3a41 4px 8px)", cur === "", () => { setPick(null); send({ type: "boatset", hull, field, value: "" }); }),
+            BOAT_PAINTS.map((p) => { const s = boatOptState(qs, "paint", p.id, level); return dot(p.id, p.name + (s.owned ? "" : s.locked ? " (level " + s.level + ")" : " ($" + s.price + ")"), boatHexStr(p.color), cur === p.id, () => tap("paint", p.id, field), s.owned ? "" : s.locked ? "🔒" : "$", s.owned ? {} : { opacity: s.locked ? 0.45 : 0.9 }); })));
+    };
+    const chipRow = (kind, list, field) => (React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, list.map((o) => { const on = look[field] === o.id; return React.createElement("button", { key: o.id, "aria-pressed": on, onClick: () => tap(kind, o.id, field), style: { ...chip(on), opacity: boatOptState(qs, kind, o.id, level).locked ? 0.5 : 1 } },
+        o.color !== undefined && React.createElement("span", { style: { display: "inline-block", width: 10, height: 10, borderRadius: 5, background: boatHexStr(o.color), marginRight: 6, border: "1px solid #fff5" } }),
+        o.name,
+        tag(kind, o.id)); })));
+    const bottomRow = (React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, BOAT_BOTTOMS.map((b) => React.createElement("button", { key: b.id, title: b.name, "aria-label": "Bottom paint " + b.name, "aria-pressed": look.bt === b.id, onClick: () => { setPick(null); send({ type: "boatset", hull, field: "bt", value: b.id }); }, style: { width: 30, height: 30, borderRadius: 15, cursor: "pointer", padding: 0, background: boatHexStr(b.color), border: look.bt === b.id ? "3px solid #ffb84d" : "2px solid rgba(255,255,255,0.35)", boxSizing: "border-box" } }))));
+    const tabs = [{ id: "paint", name: "Paint" }, { id: "deck", name: "Deck & seats" }, { id: "name", name: "Name" }, { id: "flag", name: "Flag & decal" }, { id: "fit", name: "Fittings" }];
+    const pickBar = (() => {
+        if (!pick)
+            return null;
+        const it = boatItem(pick.kind, pick.id), s = boatOptState(qs, pick.kind, pick.id, level);
+        if (!it || s.owned)
+            return null;
+        return (React.createElement("div", { style: { position: "sticky", bottom: 0, marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(14,30,38,0.97)", border: "1px solid rgba(255,184,77,0.6)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" } },
+            React.createElement("div", { style: { fontSize: 13 } },
+                React.createElement("b", null, it.name),
+                " \u00B7 $",
+                s.price,
+                it.level > 1 ? " · level " + it.level : ""),
+            s.locked ? React.createElement("span", { style: { fontSize: 12, color: "#ffb4a0" } },
+                "\uD83D\uDD12 Reach level ",
+                s.level,
+                " (you are ",
+                level,
+                ")")
+                : !canBuy ? React.createElement("span", { style: { fontSize: 12, opacity: 0.75 } }, "Buy it at the marina boat yard")
+                    : React.createElement("button", { disabled: !s.afford, onClick: () => { send({ type: "boatbuy", kind: pick.kind, id: pick.id, hull, field: pick.field }); setPick(null); }, style: { ...small("#ffb84d"), opacity: s.afford ? 1 : 0.45 } },
+                        s.afford ? "Buy and use" : "Not enough money",
+                        " ($",
+                        s.price,
+                        ")")));
+    })();
+    const plate = boatPlate(qs, hull);
+    const copy = () => { try {
+        if (navigator.clipboard)
+            navigator.clipboard.writeText(plate);
+    }
+    catch (e) { /* no clipboard here */ } };
+    return (React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 } }, hullItems.map((g) => React.createElement("button", { key: g.id, "aria-pressed": hull === g.hullIndex, onClick: () => setHull(g.hullIndex), style: chip(hull === g.hullIndex) },
+            boatIcon(BOATS[g.hullIndex]),
+            " ",
+            BOATS[g.hullIndex].name,
+            g.hullIndex === boatIndex ? " ★" : ""))),
+        React.createElement("div", { style: { padding: "10px 6px 4px", background: "linear-gradient(180deg, rgba(111,180,216,0.16), rgba(111,180,216,0.04))", borderRadius: 8, marginBottom: 6 } },
+            React.createElement(BoatCard, { look: look, def: def }),
+            React.createElement("div", { style: { textAlign: "center", fontSize: 11, opacity: 0.7, padding: "2px 0 4px" } },
+                def.kind,
+                " \u00B7 ",
+                def.length,
+                " ft",
+                canBuy ? "" : " · paid items are bought at the marina boat yard")),
+        React.createElement("div", { style: { fontSize: 12, marginBottom: 6, color: "#8fd97a" } },
+            "\uD83D\uDCB0 $",
+            qs.money),
+        React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 } }, tabs.map((t) => React.createElement("button", { key: t.id, "aria-pressed": tab === t.id, onClick: () => setTab(t.id), style: chip(tab === t.id) }, t.name))),
+        tab === "paint" && (React.createElement("div", null,
+            label("Hull colour"),
+            paintRow("h", def.hullColor),
+            label("Stripe style"),
+            chipRow("stripe", BOAT_STRIPES, "st"),
+            label("Stripe and trim colour"),
+            paintRow("a", def.accent),
+            label("Gunwale cap"),
+            React.createElement("div", { style: { display: "flex", gap: 6 } }, [["hull", "Hull colour"], ["accent", "Trim colour"]].map(([v, n]) => React.createElement("button", { key: v, "aria-pressed": look.cp === v, onClick: () => send({ type: "boatset", hull, field: "cp", value: v }), style: chip(look.cp === v) }, n))),
+            label("Bottom paint"),
+            bottomRow)),
+        tab === "deck" && (React.createElement("div", null,
+            label("Deck finish"),
+            chipRow("deck", BOAT_DECKS, "dk"),
+            label("Seat cushions"),
+            paintRow("sk", null, "Original upholstery"),
+            label(FIT.ttop || boatFamily(def) === "sport" ? "T-top roof" : "Canvas shade"),
+            paintRow("cv", null, "Original canvas"))),
+        tab === "name" && (React.createElement("div", null,
+            label("Boat name (on the bow and transom)"),
+            React.createElement("input", { "aria-label": "Boat name", value: nm, maxLength: 18, placeholder: "Sea Biscuit", onChange: (e) => setNm(e.target.value), onBlur: () => { if (boatText(nm, 18) !== look.nm)
+                    send({ type: "boatset", hull, field: "nm", value: nm }); }, onKeyDown: (e) => { if (e.key === "Enter")
+                    e.currentTarget.blur(); }, style: inputStyle }),
+            label("Home port (under the name on the transom)"),
+            React.createElement("input", { "aria-label": "Home port", value: pt, maxLength: 18, placeholder: "Key West, FL", onChange: (e) => setPt(e.target.value), onBlur: () => { if (boatText(pt, 18) !== look.pt)
+                    send({ type: "boatset", hull, field: "pt", value: pt }); }, onKeyDown: (e) => { if (e.key === "Enter")
+                    e.currentTarget.blur(); }, style: inputStyle }),
+            label("Lettering"),
+            React.createElement("div", { style: { display: "flex", gap: 6 } }, BOAT_FONTS.map((f) => React.createElement("button", { key: f.id, "aria-pressed": look.nf === f.id, onClick: () => send({ type: "boatset", hull, field: "nf", value: f.id }), style: chip(look.nf === f.id) }, f.name))))),
+        tab === "flag" && (React.createElement("div", null,
+            label("Stern flag"),
+            chipRow("flag", BOAT_FLAGS, "fl"),
+            look.fl !== "none" && React.createElement("div", null,
+                label("Flag colour"),
+                paintRow("fc", null, "Same as trim")),
+            label("Fish on the bow"),
+            chipRow("decal", BOAT_DECALS, "dc"),
+            look.dc !== "none" && React.createElement("div", null,
+                label("Fish colour"),
+                paintRow("dcc", null, "Same as trim")))),
+        tab === "fit" && (React.createElement("div", null,
+            label("Fittings for the " + def.name),
+            BOAT_ADDONS.filter((a) => boatAddonOk(def, a.id)).map((a) => {
+                const s = boatOptState(qs, "addon", a.id, level), on = look.ad.indexOf(a.id) >= 0;
+                return (React.createElement("div", { key: a.id, style: { border: "1px solid " + (on ? "rgba(255,184,77,0.7)" : "rgba(255,255,255,0.12)"), borderRadius: 6, padding: "8px 10px", marginBottom: 8, background: on ? "rgba(255,184,77,0.07)" : "rgba(255,255,255,0.03)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 } },
+                    React.createElement("div", { style: { minWidth: 0 } },
+                        React.createElement("div", { style: { fontSize: 13, fontWeight: 700 } },
+                            a.name,
+                            on ? " ✓" : ""),
+                        React.createElement("div", { style: { fontSize: 11, opacity: 0.6 } }, a.blurb)),
+                    React.createElement("div", { style: { flexShrink: 0 } },
+                        s.owned && React.createElement("button", { style: small(on ? "#ffb4a0" : "#6fd6e8"), onClick: () => send({ type: "boataddon", hull, id: a.id }) }, on ? "Remove" : "Fit"),
+                        !s.owned && s.locked && React.createElement("span", { style: { fontSize: 11, opacity: 0.8 } },
+                            "\uD83D\uDD12 Level ",
+                            s.level),
+                        !s.owned && !s.locked && canBuy && React.createElement("button", { disabled: !s.afford, style: { ...small("#ffb84d"), opacity: s.afford ? 1 : 0.45 }, onClick: () => send({ type: "boatbuy", kind: "addon", id: a.id, hull, field: "ad" }) },
+                            "Buy $",
+                            s.price),
+                        !s.owned && !s.locked && !canBuy && React.createElement("span", { style: { fontSize: 11, opacity: 0.7 } },
+                            "$",
+                            s.price,
+                            " at the boat yard"))));
+            }),
+            boatFit(def).ttop && React.createElement("div", { style: { fontSize: 11, opacity: 0.55 } }, "This boat has a T-top, so it does not take a bimini."))),
+        pickBar,
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 16, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.1)" } },
+            React.createElement("button", { style: small("#ffb4a0"), onClick: () => send({ type: "boatreset", hull }) }, "Back to factory look"),
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } },
+                React.createElement("span", { style: { fontSize: 10, opacity: 0.55 } }, "Boat code"),
+                React.createElement("input", { readOnly: true, "aria-label": "Boat code", value: plate, onFocus: (e) => e.currentTarget.select(), style: { ...inputStyle, width: 120, fontSize: 10, padding: "4px 6px", fontFamily: "monospace" } }),
+                React.createElement("button", { style: small("#6fd6e8"), onClick: copy }, "Copy")))));
+}
+function boatIcon(def) { const f = boatFamily(def); return f === "skiff" ? "🛶" : f === "sport" ? "🛥️" : def.hs && def.hs.cat ? "⛴️" : "🚤"; }
 function WardrobePanel({ qs, send, canBuy, compact, startTab }) {
     const [tab, setTab] = useState(startTab || "look");
     const [name, setName] = useState(qs.look.name);
