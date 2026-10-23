@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.19", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.20", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "22 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -5536,6 +5536,8 @@ try {
         fx.on = false;
 }
 catch (e) { /* storage blocked: stay on */ }
+const WHEEL_SEEN_KEY = "deepwater.wheelSeen"; // set once the command wheel has been opened (the new-player hint stops pulsing)
+const WHEEL_HINT_UNTIL_LEVEL = 10; // the little "boat menu" hint beside the wheel button shows until the player reaches this level
 function fxSetOn(v) { fx.on = !!v; try {
     localStorage.setItem("deepwater.fx", v ? "on" : "off");
 }
@@ -6128,6 +6130,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiWheelOpen, setUiWheelOpen] = useState(false); // command wheel (Q or the ring button)
     const [uiWheelMenu, setUiWheelMenu] = useState("main"); // which ring is showing: main | tackle | hull | world | view
     const [uiWheelNote, setUiWheelNote] = useState(""); // text in the wheel's hub: hover/tap hints, or why a slice is unavailable
+    const [uiWheelSeen, setUiWheelSeen] = useState(() => { try {
+        return typeof localStorage !== "undefined" && localStorage.getItem(WHEEL_SEEN_KEY) === "1";
+    }
+    catch (e) {
+        return false;
+    } }); // the player has opened the command wheel at least once (saved on this device)
     const [uiShowSonar, setUiShowSonar] = useState(!TOUCH_UI); // on phones the sonar starts folded away (the 📡 button in the top bar opens it)
     const [uiHudOpen, setUiHudOpen] = useState(false); // touch HUD: the top-left status drop-down
     const [uiReadoutOpen, setUiReadoutOpen] = useState(false); // touch HUD: the bottom-right boat readout, folded to one line until tapped
@@ -6219,6 +6227,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
         setUiWheelMenu("main");
         setUiWheelNote("");
     } }, [uiWheelOpen]);
+    useEffect(() => { if (uiWheelOpen && !uiWheelSeen) {
+        setUiWheelSeen(true);
+        try {
+            localStorage.setItem(WHEEL_SEEN_KEY, "1");
+        }
+        catch (e) { /* storage blocked: the hint just shows again next visit */ }
+    } }, [uiWheelOpen, uiWheelSeen]);
     useEffect(() => {
         const mount = mountRef.current;
         const width = mount.clientWidth || 800;
@@ -6772,8 +6787,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const sandTex = getSandTexture();
         // Colour is lightened to offset the texture's own average darkness, so the island keeps its previous overall tone.
         const sandMat = new THREE.MeshPhongMaterial(sandTex ? { color: 0xefe1ba, map: sandTex, flatShading: true } : { color: 0xd8c8a0, flatShading: true });
-        const keyGeo = new THREE.SphereGeometry(24, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2);
+        // The island dome is a finely cut mesh whose every vertex is set from keyHeightAt, so what you see is exactly the ground the game walks on and drapes the roads over
+        // (the old 14x9 sphere was faceted: it sagged below the true surface and poked through the quay's paving and under the road).
+        const keyGeo = new THREE.SphereGeometry(24, 72, 44, 0, Math.PI * 2, 0, Math.PI / 2);
         keyGeo.scale(1, 0.25, 0.8);
+        {
+            const kp = keyGeo.attributes.position;
+            for (let i = 0; i < kp.count; i++) {
+                const kh = keyHeightAt(kp.getX(i), kp.getZ(i)); // the mesh sits at y -1.5, so a vertex's own y is the height + 1.5
+                if (kh !== null)
+                    kp.setY(i, kh + 1.5);
+            }
+            keyGeo.computeVertexNormals();
+            keyGeo.computeBoundingSphere();
+        }
         applyPlanarUVs(keyGeo, keyCenter.x, keyCenter.z, SAND_TILE); // world-space tiling so dome and extension share one continuous sand pattern
         const key = new THREE.Mesh(keyGeo, sandMat);
         key.position.copy(keyCenter);
@@ -6956,7 +6983,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const inner = 24 * 24 - offsetX * offsetX - localZ * localZ;
             if (inner < 0)
                 return null; // outside the dome's actual footprint
-            return 0.25 * Math.sqrt(inner) - 1.5;
+            let h = 0.25 * Math.sqrt(inner) - 1.5;
+            // the east flank used to dip into a groove where the dome's rim meets the town surface (the road ran along the bottom of it): hold a level saddle there, fading to nothing at the rim so there is no cliff
+            const lift = 2.3 * smoothStep01((offsetX - 10) / 6) * smoothStep01((14 - Math.abs(offsetZ)) / 4) * smoothStep01(inner / 120);
+            if (lift > h)
+                h = lift;
+            return h;
         }
         // ---------- Homes: proper houses rather than huts. A plinth (or stilts), clapboard siding, corner boards and trim, a gabled roof with
         // overhangs (and a front gable over the porch on single-storey homes), a railed porch with steps, a framed door, shuttered windows
@@ -7492,7 +7524,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const edgeH = domeEdge !== null ? domeEdge : -1.5 - (az - 12.7) * 0.6;
             const blend = Math.max(0, Math.min(1, (offsetX - 18) / 12));
             const lat = extGroundLevel - Math.max(0, az - 14) * 0.3;
-            const h = edgeH * (1 - blend) + lat * blend;
+            let h = edgeH * (1 - blend) + lat * blend;
+            // the dome's rim drops away toward its sides, which used to leave pits (~1.5 ft deep) between the road and the back rows of houses; the town surface now holds a level floor out from the rim
+            h = Math.max(h, (extGroundLevel - 0.8) * smoothStep01((offsetX - 18) / 2.5) * smoothStep01((16 - az) / 3));
             const sea = seafloorHeightAt(keyCenter.x + offsetX, keyCenter.z + offsetZ), s = smoothStep01((26 - az) / 3);
             return sea + (h - sea) * s;
         }
@@ -7966,8 +8000,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const h = groundHeightAt(wx, wz);
                     if (h !== null)
                         lastH = h;
-                    const dr = Math.hypot(wx - keyCenter.x, (wz - keyCenter.z) / 0.8); // the island's mesh is faceted and sags below its true surface toward the rim, so lift the road more there
-                    pos.push(wx, lastH + lift + (dr < 24 ? 0.3 * (dr / 24) * (dr / 24) : 0), wz);
+                    pos.push(wx, lastH + lift, wz);
                 });
             });
             for (let i = 0; i < samples.length - 1; i++) {
@@ -7986,14 +8019,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
             return m;
         }
         function roadMat(color, units) { return new THREE.MeshPhongMaterial({ color, flatShading: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -units }); }
-        const roadShoulderMat = roadMat(0xb8a67c, 2), roadAsphaltMat = roadMat(0x54565b, 4), roadLineMat = roadMat(0xe9dca4, 6);
+        const roadShoulderMat = roadMat(0x8b8472, 2), pathMat = roadMat(0xb8a67c, 2), roadAsphaltMat = roadMat(0x54565b, 4), roadLineMat = roadMat(0xe9dca4, 6);
         ROADS.forEach((rd) => {
             buildRibbon(rd.pts, rd.w + 1.3, 0.10, roadShoulderMat, 1.5);
             buildRibbon(rd.pts, rd.w, 0.14, roadAsphaltMat, 1.5);
             if (rd.w >= 3)
                 buildRibbon(rd.pts, 0.16, 0.17, roadLineMat, 0.8, [3, 3]);
         });
-        TOWN.paths.forEach((pa) => buildRibbon(pa.pts, 1.1, 0.10, roadShoulderMat, 1.0)); // the paths from each porch to the road
+        TOWN.paths.forEach((pa) => buildRibbon(pa.pts, 1.1, 0.10, pathMat, 1.0)); // the paths from each porch to the road
         function roadSamples(rd, spacing) {
             const out = [];
             let target = 0, run = 0;
@@ -14865,6 +14898,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
     }
     // What the touch HUD folds into its top bar: a short status, whether anything needs attention, and the one thing you can tap right now.
     const hudStatus = !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY";
+    const wheelHintOn = !!uiQuest && questLevelForXp(uiQuest.xp) < WHEEL_HINT_UNTIL_LEVEL && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && uiMode !== "bite" && uiMode !== "fighting" && !(TOUCH_UI && uiShowSonar);
     const hudReadyN = uiQuest ? uiQuest.missions.filter((m) => m.status === "ready").length : 0;
     const hudCall = (() => { if (!uiQuest)
         return false; const pend = storyPending(uiQuest); return !!(pend && pend.how === "radio"); })();
@@ -15260,12 +15294,19 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     BUILD.dev && (React.createElement("button", { onClick: () => { stateRef.current.marineSpawnRequest = enc.id; setUiWildlifeOpen(false); setUiWheelOpen(false); }, style: { fontSize: 11, padding: "5px 10px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,184,77,0.4)", background: "rgba(255,184,77,0.08)", color: "#ffb84d" } }, "Summon"))));
             }))),
         React.createElement("button", { onClick: () => setUiWheelOpen((o) => !o), "aria-label": "Open command wheel", style: { position: "absolute", top: 14, right: 14, width: 48, height: 48, borderRadius: "50%", cursor: "pointer", padding: 0, zIndex: 60,
-                border: "1px solid rgba(255,184,77,0.55)", background: uiWheelOpen ? "rgba(255,184,77,0.25)" : "rgba(14,31,40,0.88)", color: "#ffb84d" } },
+                border: "1px solid rgba(255,184,77,0.55)", background: uiWheelOpen ? "rgba(255,184,77,0.25)" : "rgba(14,31,40,0.88)", color: "#ffb84d",
+                animation: wheelHintOn && !uiWheelSeen ? "wheelPulse 1.8s ease-out infinite" : "none" } },
             React.createElement("svg", { width: "30", height: "30", viewBox: "-15 -15 30 30", style: { display: "block", margin: "0 auto" } },
                 React.createElement("circle", { r: "12", fill: "none", stroke: "#ffb84d", strokeWidth: "2" }),
                 React.createElement("circle", { r: "3.2", fill: "#ffb84d" }),
                 [0, 1, 2, 3, 4, 5].map((i) => { const [x, y] = wheelPolar(12, i * 60 - 90); const [x2, y2] = wheelPolar(5.5, i * 60 - 90); return React.createElement("line", { key: i, x1: x, y1: y, x2: x2, y2: y2, stroke: "#ffb84d", strokeWidth: "1.6" }); })),
             !TOUCH_UI && React.createElement("div", { style: { position: "absolute", right: -2, bottom: -2, fontSize: 8, background: "#0e1f28", border: "1px solid rgba(255,184,77,0.4)", borderRadius: 3, padding: "0 3px", color: "#ffb84d" } }, "Q")),
+        wheelHintOn && (React.createElement("button", { onClick: () => setUiWheelOpen(true), "aria-label": "Open the command wheel (boat menu)", style: { position: "absolute", top: BUILD.dev ? 94 : 68, right: 14, zIndex: 59, cursor: "pointer", padding: "5px 10px", borderRadius: 14, fontSize: 11, lineHeight: 1.2, maxWidth: 150, textAlign: "right",
+                border: "1px solid rgba(255,184,77," + (uiWheelSeen ? "0.35" : "0.7") + ")", background: "rgba(14,31,40," + (uiWheelSeen ? "0.7" : "0.92") + ")", color: "#ffb84d", opacity: uiWheelSeen ? 0.8 : 1 } },
+            React.createElement("span", { "aria-hidden": "true" }, "\u25B4"),
+            " ",
+            uiWheelSeen ? "Boat menu" : (TOUCH_UI ? "Tap for boat controls" : "Boat controls: click or press Q"))),
+        React.createElement("style", null, "@keyframes wheelPulse{0%{box-shadow:0 0 0 0 rgba(255,184,77,.65)}70%{box-shadow:0 0 0 12px rgba(255,184,77,0)}100%{box-shadow:0 0 0 0 rgba(255,184,77,0)}}"),
         uiWheelOpen && (() => {
             const rq = (flag) => () => { stateRef.current[flag] = true; };
             const menus = {
