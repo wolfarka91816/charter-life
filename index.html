@@ -8022,7 +8022,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             return m;
         }
         function roadMat(color, units) { return new THREE.MeshPhongMaterial({ color, flatShading: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -units }); }
-        const roadShoulderMat = roadMat(0x8b8472, 2), pathMat = roadMat(0xb8a67c, 2), roadAsphaltMat = roadMat(0x54565b, 4), roadLineMat = roadMat(0xe9dca4, 6);
+        const roadShoulderMat = roadMat(0x756f60, 2), pathMat = roadMat(0xb8a67c, 2), roadAsphaltMat = roadMat(0x54565b, 4), roadLineMat = roadMat(0xe9dca4, 6);
         ROADS.forEach((rd) => {
             buildRibbon(rd.pts, rd.w + 1.3, 0.10, roadShoulderMat, 0.6);
             buildRibbon(rd.pts, rd.w, 0.14, roadAsphaltMat, 0.6);
@@ -8196,6 +8196,29 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 scene.add(back);
                 [-0.9, 0.9].forEach((dx) => { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.5), iron); leg.position.set(keyCenter.x + x + dx, QUAY.y + 0.25, keyCenter.z + z); scene.add(leg); });
             });
+        }
+        // ---- a low stone kerb along the line where the island's sand runs down onto the quay's paving, so beach and promenade read as two things
+        { // (the kerb stops short of the road, which carries on down onto the quay)
+            const kerbMat = roadMat(0xb9b4a4, 5), runs = [];
+            let run = [];
+            for (let x = QUAY.x0 + 0.5; x <= QUAY.x1 - 0.3; x += 0.6) {
+                let zc = null;
+                for (let z = QUAY.z0; z <= QUAY.z0 + 5; z += 0.1) {
+                    const d = keyHeightAt(x, z);
+                    if (d !== null && d > QUAY.y + 0.05)
+                        zc = z;
+                }
+                if (zc !== null && roadDist(x, zc + 0.2) > 2.6)
+                    run.push([x, zc + 0.2]);
+                else {
+                    if (run.length > 1)
+                        runs.push(run);
+                    run = [];
+                }
+            }
+            if (run.length > 1)
+                runs.push(run);
+            runs.forEach((r) => buildRibbon(r, 0.42, 0.13, kerbMat, 0.5));
         }
         // ---- street lamps along the harbor road
         {
@@ -14901,7 +14924,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
     }
     // What the touch HUD folds into its top bar: a short status, whether anything needs attention, and the one thing you can tap right now.
     const hudStatus = !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY";
-    const wheelHintOn = !!uiQuest && questLevelForXp(uiQuest.xp) < WHEEL_HINT_UNTIL_LEVEL && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && uiMode !== "bite" && uiMode !== "fighting" && !(TOUCH_UI && uiShowSonar);
+    const wheelHintOn = !!uiQuest && questLevelForXp(uiQuest.xp) < WHEEL_HINT_UNTIL_LEVEL && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && uiMode !== "bite" && uiMode !== "fighting" && !(TOUCH_UI && uiShowSonar) && !(TOUCH_UI && uiMarineToast);
     const hudReadyN = uiQuest ? uiQuest.missions.filter((m) => m.status === "ready").length : 0;
     const hudCall = (() => { if (!uiQuest)
         return false; const pend = storyPending(uiQuest); return !!(pend && pend.how === "radio"); })();
@@ -14911,7 +14934,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             : uiNearCooler && uiCarriedCount > 0 ? "Tap the cooler to store your catch" : uiSitting ? "🪑 Sitting · move to stand" : "";
     return (React.createElement("div", { style: { position: "relative", width: "100%", height: STAGE_HEIGHT, background: "#08161c", borderRadius: 10, overflow: "hidden", fontFamily: "system-ui, sans-serif" } },
         React.createElement("div", { ref: mountRef, style: { width: "100%", height: "100%" } }),
-        (BUILD.demo || BUILD.dev) && (React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 68 : 6, right: TOUCH_UI ? 12 : 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
+        (BUILD.demo || BUILD.dev) && !(TOUCH_UI && uiMarineToast && !uiHudOpen) && (React.createElement("div", { style: { position: "absolute", top: TOUCH_UI ? 68 : 6, right: TOUCH_UI ? 12 : 8, zIndex: 998, pointerEvents: "none", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: "#ffb84d", background: "rgba(8,22,28,0.7)", border: "1px solid rgba(255,184,77,0.5)", borderRadius: 4, padding: "2px 7px" } },
             BUILD.dev ? "DEV" : "DEMO",
             " ",
             BUILD_LABEL)),
