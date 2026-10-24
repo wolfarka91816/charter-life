@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.22", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.23", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -6106,8 +6106,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         coolerStorage: { bait: [], fish: [] },
         joyX: 0,
         joyY: 0,
-        camJoyX: 0,
-        camJoyY: 0,
+        throttleStep: 0, // the throttle lever's detent: -1 reverse, 0 stop, 1..3 ahead (set by the on-screen lever or W/S)
         netEquipToggleRequested: false,
         netThrowButtonRequested: false,
         dragPointerId: null,
@@ -6214,10 +6213,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [joyActive, setJoyActive] = useState(false);
     const joyBaseRef = useRef(null);
     const joyPointerIdRef = useRef(null);
-    const [camJoyKnobPos, setCamJoyKnobPos] = useState({ x: 0, y: 0 });
-    const [camJoyActive, setCamJoyActive] = useState(false);
-    const camJoyBaseRef = useRef(null);
-    const camJoyPointerIdRef = useRef(null);
+    const [uiStep, setUiStep] = useState(0); // the throttle lever's detent, for drawing it
+    const leverRef = useRef(null);
+    const leverPointerIdRef = useRef(null);
+    const [steerKnob, setSteerKnob] = useState(0); // the steering bar, -1 (left) .. 1 (right), springs back to 0
+    const steerRef = useRef(null);
+    const steerPointerIdRef = useRef(null);
     const [uiDoorOpen, setUiDoorOpen] = useState(false);
     const [uiMode, setUiMode] = useState("idle");
     const [uiTension, setUiTension] = useState(0);
@@ -10482,6 +10483,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             fs.anchored = false;
             throttle = 0;
+            stateRef.current.throttleStep = 0;
             wheelAngle = 0;
             yawRate = 0;
             dockBerth = berth;
@@ -10525,6 +10527,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             boatHeading = dockHeadingAt(a.fromH, a.toH, k);
             boatSpeed = 0;
             throttle = 0;
+            stateRef.current.throttleStep = 0;
             yawRate = 0;
             wheelAngle = 0;
             if (a.t >= a.dur) {
@@ -10560,6 +10563,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             boatHeading = 0;
             boatSpeed = 0;
             throttle = 0;
+            stateRef.current.throttleStep = 0;
             gear = "high";
             wheelAngle = 0;
             yawRate = 0;
@@ -11462,6 +11466,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             boatHeading = dest.heading;
             boatSpeed = 0;
             throttle = 0;
+            stateRef.current.throttleStep = 0;
             wheelAngle = 0;
             yawRate = 0;
             camSnap = 3; // the camera jumps with the boat instead of sweeping across the sea
@@ -11474,6 +11479,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             a.t += dt;
             boatSpeed = 0;
             throttle = 0;
+            stateRef.current.throttleStep = 0;
             if (!a.moved && a.t >= 1.1) {
                 a.moved = true;
                 travelMoveBoat(a.dest);
@@ -13290,6 +13296,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             fs.anchored = true;
                             boatSpeed = 0;
                             throttle = 0;
+                            stateRef.current.throttleStep = 0;
                             wheelAngle = 0;
                             yawRate = 0;
                             const fwd = new THREE.Vector3(Math.sin(boatHeading), 0, Math.cos(boatHeading));
@@ -13891,7 +13898,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // ---- Boat movement (disabled while anchored) ----
                 const WHEEL_TURN_SPEED = 2.4; // how fast holding A/D cranks the wheel over
                 const WHEEL_RETURN_SPEED = 0.9; // how fast it eases back toward center on its own
-                const THROTTLE_RATE = 0.6; // how fast holding W/S moves the throttle lever
+                const THROTTLE_RATE = 0.9; // how fast the throttle eases to the detent the lever was put in
+                const THROTTLE_STEPS = [-1, 0, 0.34, 0.67, 1]; // reverse, stop, 1, 2, 3
                 const LOW_GEAR_FRACTION = 0.3; // low gear caps speed to a trolling-appropriate range
                 const REVERSE_FRACTION = 0.4;
                 if (dockStep(dt)) {
@@ -13902,15 +13910,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         stateRef.current.gearToggleRequested = false;
                         gear = gear === "high" ? "low" : "high";
                     }
-                    // Joystick throttle — reuses the same stick that drives walking
-                    // movement, since it's otherwise unused while not walking.
-                    const joyThrottleUp = stateRef.current.joyY < -0.15;
-                    const joyThrottleDown = stateRef.current.joyY > 0.15;
-                    if (keysNow["w"] || keysNow["arrowup"] || joyThrottleUp)
-                        throttle = Math.min(1, throttle + THROTTLE_RATE * dt);
-                    else if (keysNow["s"] || keysNow["arrowdown"] || joyThrottleDown)
-                        throttle = Math.max(-1, throttle - THROTTLE_RATE * dt);
-                    // else: throttle holds its position — it's a lever, not a gas pedal
+                    // The throttle is a lever with five detents: reverse, stop and three speeds ahead. The on-screen lever sets stateRef.throttleStep;
+                    // W / S (or the arrow keys) click it up and down one detent. The boat's actual throttle then eases to the detent.
+                    if (justPressed("w") || justPressed("arrowup"))
+                        stateRef.current.throttleStep = Math.min(3, stateRef.current.throttleStep + 1);
+                    if (justPressed("s") || justPressed("arrowdown"))
+                        stateRef.current.throttleStep = Math.max(-1, stateRef.current.throttleStep - 1);
+                    const throttleGoal = THROTTLE_STEPS[stateRef.current.throttleStep + 1];
+                    throttle += Math.max(-THROTTLE_RATE * dt, Math.min(THROTTLE_RATE * dt, throttleGoal - throttle));
                     const handlingMax = boatDef.maxSpeed * gearNow.topSpeed * (0.5 + 0.5 * handling);
                     const gearMax = gear === "low" ? handlingMax * LOW_GEAR_FRACTION : handlingMax;
                     const fastM = gear === "high" ? fastMulNow : 1; // fast sail (see seaNavStep)
@@ -14592,21 +14599,6 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                 }
                 const s = stateRef.current;
-                // Camera joystick — continuous rotation rate while held, matching the
-                // same sign convention as the existing drag-to-look (which is already
-                // verified correct), just applied per-frame instead of per-drag-delta.
-                if (Math.abs(s.camJoyX) > 0.05 || Math.abs(s.camJoyY) > 0.05) {
-                    const camTurnRate = 1.3; // radians/sec at full stick deflection
-                    if (s.firstPerson) {
-                        s.fpYaw -= s.camJoyX * camTurnRate * dt;
-                        s.fpPitch = Math.max(-1.3, Math.min(1.3, s.fpPitch - s.camJoyY * camTurnRate * dt));
-                    }
-                    else {
-                        s.orbitYaw -= s.camJoyX * camTurnRate * dt;
-                        s.orbitPitch = Math.max(0.08, Math.min(1.2, s.orbitPitch - s.camJoyY * camTurnRate * dt));
-                    }
-                    camRecenter = false; // the player is steering the camera: leave it alone
-                }
                 if (angler)
                     angler.visible = !(walkMode && s.firstPerson) && !ashoreMode;
                 let firstPersonOk = false;
@@ -14830,6 +14822,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     setUiLineOut(Math.round(fs.lineOut * 10) / 10);
                     setUiWheel(Math.round(wheelAngle * 100) / 100);
                     setUiThrottle(Math.round(throttle * 100) / 100);
+                    setUiStep(stateRef.current.throttleStep);
                     setUiGear(gear);
                     setUiSceneDebug(`cam(${camera.position.x.toFixed(1)},${camera.position.y.toFixed(1)},${camera.position.z.toFixed(1)}) boat(${boatPos.x.toFixed(1)},${centerY.toFixed(1)},${boatPos.z.toFixed(1)}) sceneChildren=${scene.children.length} boatGroupChildren=${currentBoatGroup ? currentBoatGroup.children.length : "null"} rendererSize=${renderer.domElement.width}x${renderer.domElement.height}`);
                     const dc = currentBoatGroup ? currentBoatGroup.userData.cabinCollision : null;
@@ -14926,42 +14919,42 @@ function DeepWaterPrototype({ onExit, newLook }) {
         stateRef.current.joyX = 0;
         stateRef.current.joyY = 0;
     }
-    function camJoyUpdateFromEvent(clientX, clientY) {
-        if (!camJoyBaseRef.current)
+    // The throttle lever (boat): five detents, tap or drag up and down. Reverse is the bottom one, Stop sits just above it.
+    const LEVER_ROW = 36;
+    function leverFromEvent(clientY) {
+        if (!leverRef.current)
             return;
-        const rect = camJoyBaseRef.current.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-        let dx = clientX - cx, dy = clientY - cy;
-        const dist = Math.hypot(dx, dy);
-        if (dist > JOY_RADIUS) {
-            dx = (dx / dist) * JOY_RADIUS;
-            dy = (dy / dist) * JOY_RADIUS;
-        }
-        setCamJoyKnobPos({ x: dx, y: dy });
-        stateRef.current.camJoyX = dx / JOY_RADIUS;
-        stateRef.current.camJoyY = dy / JOY_RADIUS;
+        const r = leverRef.current.getBoundingClientRect();
+        const row = Math.max(0, Math.min(4, Math.floor((clientY - r.top) / (r.height / 5))));
+        const step = 3 - row;
+        stateRef.current.throttleStep = step;
+        setUiStep(step);
     }
-    function handleCamJoyPointerDown(e) {
-        e.preventDefault();
-        camJoyPointerIdRef.current = e.pointerId;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        setCamJoyActive(true);
-        camJoyUpdateFromEvent(e.clientX, e.clientY);
-    }
-    function handleCamJoyPointerMove(e) {
-        if (camJoyPointerIdRef.current !== e.pointerId)
+    function handleLeverDown(e) { e.preventDefault(); leverPointerIdRef.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); leverFromEvent(e.clientY); }
+    function handleLeverMove(e) { if (leverPointerIdRef.current === e.pointerId)
+        leverFromEvent(e.clientY); }
+    function handleLeverUp(e) { if (leverPointerIdRef.current === e.pointerId)
+        leverPointerIdRef.current = null; }
+    // The steering bar (boat): drag left or right, it springs back to centre when you let go.
+    function steerFromEvent(clientX) {
+        if (!steerRef.current)
             return;
-        camJoyUpdateFromEvent(e.clientX, e.clientY);
+        const r = steerRef.current.getBoundingClientRect();
+        const k = Math.max(-1, Math.min(1, (clientX - (r.left + r.width / 2)) / (r.width / 2 - 22)));
+        setSteerKnob(k);
+        stateRef.current.joyX = k;
     }
-    function handleCamJoyPointerUp(e) {
-        if (camJoyPointerIdRef.current !== e.pointerId)
-            return;
-        camJoyPointerIdRef.current = null;
-        setCamJoyActive(false);
-        setCamJoyKnobPos({ x: 0, y: 0 });
-        stateRef.current.camJoyX = 0;
-        stateRef.current.camJoyY = 0;
-    }
+    function handleSteerDown(e) { e.preventDefault(); steerPointerIdRef.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); steerFromEvent(e.clientX); }
+    function handleSteerMove(e) { if (steerPointerIdRef.current === e.pointerId)
+        steerFromEvent(e.clientX); }
+    function handleSteerUp(e) { if (steerPointerIdRef.current !== e.pointerId)
+        return; steerPointerIdRef.current = null; setSteerKnob(0); stateRef.current.joyX = 0; }
+    const showDrive = !uiWalkMode && !uiAshoreMode && !uiAnchored && uiDock === "none"; // the lever and steering bar are for driving; walking and the dock use the move stick
+    useEffect(() => { if (!showDrive) {
+        steerPointerIdRef.current = null;
+        setSteerKnob(0);
+        stateRef.current.joyX = 0;
+    } }, [showDrive]);
     // What the touch HUD folds into its top bar: a short status, whether anything needs attention, and the one thing you can tap right now.
     const hudStatus = !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY";
     const wheelHintOn = !!uiQuest && questLevelForXp(uiQuest.xp) < WHEEL_HINT_UNTIL_LEVEL && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && uiMode !== "bite" && uiMode !== "fighting" && !(TOUCH_UI && uiShowSonar) && !(TOUCH_UI && uiMarineToast);
@@ -14981,7 +14974,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         uiShowDebug && (React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, padding: "4px 10px", background: "rgba(0,0,0,0.75)", fontSize: 9, fontFamily: "monospace", color: "#8fd97a", zIndex: 999, wordBreak: "break-all" } },
             "DEBUG: ",
             uiSceneDebug || "waiting for first frame...")),
-        React.createElement("div", { ref: joyBaseRef, onPointerDown: handleJoyPointerDown, onPointerMove: handleJoyPointerMove, onPointerUp: handleJoyPointerUp, onPointerCancel: handleJoyPointerUp, style: {
+        (uiWalkMode || uiAshoreMode) && (React.createElement("div", { ref: joyBaseRef, onPointerDown: handleJoyPointerDown, onPointerMove: handleJoyPointerMove, onPointerUp: handleJoyPointerUp, onPointerCancel: handleJoyPointerUp, style: {
                 position: "absolute", bottom: 30, left: 30, width: 90, height: 90, borderRadius: "50%",
                 background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
                 touchAction: "none", zIndex: 50,
@@ -14993,19 +14986,29 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     transform: `translate(calc(-50% + ${joyKnobPos.x}px), calc(-50% + ${joyKnobPos.y}px))`,
                     pointerEvents: "none",
                 } }),
-            React.createElement("div", { style: { position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 9, opacity: 0.5, whiteSpace: "nowrap" } }, uiWalkMode ? "MOVE" : "THROTTLE / WHEEL")),
-        React.createElement("div", { ref: camJoyBaseRef, onPointerDown: handleCamJoyPointerDown, onPointerMove: handleCamJoyPointerMove, onPointerUp: handleCamJoyPointerUp, onPointerCancel: handleCamJoyPointerUp, style: {
-                position: "absolute", bottom: 160, right: 30, width: 90, height: 90, borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
-                touchAction: "none", zIndex: 50,
-            } },
-            React.createElement("div", { style: {
-                    position: "absolute", left: "50%", top: "50%", width: 40, height: 40, borderRadius: "50%",
-                    background: camJoyActive ? "rgba(240,198,116,0.55)" : "rgba(255,255,255,0.25)",
-                    border: "1px solid rgba(255,255,255,0.4)",
-                    transform: `translate(calc(-50% + ${camJoyKnobPos.x}px), calc(-50% + ${camJoyKnobPos.y}px))`,
-                    pointerEvents: "none",
-                } })),
+            React.createElement("div", { style: { position: "absolute", top: -18, left: "50%", transform: "translateX(-50%)", fontSize: 9, opacity: 0.5, whiteSpace: "nowrap" } }, "MOVE"))),
+        showDrive && (React.createElement(React.Fragment, null,
+            React.createElement("div", { ref: leverRef, "data-testid": "throttle-lever", role: "slider", "aria-label": "Throttle", "aria-valuemin": -1, "aria-valuemax": 3, "aria-valuenow": uiStep, onPointerDown: handleLeverDown, onPointerMove: handleLeverMove, onPointerUp: handleLeverUp, onPointerCancel: handleLeverUp, style: {
+                    position: "absolute", bottom: 30, left: "max(16px, env(safe-area-inset-left, 0px))", width: 72, height: LEVER_ROW * 5, borderRadius: 14,
+                    background: "rgba(8,22,28,0.72)", border: "1px solid rgba(255,255,255,0.28)", boxSizing: "border-box", overflow: "hidden",
+                    touchAction: "none", userSelect: "none", WebkitUserSelect: "none", zIndex: 50,
+                } }, [3, 2, 1, 0, -1].map((st, i) => {
+                const on = uiStep === st, col = st < 0 ? "#6fd6e8" : st === 0 ? "#eaf3f5" : "#ffb84d";
+                return (React.createElement("div", { key: st, "data-step": st, style: { position: "absolute", left: 0, right: 0, top: i * LEVER_ROW, height: LEVER_ROW, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, fontWeight: on ? 800 : 600, letterSpacing: 0.5, color: on ? "#0b1a21" : col, opacity: on ? 1 : 0.8, background: on ? col : "transparent", borderTop: i ? "1px solid rgba(255,255,255,0.1)" : "none", transition: "background 0.12s" } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 800, ...monoStyle } }, st === 0 ? "N" : st < 0 ? "R" : st),
+                    React.createElement("span", { style: { fontSize: 8, opacity: 0.85 } }, st === 3 ? "FULL" : st === 2 ? "MID" : st === 1 ? "SLOW" : st === 0 ? "STOP" : "REV")));
+            })),
+            React.createElement("div", { style: { position: "absolute", bottom: 30 + LEVER_ROW * 5 + 4, left: "max(16px, env(safe-area-inset-left, 0px))", width: 72, textAlign: "center", fontSize: 9, opacity: 0.5, pointerEvents: "none" } }, "THROTTLE"),
+            React.createElement("div", { ref: steerRef, "data-testid": "steer-bar", role: "slider", "aria-label": "Steering", "aria-valuemin": -1, "aria-valuemax": 1, "aria-valuenow": steerKnob, onPointerDown: handleSteerDown, onPointerMove: handleSteerMove, onPointerUp: handleSteerUp, onPointerCancel: handleSteerUp, style: {
+                    position: "absolute", bottom: 30, left: "calc(max(16px, env(safe-area-inset-left, 0px)) + 84px)", width: "min(170px, calc(100% - 250px))", minWidth: 110, height: 48, borderRadius: 24,
+                    background: "rgba(8,22,28,0.72)", border: "1px solid rgba(255,255,255,0.28)", boxSizing: "border-box",
+                    touchAction: "none", userSelect: "none", WebkitUserSelect: "none", zIndex: 50,
+                } },
+                React.createElement("div", { style: { position: "absolute", left: "50%", top: 8, bottom: 8, width: 1, background: "rgba(255,255,255,0.25)", pointerEvents: "none" } }),
+                React.createElement("div", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: 0.55, pointerEvents: "none" } }, "\u25C0"),
+                React.createElement("div", { style: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: 0.55, pointerEvents: "none" } }, "\u25B6"),
+                React.createElement("div", { style: { position: "absolute", top: 5, width: 38, height: 38, borderRadius: "50%", left: `calc(50% - 19px + ${steerKnob} * (50% - 22px))`, background: steerKnob !== 0 ? "rgba(111,214,232,0.6)" : "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.45)", pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 } }, "\u2638"),
+                React.createElement("div", { style: { position: "absolute", top: -16, left: 0, right: 0, textAlign: "center", fontSize: 9, opacity: 0.5, pointerEvents: "none" } }, "STEER")))),
         React.createElement("div", { style: { position: "absolute", top: 14, left: 14, maxWidth: TOUCH_UI ? "calc(100% - 82px)" : "calc(100vw - 28px)", boxSizing: "border-box", zIndex: TOUCH_UI ? 61 : undefined, ...panelStyle, ...(TOUCH_UI ? { padding: "7px 10px" } : {}) } },
             TOUCH_UI && (React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
@@ -15508,7 +15511,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("circle", { cx: "22", cy: "22", r: "18", fill: "none", stroke: "rgba(255,255,255,0.15)", strokeWidth: "2" }),
                     React.createElement("line", { x1: "22", y1: "22", x2: "22", y2: "6", stroke: "#6fd6e8", strokeWidth: "3", strokeLinecap: "round", transform: `rotate(${uiWheel * 80} 22 22)` }),
                     React.createElement("circle", { cx: "22", cy: "22", r: "2.5", fill: "#6fd6e8" }))),
-            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S throttle lever \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
+            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S click the throttle up and down \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
         uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? 0 : 300, ...(TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? { maxWidth: 150, padding: "8px 10px" } : {}), textAlign: "center" } },
             uiMode === "idle" && (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } },
@@ -17074,7 +17077,7 @@ function CharterLife() {
                         BUILD.demoMaxLevel,
                         " at the Marina and Sandy Shoals. The full game opens the rest of the coast and the late-game homes."),
                     React.createElement("br", null),
-                    "Drive with the on-screen stick, use the ring button for commands, and talk to the dock folks for jobs."),
+                    "Drive with the throttle lever and steering bar, drag the water to look around, use the ring button for commands, and talk to the dock folks for jobs."),
                 React.createElement("button", { className: "cl-btn", onClick: () => setShowAbout(false) }, "Back"))) : confirmNew ? (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "cl-note" },
                     "Start over? This erases your saved boat, gear and progress",
