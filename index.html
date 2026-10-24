@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.23", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.24", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -6216,9 +6216,6 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiStep, setUiStep] = useState(0); // the throttle lever's detent, for drawing it
     const leverRef = useRef(null);
     const leverPointerIdRef = useRef(null);
-    const [steerKnob, setSteerKnob] = useState(0); // the steering bar, -1 (left) .. 1 (right), springs back to 0
-    const steerRef = useRef(null);
-    const steerPointerIdRef = useRef(null);
     const [uiDoorOpen, setUiDoorOpen] = useState(false);
     const [uiMode, setUiMode] = useState("idle");
     const [uiTension, setUiTension] = useState(0);
@@ -10393,6 +10390,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
         let walkPhase = 0; // accumulates while moving, drives the alternating leg-swing walk cycle
         let walkCycleAmount = 0; // eases 0-1 as movement starts/stops, so the cycle doesn't snap on/off abruptly
         let turnLean = 0; // banks slightly into turns while walking, eases back to 0 when heading straight
+        let drivingNow = false; // true on frames when the boat is under the player's control (not anchored, docked, walking or being eased to the dock)
+        let driveCamSettle = true; // true while the camera swings round to sit behind the boat looking straight down it (on setting off); the boat does not steer to it meanwhile
+        const normAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
         let camRecenter = false; // true while the camera swings once to sit behind the character (stepping aboard to walk, leaving first person). It never follows your steering, so it cannot fight it.
         let netEquipped = false;
         let netThrowPhase = "none"; // none | flying | sunk | retrieving
@@ -11470,7 +11470,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             wheelAngle = 0;
             yawRate = 0;
             camSnap = 3; // the camera jumps with the boat instead of sweeping across the sea
-            stateRef.current.orbitYaw = 0;
+            stateRef.current.orbitYaw = Math.PI; // (behind the boat, looking straight down it)
         }
         function travelStep(dt) {
             if (!travelAnim)
@@ -13902,10 +13902,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const THROTTLE_STEPS = [-1, 0, 0.34, 0.67, 1]; // reverse, stop, 1, 2, 3
                 const LOW_GEAR_FRACTION = 0.3; // low gear caps speed to a trolling-appropriate range
                 const REVERSE_FRACTION = 0.4;
+                const wasDriving = drivingNow;
+                drivingNow = false;
                 if (dockStep(dt)) {
                     // the boat is being eased alongside the dock (or away from it): the controls wait
                 }
                 else if (!fs.anchored && !fs.docked && !walkMode) {
+                    drivingNow = true;
+                    if (!wasDriving)
+                        driveCamSettle = true; // setting off: the view swings round to look straight down the boat
                     if (justPressed("g") || stateRef.current.gearToggleRequested) {
                         stateRef.current.gearToggleRequested = false;
                         gear = gear === "high" ? "low" : "high";
@@ -13929,9 +13934,26 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         boatSpeed = Math.max(targetSpeed, boatSpeed - accel * dt * (boatSpeed > handlingMax * 1.1 ? 3 : 1));
                     // The wheel moves while you hold a direction, and now eases back toward
                     // center on its own once you let go — no more holding a turn forever.
-                    const wheelInput = (keysNow["a"] || keysNow["arrowleft"] ? 1 : 0) - (keysNow["d"] || keysNow["arrowright"] ? 1 : 0) - stateRef.current.joyX;
+                    // The steering follows the camera: the boat turns toward wherever the view is pointing (drag the view to steer). The camera keeps its
+                    // direction while the boat swings round to it, so a drag to the right turns the boat right until it is lined up again. With A / D held
+                    // the wheel is turned by hand and the view stays straight behind the boat.
+                    const wheelInput = (keysNow["a"] || keysNow["arrowleft"] ? 1 : 0) - (keysNow["d"] || keysNow["arrowright"] ? 1 : 0);
+                    const camS = stateRef.current;
+                    if (wheelInput !== 0)
+                        driveCamSettle = true;
+                    if (driveCamSettle) { // the view eases back to sit behind the boat, looking straight down it
+                        const dSet = normAngle(Math.PI - camS.orbitYaw);
+                        camS.orbitYaw += dSet * Math.min(1, dt * 3);
+                        if (camS.dragging || Math.abs(dSet) < 0.03)
+                            driveCamSettle = false;
+                    }
+                    const camErr = normAngle(camS.orbitYaw + Math.PI); // how far the view is turned from straight down the boat (+ = to the left)
                     if (wheelInput !== 0) {
                         wheelAngle = Math.max(-1, Math.min(1, wheelAngle + wheelInput * WHEEL_TURN_SPEED * dt));
+                    }
+                    else if (!driveCamSettle && Math.abs(camErr) > 0.035) {
+                        const wheelGoal = Math.max(-1, Math.min(1, 2.6 * camErr - 1.0 * yawRate));
+                        wheelAngle += Math.max(-WHEEL_TURN_SPEED * dt, Math.min(WHEEL_TURN_SPEED * dt, wheelGoal - wheelAngle));
                     }
                     else if (wheelAngle !== 0) {
                         const ease = WHEEL_RETURN_SPEED * dt;
@@ -13952,6 +13974,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         boatHeading = headingBefore;
                         yawRate = 0; // can't turn into it
                     }
+                    if (!driveCamSettle)
+                        stateRef.current.orbitYaw -= boatHeading - headingBefore; // the view holds its direction while the boat swings round to it
                     if (Math.abs(boatSpeed) > 0.01) {
                         const intendedX = boatPos.x + Math.sin(boatHeading) * boatSpeed * dt;
                         const intendedZ = boatPos.z + Math.cos(boatHeading) * boatSpeed * dt;
@@ -14695,7 +14719,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     camera.position.lerp(desiredCamPos, camSnap > 0 ? 1 : 1 - Math.pow(0.001, dt));
                     if (camSnap > 0)
                         camSnap--;
-                    camera.lookAt(orbitTargetX, orbitTargetY + 0.3, orbitTargetZ);
+                    if (drivingNow && !ashoreMode) { // driving: the view looks straight down the boat and out past the bow
+                        const psi = headingRef + s.orbitYaw + Math.PI, ahead = Math.min(14, effectiveDist * 0.7);
+                        camera.lookAt(orbitTargetX + Math.sin(psi) * ahead, orbitTargetY + 0.3, orbitTargetZ + Math.cos(psi) * ahead);
+                    }
+                    else
+                        camera.lookAt(orbitTargetX, orbitTargetY + 0.3, orbitTargetZ);
                 }
                 baitSchools.forEach((sc) => {
                     updateBoids(sc, dt, 0.8, 1.2, 2.2, 2.4);
@@ -14935,26 +14964,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         leverFromEvent(e.clientY); }
     function handleLeverUp(e) { if (leverPointerIdRef.current === e.pointerId)
         leverPointerIdRef.current = null; }
-    // The steering bar (boat): drag left or right, it springs back to centre when you let go.
-    function steerFromEvent(clientX) {
-        if (!steerRef.current)
-            return;
-        const r = steerRef.current.getBoundingClientRect();
-        const k = Math.max(-1, Math.min(1, (clientX - (r.left + r.width / 2)) / (r.width / 2 - 22)));
-        setSteerKnob(k);
-        stateRef.current.joyX = k;
-    }
-    function handleSteerDown(e) { e.preventDefault(); steerPointerIdRef.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); steerFromEvent(e.clientX); }
-    function handleSteerMove(e) { if (steerPointerIdRef.current === e.pointerId)
-        steerFromEvent(e.clientX); }
-    function handleSteerUp(e) { if (steerPointerIdRef.current !== e.pointerId)
-        return; steerPointerIdRef.current = null; setSteerKnob(0); stateRef.current.joyX = 0; }
     const showDrive = !uiWalkMode && !uiAshoreMode && !uiAnchored && uiDock === "none"; // the lever and steering bar are for driving; walking and the dock use the move stick
-    useEffect(() => { if (!showDrive) {
-        steerPointerIdRef.current = null;
-        setSteerKnob(0);
-        stateRef.current.joyX = 0;
-    } }, [showDrive]);
     // What the touch HUD folds into its top bar: a short status, whether anything needs attention, and the one thing you can tap right now.
     const hudStatus = !uiSkiff ? "🚶 ON FOOT" : uiDock === "docked" ? "🛟 DOCKED" : uiDock === "docking" ? "⚓ DOCKING…" : uiDock === "undocking" ? "⛵ CASTING OFF…" : uiAnchored ? "⚓ ANCHORED" : "UNDERWAY";
     const wheelHintOn = !!uiQuest && questLevelForXp(uiQuest.xp) < WHEEL_HINT_UNTIL_LEVEL && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && uiMode !== "bite" && uiMode !== "fighting" && !(TOUCH_UI && uiShowSonar) && !(TOUCH_UI && uiMarineToast);
@@ -14999,16 +15009,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("span", { style: { fontSize: 8, opacity: 0.85 } }, st === 3 ? "FULL" : st === 2 ? "MID" : st === 1 ? "SLOW" : st === 0 ? "STOP" : "REV")));
             })),
             React.createElement("div", { style: { position: "absolute", bottom: 30 + LEVER_ROW * 5 + 4, left: "max(16px, env(safe-area-inset-left, 0px))", width: 72, textAlign: "center", fontSize: 9, opacity: 0.5, pointerEvents: "none" } }, "THROTTLE"),
-            React.createElement("div", { ref: steerRef, "data-testid": "steer-bar", role: "slider", "aria-label": "Steering", "aria-valuemin": -1, "aria-valuemax": 1, "aria-valuenow": steerKnob, onPointerDown: handleSteerDown, onPointerMove: handleSteerMove, onPointerUp: handleSteerUp, onPointerCancel: handleSteerUp, style: {
-                    position: "absolute", bottom: 30, left: "calc(max(16px, env(safe-area-inset-left, 0px)) + 84px)", width: "min(170px, calc(100% - 250px))", minWidth: 110, height: 48, borderRadius: 24,
-                    background: "rgba(8,22,28,0.72)", border: "1px solid rgba(255,255,255,0.28)", boxSizing: "border-box",
-                    touchAction: "none", userSelect: "none", WebkitUserSelect: "none", zIndex: 50,
-                } },
-                React.createElement("div", { style: { position: "absolute", left: "50%", top: 8, bottom: 8, width: 1, background: "rgba(255,255,255,0.25)", pointerEvents: "none" } }),
-                React.createElement("div", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: 0.55, pointerEvents: "none" } }, "\u25C0"),
-                React.createElement("div", { style: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12, opacity: 0.55, pointerEvents: "none" } }, "\u25B6"),
-                React.createElement("div", { style: { position: "absolute", top: 5, width: 38, height: 38, borderRadius: "50%", left: `calc(50% - 19px + ${steerKnob} * (50% - 22px))`, background: steerKnob !== 0 ? "rgba(111,214,232,0.6)" : "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.45)", pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 } }, "\u2638"),
-                React.createElement("div", { style: { position: "absolute", top: -16, left: 0, right: 0, textAlign: "center", fontSize: 9, opacity: 0.5, pointerEvents: "none" } }, "STEER")))),
+            React.createElement("div", { "data-testid": "steer-hint", style: { position: "absolute", bottom: 30, left: "calc(max(16px, env(safe-area-inset-left, 0px)) + 84px)", pointerEvents: "none", fontSize: 10, letterSpacing: 0.6, opacity: 0.55, lineHeight: 1.35, textShadow: "0 1px 3px rgba(0,0,0,0.8)" } },
+                "\u25C0 DRAG THE VIEW \u25B6",
+                React.createElement("br", null),
+                "to steer"))),
         React.createElement("div", { style: { position: "absolute", top: 14, left: 14, maxWidth: TOUCH_UI ? "calc(100% - 82px)" : "calc(100vw - 28px)", boxSizing: "border-box", zIndex: TOUCH_UI ? 61 : undefined, ...panelStyle, ...(TOUCH_UI ? { padding: "7px 10px" } : {}) } },
             TOUCH_UI && (React.createElement("div", null,
                 React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
@@ -15511,7 +15515,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("circle", { cx: "22", cy: "22", r: "18", fill: "none", stroke: "rgba(255,255,255,0.15)", strokeWidth: "2" }),
                     React.createElement("line", { x1: "22", y1: "22", x2: "22", y2: "6", stroke: "#6fd6e8", strokeWidth: "3", strokeLinecap: "round", transform: `rotate(${uiWheel * 80} 22 22)` }),
                     React.createElement("circle", { cx: "22", cy: "22", r: "2.5", fill: "#6fd6e8" }))),
-            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S click the throttle up and down \u00B7 G gear \u00B7 A/D wheel \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
+            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S click the throttle up and down \u00B7 drag the view (or A/D) to steer \u00B7 G gear \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
         uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? 0 : 300, ...(TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? { maxWidth: 150, padding: "8px 10px" } : {}), textAlign: "center" } },
             uiMode === "idle" && (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } },
@@ -17077,7 +17081,7 @@ function CharterLife() {
                         BUILD.demoMaxLevel,
                         " at the Marina and Sandy Shoals. The full game opens the rest of the coast and the late-game homes."),
                     React.createElement("br", null),
-                    "Drive with the throttle lever and steering bar, drag the water to look around, use the ring button for commands, and talk to the dock folks for jobs."),
+                    "Drive with the throttle lever and steer by dragging the view, use the ring button for commands, and talk to the dock folks for jobs."),
                 React.createElement("button", { className: "cl-btn", onClick: () => setShowAbout(false) }, "Back"))) : confirmNew ? (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "cl-note" },
                     "Start over? This erases your saved boat, gear and progress",
