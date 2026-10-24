@@ -49,8 +49,8 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.29", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    version: "0.30", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "24 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
@@ -4398,7 +4398,7 @@ const GEAR_FLAG_TEXT = { baitfish: "shows baitfish", sizeMarks: "bigger fish, bi
 function gearDefaults() {
     const owned = {}, equipped = {};
     GEAR_SLOTS.forEach((s) => { const first = GEAR_ITEMS.find((g) => g.slot === s.id && g.price === 0); owned[first.id] = true; equipped[s.id] = first.id; });
-    return { owned, equipped };
+    return { owned, equipped, rigs: [null, null, null, null] };
 }
 function gearItem(id) { return GEAR_ITEMS.find((g) => g.id === id) || null; }
 function gearStatsLines(item) {
@@ -4508,8 +4508,58 @@ function gearSanitize(g) {
         out.owned[id] = true; });
     GEAR_SLOTS.forEach((s) => { const it = gearItem(g.equipped[s.id]); if (it && it.slot === s.id && out.owned[it.id])
         out.equipped[s.id] = it.id; });
+    out.rigs = rigSanitize(g.rigs, out.owned);
     return out;
 }
+// ---------- The boat's tackle rack ----------
+// A rack on the boat holds saved RIGS: a rod, reel, line and lure that you set up together. Tap a rig to switch to all four at once, even with a
+// line in the water (not while a fish is on). A bigger boat has a bigger rack. Anything else you own (sonar, hat, gloves...) can be swapped from
+// the same tray one at a time. The rack only stores choices from the locker (qs.gear.owned); nothing is bought or lost by using it.
+const RIG_PARTS = ["rod", "reel", "line", "lure"];
+const RACK_SLOTS = [2, 3, 4, 2, 3, 4]; // by BOATS index: Tideline 16, Horizon 32 CC, Canyon Chaser 40, Backwater 19, Reef Runner 24, Stormbreaker 36 Cat
+function rackSize(hullIndex) { return RACK_SLOTS[hullIndex] || 2; }
+function rigSanitize(rigs, owned) {
+    const out = [null, null, null, null];
+    if (!Array.isArray(rigs))
+        return out;
+    for (let i = 0; i < 4; i++) {
+        const r = rigs[i];
+        if (!r || typeof r !== "object")
+            continue;
+        const rig = {};
+        let any = false;
+        RIG_PARTS.forEach((part) => { const it = gearItem(r[part]); if (it && it.slot === part && owned[it.id]) {
+            rig[part] = it.id;
+            any = true;
+        } });
+        if (any)
+            out[i] = rig;
+    }
+    return out;
+}
+function rigCapture(qs) { const rig = {}; RIG_PARTS.forEach((part) => { rig[part] = qs.gear.equipped[part]; }); return rig; }
+function rigSave(qs, i, hullIndex) {
+    if (!(i >= 0 && i < rackSize(hullIndex)))
+        return { ok: false, reason: "No such slot on this boat" };
+    if (!qs.gear.rigs)
+        qs.gear.rigs = [null, null, null, null];
+    qs.gear.rigs[i] = rigCapture(qs);
+    return { ok: true };
+}
+function rigUse(qs, i, hullIndex) {
+    const r = qs.gear.rigs && qs.gear.rigs[i];
+    if (!(i >= 0 && i < rackSize(hullIndex)) || !r)
+        return { ok: false, reason: "That rack slot is empty" };
+    let changed = 0;
+    RIG_PARTS.forEach((part) => { if (r[part] && qs.gear.owned[r[part]] && qs.gear.equipped[part] !== r[part]) {
+        qs.gear.equipped[part] = r[part];
+        changed++;
+    } });
+    return { ok: true, changed };
+}
+function rigMatch(qs, i) { const r = qs.gear.rigs && qs.gear.rigs[i]; return !!r && RIG_PARTS.every((part) => !r[part] || qs.gear.equipped[part] === r[part]); }
+function rigClear(qs, i) { if (qs.gear.rigs)
+    qs.gear.rigs[i] = null; return { ok: true }; }
 // ---------- The captain's look and wardrobe ----------
 // Two layers. The LOOK is who the captain is (skin, hair, beard, build, name) and is always free to change. The WARDROBE is what they wear:
 // tops, bottoms and extras (neckwear, vests, aprons). Every piece comes in any colour from LOOK_COLORS once you own it; some pieces
@@ -6033,6 +6083,58 @@ function GearPanel({ qs, canBuy, send, showTesting, hullSwapOk }) {
                 React.createElement("button", { style: small("rgba(111,214,232,0.6)"), onClick: () => send({ type: "testprogress" }) }, "Test boost (level 12, +$20000, 60 of each fish, all spots)"),
                 React.createElement("button", { style: small("rgba(255,120,120,0.6)"), onClick: () => send({ type: "testreset" }) }, "Reset all progress"))))));
 }
+// The tackle rack tray: saved rigs on top (tap one to rig up the rod, reel, line and lure together), then one row per kind of gear you own more than one of.
+// Opened with the Rack button or T while fishing. Everything here sends the same actions as the Gear panel, so it follows the same rules.
+function RackTray({ qs, hullIndex, send, onClose, compact }) {
+    const n = rackSize(hullIndex), boat = BOATS[hullIndex] || {};
+    const rigs = qs.gear.rigs || [];
+    const nameOf = (id) => { const it = gearItem(id); return it ? it.name.replace(/ (Spinning|Inshore|Offshore) Rod| Rod| Reel/g, "") : "-"; };
+    const tiny = (color, on) => ({ fontSize: 11, padding: compact ? "5px 8px" : "4px 9px", borderRadius: 12, cursor: "pointer", border: `1px solid ${on ? "#7fe6a8" : color}`, background: on ? "rgba(127,230,168,0.16)" : "rgba(255,255,255,0.05)", color: on ? "#7fe6a8" : color, whiteSpace: "nowrap" });
+    const rows = GEAR_SLOTS.filter((sl) => sl.id !== "hull").map((sl) => ({ sl, items: GEAR_ITEMS.filter((g) => g.slot === sl.id && qs.gear.owned[g.id]) })).filter((r) => r.items.length > 1);
+    return (React.createElement("div", { "data-rack": "1", style: { background: "rgba(14,31,40,0.96)", border: "1px solid rgba(255,184,77,0.35)", borderRadius: 8, padding: "10px 12px", color: "#eaf3f5", maxHeight: compact ? 290 : "50vh", overflowY: "auto", width: compact ? "min(94vw, 380px)" : 400, boxSizing: "border-box", textAlign: "left" } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 8 } },
+            React.createElement("div", { style: { flex: 1, fontSize: 13, fontWeight: 700, color: "#ffb84d" } },
+                "\uD83E\uDDF0 Tackle rack ",
+                React.createElement("span", { style: { fontWeight: 400, fontSize: 11, color: "#8fa3aa" } },
+                    "\u00B7 ",
+                    boat.name,
+                    " \u00B7 ",
+                    n,
+                    " slots")),
+            React.createElement("button", { onClick: onClose, style: { fontSize: 12, padding: "3px 10px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "transparent", color: "#eaf3f5" } }, "Close")),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: rows.length ? 10 : 0 } }, Array.from({ length: n }).map((_, i) => {
+            const r = rigs[i], on = !!r && rigMatch(qs, i);
+            return (React.createElement("div", { key: i, style: { padding: "6px 8px", borderRadius: 6, border: `1px solid ${on ? "rgba(127,230,168,0.6)" : "rgba(255,255,255,0.14)"}`, background: on ? "rgba(127,230,168,0.08)" : "rgba(255,255,255,0.03)" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+                    React.createElement("span", { style: { fontSize: 10, letterSpacing: 1, color: "#8fa3aa" } },
+                        "SLOT ",
+                        i + 1),
+                    on && React.createElement("span", { style: { fontSize: 10, color: "#7fe6a8" } }, "\u2714 in use")),
+                r ? (React.createElement("button", { onClick: () => send({ type: "rackuse", i }), style: { display: "block", width: "100%", textAlign: "left", marginTop: 3, fontSize: 11, lineHeight: 1.35, padding: "4px 6px", borderRadius: 4, cursor: "pointer", border: "1px solid rgba(111,214,232,0.5)", background: "rgba(111,214,232,0.08)", color: "#d6eef3" } },
+                    "\uD83C\uDFA3 ",
+                    nameOf(r.rod),
+                    React.createElement("br", null),
+                    "\u2699\uFE0F ",
+                    nameOf(r.reel),
+                    React.createElement("br", null),
+                    "\uD83E\uDDF5 ",
+                    nameOf(r.line),
+                    React.createElement("br", null),
+                    "\uD83E\uDE9D ",
+                    nameOf(r.lure))) : React.createElement("div", { style: { fontSize: 11, color: "#7f8d92", margin: "5px 0" } }, "Empty: rig up, then save here"),
+                React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 4 } },
+                    React.createElement("button", { onClick: () => send({ type: "racksave", i }), style: tiny("#ffb84d") }, "Save current"),
+                    r && React.createElement("button", { onClick: () => send({ type: "rackclear", i }), style: tiny("#9aa8ad") }, "Empty"))));
+        })),
+        rows.length > 0 && React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.5, color: "#8fa3aa", margin: "2px 0 4px" } }, "SWAP ONE PIECE"),
+        rows.map(({ sl, items }) => (React.createElement("div", { key: sl.id, style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 5 } },
+            React.createElement("span", { style: { fontSize: 11, width: 74, flexShrink: 0, color: "#b4c3c8" } },
+                sl.icon,
+                " ",
+                sl.label),
+            React.createElement("div", { style: { display: "flex", gap: 5, overflowX: "auto", paddingBottom: 2, flex: 1 } }, items.map((it) => React.createElement("button", { key: it.id, onClick: () => send({ type: "gearequip", id: it.id }), style: tiny("#6fd6e8", qs.gear.equipped[sl.id] === it.id) }, nameOf(it.id))))))),
+        rows.length === 0 && React.createElement("div", { style: { fontSize: 10, color: "#7f8d92", marginTop: 6 } }, "Gear you buy at the marina shop shows up here, ready to swap mid-trip.")));
+}
 function progTimeText(sec) { const m = Math.floor((sec || 0) / 60), h = Math.floor(m / 60); return h > 0 ? h + "h " + (m % 60) + "m" : m + "m"; }
 // The captain's progression screen: level, XP, perks to spend points on, what is coming up, and lifetime stats.
 // (A crew member or friend would get the same screen for their own xp/perks.)
@@ -7412,6 +7514,19 @@ try {
 }
 catch (e) { /* storage blocked: stay on */ }
 const HOOKSET_EASE = 2.0; // multiplies every fish's strike window (species biteWindow x gear), so the hookset gives about twice the time to answer; tune here
+// New-player hints: a few soft glows on the control that matters next, plus one quiet line saying the current objective. Each glow is counted
+// and goes away for good after a couple of uses, the whole set ends at HINT_UNTIL_LEVEL, and the View menu can switch it off.
+const HINTS_KEY = "deepwater.hints", HINTS_OFF_KEY = "deepwater.hintsOff";
+const HINT_UNTIL_LEVEL = 4;
+const HINT_LIMITS = { cast: 2, strike: 2, reel: 2, rack: 2, talk: 3 };
+function hintsLoad() { try {
+    const o = JSON.parse(localStorage.getItem(HINTS_KEY) || "{}");
+    return o && typeof o === "object" ? o : {};
+}
+catch (e) {
+    return {};
+} }
+const HINT_GLOW = { animation: "hintGlow 2.2s ease-in-out infinite" };
 const WHEEL_SEEN_KEY = "deepwater.wheelSeen"; // set once the command wheel has been opened (the new-player hint stops pulsing)
 const WHEEL_HINT_UNTIL_LEVEL = 10; // the little "boat menu" hint beside the wheel button shows until the player reaches this level
 function fxSetOn(v) { fx.on = !!v; try {
@@ -8054,6 +8169,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiStoryOpen, setUiStoryOpen] = useState(false); // the story journal (chapters, logbook pages, people met)
     const [uiStoryScene, setUiStoryScene] = useState(null); // the scene being played: { id, kind, who, how, lines }
     const [uiSpotHint, setUiSpotHint] = useState(""); // radar hint toward the nearest unexplored fishing ground (top-tier sonar only)
+    const [uiRackOpen, setUiRackOpen] = useState(false); // the boat tackle rack tray (swap rigs and gear while fishing)
     const [uiGearOpen, setUiGearOpen] = useState(false); // tackle (rod / reel / line) panel opened from the wheel
     const [uiBoatYardOpen, setUiBoatYardOpen] = useState(false); // boat colours, name, flag and fittings (wheel > Boat > Boat Yard)
     const [uiWardrobeOpen, setUiWardrobeOpen] = useState(false); // look and clothes panel (wheel > Tackle > Wardrobe)
@@ -8085,6 +8201,43 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const leverPointerIdRef = useRef(null);
     const [uiDoorOpen, setUiDoorOpen] = useState(false);
     const [uiMode, setUiMode] = useState("idle");
+    useEffect(() => { if (uiRackOpen && (!uiCastOk || uiMode === "bite" || uiMode === "fighting"))
+        setUiRackOpen(false); }, [uiRackOpen, uiCastOk, uiMode]); // the tray puts itself away when the line comes in or a fish hits
+    const [uiHints, setUiHints] = useState(hintsLoad); // how many times each glow has done its job (kept on this device)
+    const [uiHintsOff, setUiHintsOff] = useState(() => { try {
+        return localStorage.getItem(HINTS_OFF_KEY) === "1";
+    }
+    catch (e) {
+        return false;
+    } });
+    const hintBump = (key) => setUiHints((h) => { const n = { ...h, [key]: (h[key] || 0) + 1 }; try {
+        localStorage.setItem(HINTS_KEY, JSON.stringify(n));
+    }
+    catch (e) { /* storage blocked: hints just repeat next visit */ } return n; });
+    const hintsFlip = () => setUiHintsOff((v) => { const n = !v; try {
+        localStorage.setItem(HINTS_OFF_KEY, n ? "1" : "0");
+    }
+    catch (e) { /* ignore */ } return n; });
+    const hintLvlOk = !!uiQuest && questLevelForXp(uiQuest.xp) < HINT_UNTIL_LEVEL;
+    const hintCan = (key) => !uiHintsOff && !!uiQuest && (uiHints[key] || 0) < HINT_LIMITS[key];
+    const hintOn = (key) => hintCan(key) && (key === "rack" ? RIG_PARTS.some((part) => GEAR_ITEMS.filter((g) => g.slot === part && uiQuest.gear.owned[g.id]).length > 1) : hintLvlOk);
+    const prevHintMode = useRef("idle");
+    useEffect(() => {
+        const was = prevHintMode.current;
+        prevHintMode.current = uiMode;
+        if (was === uiMode)
+            return;
+        if (uiMode === "dropping")
+            hintBump("cast");
+        if (was === "bite" && uiMode === "fighting")
+            hintBump("strike");
+        if (was === "fighting" && uiMode !== "fighting")
+            hintBump("reel");
+    }, [uiMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (uiRackOpen)
+        hintBump("rack"); }, [uiRackOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (uiQuestDialog || uiStoryScene)
+        hintBump("talk"); }, [!!uiQuestDialog, !!uiStoryScene]); // eslint-disable-line react-hooks/exhaustive-deps
     const [uiTension, setUiTension] = useState(0);
     const [uiStamina, setUiStamina] = useState(100);
     const [uiLineOut, setUiLineOut] = useState(0);
@@ -13954,6 +14107,37 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     marineShowToast("🎣 Equipped: " + gearItem(a.id).name, "#8fd9e6", 3);
                 }
             }
+            else if (/^rack(use|save|clear)$/.test(a.type)) { // the boat's tackle rack: switch to a saved rig, save the current one, empty a slot
+                const hi = stateRef.current.boatIndex;
+                if (a.type === "racksave") {
+                    const r = rigSave(quest, a.i, hi);
+                    if (r.ok) {
+                        questSave(quest);
+                        questPush();
+                        marineShowToast("🧰 Rig saved in rack slot " + (a.i + 1), "#8fd9e6", 2.5);
+                    }
+                    else
+                        marineShowToast(r.reason, "#ffb84d", 3);
+                }
+                else if (a.type === "rackclear") {
+                    rigClear(quest, a.i);
+                    questSave(quest);
+                    questPush();
+                }
+                else if (fishingState.mode === "bite" || fishingState.mode === "fighting")
+                    marineShowToast("Can't change rigs while a fish is on", "#ffb84d", 3);
+                else {
+                    const r = rigUse(quest, a.i, hi);
+                    if (r.ok) {
+                        gearAfterChange();
+                        questSave(quest);
+                        questPush();
+                        marineShowToast(r.changed ? "🧰 Switched to rack slot " + (a.i + 1) : "Already rigged that way", "#8fd9e6", 2.5);
+                    }
+                    else
+                        marineShowToast(r.reason, "#ffb84d", 3);
+                }
+            }
             else if (a.type === "lookset" || /^wardrobe/.test(a.type)) { // look and clothes (the character creator uses the same wardrobeApply)
                 const r = wardrobeApply(quest, a, { canBuy: shopOpen });
                 if (r.ok) {
@@ -15052,6 +15236,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 }
                 if (justPressed("m"))
                     setUiChartOpen((v) => !v); // the chart
+                if (justPressed("t") && fs.mode !== "bite" && fs.mode !== "fighting")
+                    setUiRackOpen((v) => !v); // the tackle rack (only drawn where a line can go out)
                 if (justPressed("j"))
                     seaToggleFast(); // fast sail
                 if (stateRef.current.dockServicesRequested) { // marina services straight from the boat while tied up
@@ -16869,7 +17055,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, opacity: 0.7 } }, uiHudOpen ? "▲" : "▼")),
                     React.createElement("button", { onClick: () => setUiShowSonar((v) => !v), "aria-pressed": uiShowSonar, "aria-label": "Sonar", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiShowSonar ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiShowSonar ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83D\uDCE1"),
                     React.createElement("button", { onClick: () => setUiMiniOn((v) => !v), "aria-pressed": uiMiniOn, "aria-label": "Mini-map", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiMiniOn ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiMiniOn ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83E\uDDED")),
-                tapPrompt && React.createElement("div", { style: { fontSize: 11, marginTop: 5, color: "#ffb84d" } }, tapPrompt))),
+                tapPrompt && React.createElement("div", { style: { fontSize: 11, marginTop: 5, color: "#ffb84d", borderRadius: 4, ...(uiNearGiver && hintOn("talk") ? HINT_GLOW : {}) } }, tapPrompt),
+                TOUCH_UI && !uiHudOpen && uiQuest && hintLvlOk && !uiHintsOff && !tapPrompt && (() => { const h = storyHud(uiQuest); return h && h.obj && h.state !== "done" && h.state !== "demoend" ? React.createElement("div", { "data-hint": "objective", style: { fontSize: 11, marginTop: 5, color: "#f0d9a8", lineHeight: 1.3, animation: "hintBreathe 3.2s ease-in-out infinite" } },
+                    "\uD83C\uDFAF ",
+                    h.obj,
+                    h.where ? " · " + h.where : "") : null; })())),
             (!TOUCH_UI || uiHudOpen) && (React.createElement(React.Fragment, null,
                 !TOUCH_UI && React.createElement("div", { style: { ...labelStyle, color: "#ffb84d" } },
                     BUILD.title,
@@ -16934,7 +17124,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("span", { style: { color: "#ffb84d", fontWeight: 700 } }, "E"),
                     " to sit")),
                 uiAshoreMode && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#8fd97a" } }, "\uD83C\uDFDD\uFE0F ASHORE"),
-                !TOUCH_UI && uiNearGiver && !uiQuestDialog && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d" } },
+                !TOUCH_UI && uiNearGiver && !uiQuestDialog && (React.createElement("div", { style: { fontSize: 11, marginTop: 2, color: "#ffb84d", borderRadius: 4, ...(hintOn("talk") ? HINT_GLOW : {}) } },
                     "Press ",
                     React.createElement("span", { style: { fontWeight: 700 } }, "E"),
                     " or tap to talk to ",
@@ -17222,7 +17412,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             React.createElement("span", { "aria-hidden": "true" }, "\u25B4"),
             " ",
             uiWheelSeen ? "Boat menu" : (TOUCH_UI ? "Tap for boat controls" : "Boat controls: click or press Q"))),
-        React.createElement("style", null, "@keyframes wheelPulse{0%{box-shadow:0 0 0 0 rgba(255,184,77,.65)}70%{box-shadow:0 0 0 12px rgba(255,184,77,0)}100%{box-shadow:0 0 0 0 rgba(255,184,77,0)}}"),
+        React.createElement("style", null, "@keyframes hintGlow{0%,100%{box-shadow:0 0 0 0 rgba(255,184,77,0);filter:brightness(1)}50%{box-shadow:0 0 12px 3px rgba(255,184,77,.55);filter:brightness(1.18)}}@keyframes hintBreathe{0%,100%{opacity:.95}50%{opacity:.6}}@keyframes wheelPulse{0%{box-shadow:0 0 0 0 rgba(255,184,77,.65)}70%{box-shadow:0 0 0 12px rgba(255,184,77,0)}100%{box-shadow:0 0 0 0 rgba(255,184,77,0)}}"),
         uiWheelOpen && (() => {
             const rq = (flag) => () => { stateRef.current[flag] = true; };
             const menus = {
@@ -17260,6 +17450,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "📡", label: "Sonar", active: uiShowSonar, enabled: true, keepOpen: true, run: () => setUiShowSonar((v) => !v) },
                         ...(BUILD.dev ? [{ icon: "🐞", label: "Debug Bar", active: uiShowDebug, enabled: true, keepOpen: true, run: () => setUiShowDebug((v) => !v) }] : []),
                         { icon: "👁", label: uiFirstPerson ? "Exit 1st" : "1st Person", active: uiFirstPerson, enabled: uiWalkMode, why: "Walk on deck for first-person", run: rq("fpToggleRequested") },
+                        { icon: "💡", label: "Hints", active: !uiHintsOff, enabled: true, keepOpen: true, run: hintsFlip },
                         { icon: "⭐", label: "Progress", enabled: true, run: () => setUiProgressOpen(true) },
                         { icon: "★", label: "Story", enabled: true, run: () => setUiStoryOpen(true) },
                         { icon: "📋", label: "Missions", enabled: true, run: () => setUiMissionsOpen(true) },
@@ -17358,7 +17549,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("circle", { cx: "22", cy: "22", r: "18", fill: "none", stroke: "rgba(255,255,255,0.15)", strokeWidth: "2" }),
                     React.createElement("line", { x1: "22", y1: "22", x2: "22", y2: "6", stroke: "#6fd6e8", strokeWidth: "3", strokeLinecap: "round", transform: `rotate(${uiWheel * 80} 22 22)` }),
                     React.createElement("circle", { cx: "22", cy: "22", r: "2.5", fill: "#6fd6e8" }))),
-            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S click the throttle up and down \u00B7 drag left / right (or A/D) to steer \u00B7 G gear \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
+            uiShowHelp && !TOUCH_UI && React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 6 } }, "W/S click the throttle up and down \u00B7 drag left / right (or A/D) to steer \u00B7 G gear \u00B7 E (or 1-8) anchor \u00B7 K dock at the marina \u00B7 F drop line \u00B7 T tackle rack \u00B7 SPACE hook/reel \u00B7 V walk on deck")),
+        uiRackOpen && uiCastOk && uiQuest && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") && !uiGearOpen && !uiShopOpen && !uiWheelOpen && (React.createElement("div", { style: { position: "absolute", bottom: TOUCH_UI ? 262 : 200, left: "50%", transform: "translateX(-50%)", zIndex: 75 } },
+            React.createElement(RackTray, { qs: uiQuest, hullIndex: uiBoatIndex, compact: TOUCH_UI, onClose: () => setUiRackOpen(false), send: (a) => { stateRef.current.questAction = a; } }))),
         uiCastOk ? (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, minWidth: TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? 0 : 300, ...(TOUCH_UI && (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") ? { maxWidth: 150, padding: "8px 10px" } : {}), textAlign: "center" } },
             uiMode === "idle" && (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } },
@@ -17368,15 +17561,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         React.createElement("span", { style: { color: "#ffb84d" } }, "Press F"),
                         " to drop your line."),
                     uiAshoreMode && React.createElement("span", { style: { display: "block", fontSize: 10, opacity: 0.55, marginTop: 3 } }, "Face the water you want. Walk away to reel in.")),
-                React.createElement("button", { onClick: () => { stateRef.current.castRequested = true; }, style: { fontSize: 13, padding: "6px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(255,184,77,0.15)", color: "#ffb84d", fontWeight: 600 } }, "\uD83C\uDFA3 Cast Line"))),
+                React.createElement("button", { onClick: () => { stateRef.current.castRequested = true; }, style: { fontSize: 13, padding: "6px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(255,184,77,0.15)", color: "#ffb84d", fontWeight: 600, ...(hintOn("cast") ? HINT_GLOW : {}) } }, "\uD83C\uDFA3 Cast Line"))),
             uiMode === "dropping" && React.createElement("div", { style: { fontSize: 13, opacity: 0.8 } }, "Dropping line..."),
             uiMode === "waiting" && React.createElement("div", { style: { fontSize: 13, opacity: 0.8 } }, "Waiting for a bite..."),
+            (uiMode === "idle" || uiMode === "dropping" || uiMode === "waiting") && uiQuest && (React.createElement("button", { "data-hint": "rack", onClick: () => setUiRackOpen((v) => !v), style: { marginTop: 7, fontSize: 11, padding: "4px 12px", borderRadius: 12, cursor: "pointer", border: `1px solid ${uiRackOpen ? "#7fe6a8" : "rgba(111,214,232,0.55)"}`, background: uiRackOpen ? "rgba(127,230,168,0.14)" : "rgba(111,214,232,0.08)", color: uiRackOpen ? "#7fe6a8" : "#8fd9e6", ...(hintOn("rack") && !uiRackOpen ? HINT_GLOW : {}) } },
+                "\uD83E\uDDF0 Rack",
+                TOUCH_UI ? "" : " (T)")),
             uiMode === "bite" && (uiFight && uiFight.stage === "strike" ? (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ff5c5c", marginBottom: 6 } }, "STRIKE! Set the hook!"),
                 React.createElement("div", { style: { height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: 4 } },
                     React.createElement("div", { style: { height: "100%", width: `${Math.round((1 - uiFight.strike) * 100)}%`, background: uiFight.strike < 0.45 ? "#8fd97a" : uiFight.strike < 0.7 ? "#ffb84d" : "#ff5c5c" } })),
                 React.createElement("div", { style: { fontSize: 10, opacity: 0.55, marginBottom: 8 } }, "The sooner you answer, the cleaner the hookset"),
-                React.createElement("button", { onClick: () => { stateRef.current.hooksetRequested = true; }, style: { fontSize: 14, padding: "8px 20px", borderRadius: 6, cursor: "pointer", border: "1px solid #ff5c5c", background: "rgba(255,92,92,0.2)", color: "#ff5c5c", fontWeight: 700 } }, "SET HOOK!"))) : (React.createElement("div", null,
+                React.createElement("button", { onClick: () => { stateRef.current.hooksetRequested = true; }, style: { fontSize: 14, padding: "8px 20px", borderRadius: 6, cursor: "pointer", border: "1px solid #ff5c5c", background: "rgba(255,92,92,0.2)", color: "#ff5c5c", fontWeight: 700, ...(hintOn("strike") ? { animation: "hintGlow 0.9s ease-in-out infinite" } : {}) } }, "SET HOOK!"))) : (React.createElement("div", null,
                 React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#ffb84d", marginBottom: 4 } }, uiFight && uiFight.tug ? "Tug!" : "Something is nibbling..."),
                 React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 8 } }, "Wait for the hard strike. Striking now spooks it."),
                 React.createElement("button", { onClick: () => { stateRef.current.hooksetRequested = true; }, style: { fontSize: 12, padding: "6px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid rgba(255,184,77,0.4)", background: "rgba(255,184,77,0.06)", color: "rgba(255,184,77,0.7)", fontWeight: 600 } }, "Set hook")))),
@@ -17441,7 +17637,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("div", { style: { fontSize: 10, opacity: 0.5, marginTop: 4, marginBottom: 8 } },
                         f.blurb ? "This one " + f.blurb + ". " : "",
                         TOUCH_UI ? "Hold the button to reel, let go to give line." : "Hold SPACE to reel, let go to give line."),
-                    React.createElement("button", { onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); stateRef.current.reelHeld = true; }, onPointerUp: () => { stateRef.current.reelHeld = false; }, onPointerCancel: () => { stateRef.current.reelHeld = false; }, style: { fontSize: 14, padding: "12px 28px", borderRadius: 6, cursor: "pointer", border: "1px solid #6fd6e8", background: "rgba(111,214,232,0.15)", color: "#6fd6e8", fontWeight: 700, touchAction: "none", userSelect: "none" } }, "HOLD TO REEL")));
+                    React.createElement("button", { onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); stateRef.current.reelHeld = true; }, onPointerUp: () => { stateRef.current.reelHeld = false; }, onPointerCancel: () => { stateRef.current.reelHeld = false; }, style: { fontSize: 14, padding: "12px 28px", borderRadius: 6, cursor: "pointer", border: "1px solid #6fd6e8", background: "rgba(111,214,232,0.15)", color: "#6fd6e8", fontWeight: 700, touchAction: "none", userSelect: "none", ...(hintOn("reel") ? HINT_GLOW : {}) } }, "HOLD TO REEL")));
             })(),
             uiMode === "result" && (uiResultSuccess && uiCatch ? (React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center", textAlign: "left" } },
                 React.createElement("svg", { width: "64", height: "40", viewBox: "0 0 64 40", "aria-label": "A " + uiCatch.name, style: { flexShrink: 0 } },
