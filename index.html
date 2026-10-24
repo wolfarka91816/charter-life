@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.28", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.29", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -5403,7 +5403,9 @@ function charBuildAngler(shirtColor) {
     const rodBaseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), rodDirNorm);
     rodGroup.quaternion.copy(rodBaseQuat);
     rodGroup.userData.baseQuat = rodBaseQuat.clone();
-    group.add(rodGroup);
+    const gearRoot = new THREE.Group();
+    group.add(gearRoot); // the rod, reel and handle move as one when the rod is carried on the back
+    gearRoot.add(rodGroup);
     const rodTipAnchor = new THREE.Object3D(); // the very end of the rod: where the fishing line leaves it
     rodTipAnchor.position.set(0, rodLength + 0.04, 0);
     rodGroup.add(rodTipAnchor);
@@ -5411,11 +5413,11 @@ function charBuildAngler(shirtColor) {
     const reelSeat = rodButt.clone().add(rodDirNorm.clone().multiplyScalar(rodLength * 0.14)); // = the handle's pivot; moved by charBuildReel
     const reelMat = M(0x2a2d30, { shininess: 70, specular: 0x777777 });
     const reelBody = new THREE.Group();
-    group.add(reelBody);
+    gearRoot.add(reelBody);
     const crankRadius = 0.07;
     const crankGroup = new THREE.Group();
     crankGroup.position.copy(reelSeat);
-    group.add(crankGroup);
+    gearRoot.add(crankGroup);
     // Support hand: just above the reel, on the rod itself (the "back side"
     // relative to the crank, which sticks out to the left-right instead).
     const foreGrip = rodButt.clone().add(rodDirNorm.clone().multiplyScalar(rodLength * 0.3));
@@ -5438,7 +5440,7 @@ function charBuildAngler(shirtColor) {
     handL.position.y = armL.userData.restLength / 2;
     charHandGeoParts(handL, handMat);
     armL.add(handL);
-    group.userData.parts = { armL, armR, torso, rodGroup, rodTipAnchor, crankGroup, reelSeat, crankRadius, crankAngle: 0, legs, reelBody, rodMat, reelMat, hats, hatMat, glassGroup, glassVariants, glassMat, frameMat, handMat, hands: [handR, handL], bootMat };
+    group.userData.parts = { gearRoot, armL, armR, torso, rodGroup, rodTipAnchor, crankGroup, reelSeat, crankRadius, crankAngle: 0, legs, reelBody, rodMat, reelMat, hats, hatMat, glassGroup, glassVariants, glassMat, frameMat, handMat, hands: [handR, handL], bootMat };
     {
         const pr = group.userData.parts;
         charFrameInit(pr, rodButt, rodDirNorm, rodLength, rodBaseQuat);
@@ -5512,7 +5514,7 @@ function charFrameInit(pr, rodButt, rodDir, rodLength, baseQuat) {
     const downL = downW.clone().applyQuaternion(baseQuat.clone().invert());
     const seat0 = rodButt.clone().add(dir.clone().multiplyScalar(rodLength * 0.14));
     const center = seat0.clone().add(downW.clone().multiplyScalar(0.088)), handle = center.clone().add(new THREE.Vector3(-0.056, 0, 0));
-    pr.rodFrame = { length: rodLength, downL, downW, baseQuat: baseQuat.clone(), seat0, center, handle };
+    pr.rodFrame = { butt: rodButt.clone(), dir, length: rodLength, downL, downW, baseQuat: baseQuat.clone(), seat0, center, handle };
     return pr.rodFrame;
 }
 function charBuildRod(pr, item, reelKind) {
@@ -5697,7 +5699,7 @@ function charApplyGear(pr, eq, gi) {
     const gv = gi(eq.gloves), gon = styleOf(gv) !== "none", gm = gv ? CHAR_GEAR_MODEL.gloves[gv.id] || "work" : null;
     pr.glovesOn = gon;
     pr.handMat.color.setHex(gon ? gv.color : (pr.skinColor || 0xd9a679));
-    pr.hands.forEach((h) => { h.scale.setScalar(gon ? 1.08 : 1); const V = h.userData.gloveVariants; if (V)
+    pr.hands.forEach((h) => { h.userData.gs = gon ? 1.08 : 1; h.scale.setScalar(h.userData.gs); const V = h.userData.gloveVariants; if (V)
         Object.keys(V).forEach((n) => { V[n].visible = gon && n === gm; }); });
     const bt = gi(eq.boots), bon = styleOf(bt) !== "none", bm = bt ? CHAR_GEAR_MODEL.boots[bt.id] || "boot" : null;
     if (bon)
@@ -5707,6 +5709,99 @@ function charApplyGear(pr, eq, gi) {
     if (pr.lk)
         pr.lk.shoes.forEach((m) => { m.visible = !bon; });
 }
+// ======================= Poses: knees, reaching arms, the stowed rod =======================
+const CHAR_KNEE_Y = -0.01, CHAR_KNEE_H = 0.045; // the knee's height on the leg (leg-local y) and half the zone over which a bend is smoothed
+const _cb = {}; // (a scratch vector, made on first use)
+function charRelMatrix(m, root) { const mat = new THREE.Matrix4(); for (let o = m; o && o !== root; o = o.parent) {
+    o.updateMatrix();
+    mat.premultiply(o.matrix);
+} return mat; }
+function charShownUnder(m, root) { for (let o = m; o && o !== root; o = o.parent)
+    if (!o.visible)
+        return false; return true; }
+function charLegBend(leg, knee) {
+    leg.traverse((m) => {
+        if (!m.isMesh || !m.geometry || !m.geometry.attributes || !m.geometry.attributes.position || m.userData.noBend)
+            return;
+        const u = m.userData;
+        if (u.bendKnee === undefined && knee === 0)
+            return;
+        if (u.bendKnee === knee && u.bendGeo === m.geometry)
+            return;
+        if (!charShownUnder(m, leg))
+            return;
+        if (u.bendGeo !== m.geometry) {
+            u.bendSrc = Float32Array.from(m.geometry.attributes.position.array);
+            const g = m.geometry.clone();
+            u.bendGeo = g;
+            m.geometry = g;
+            u.bendKnee = 0;
+        }
+        const rel = charRelMatrix(m, leg), inv = rel.clone().invert(), src = u.bendSrc, dst = m.geometry.attributes.position.array, v = _cb.v || (_cb.v = new THREE.Vector3());
+        for (let i = 0; i < src.length; i += 3) {
+            v.set(src[i], src[i + 1], src[i + 2]).applyMatrix4(rel);
+            const f = (v.y - (CHAR_KNEE_Y - CHAR_KNEE_H)) / (2 * CHAR_KNEE_H), w = f >= 1 ? 0 : f <= 0 ? 1 : 1 - f * f * (3 - 2 * f), a = knee * w;
+            if (a !== 0) {
+                const c = Math.cos(a), s = Math.sin(a), dy = v.y - CHAR_KNEE_Y;
+                v.y = CHAR_KNEE_Y + dy * c - v.z * s;
+                v.z = dy * s + v.z * c;
+            }
+            v.applyMatrix4(inv);
+            dst[i] = v.x;
+            dst[i + 1] = v.y;
+            dst[i + 2] = v.z;
+        }
+        m.geometry.attributes.position.needsUpdate = true;
+        m.geometry.computeVertexNormals();
+        m.geometry.computeBoundingSphere();
+        u.bendKnee = knee;
+    });
+}
+function charLegsPose(pr, o) {
+    const sit = o.sit || 0, amt = o.amount || 0, ph0 = o.phase || 0;
+    pr.legs.forEach((leg, i) => {
+        const ph = ph0 + (i === 0 ? 0 : Math.PI), swing = Math.sin(ph) * 0.55 * amt * (1 - sit);
+        const hipA = -sit * 1.42 + swing, knee = Math.round((sit * 1.42 + amt * (1 - sit) * (0.1 + 0.75 * Math.max(0, -Math.cos(ph)))) * 60) / 60;
+        const cosB = Math.cos(hipA), sinB = Math.sin(hipA), hip = leg.userData.hip, restLocal = leg.userData.restPos.clone().sub(hip);
+        leg.position.copy(hip).add(new THREE.Vector3(restLocal.x, restLocal.y * cosB - restLocal.z * sinB, restLocal.y * sinB + restLocal.z * cosB));
+        leg.quaternion.copy(leg.userData.restQuat).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), hipA));
+        if (pr.lk && pr.lk.creases[i])
+            pr.lk.creases[i].scale.y = knee > 0.15 ? 0.0001 : 1; // (the trouser crease is a straight strip: it cannot follow a bend)
+        charLegBend(leg, knee);
+    });
+}
+function charArmTo(arm, target) {
+    const o = arm.userData.origin, d = target.clone().sub(o), dist = Math.max(1e-4, d.length());
+    return { q: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.multiplyScalar(1 / dist)), sy: dist / arm.userData.restLength, pos: o.clone().add(target).multiplyScalar(0.5) };
+}
+function charArmRelaxed(arm, side, swing) {
+    const L = arm.userData.restLength * 0.97, a = swing || 0;
+    return arm.userData.origin.clone().add(new THREE.Vector3(side * 0.02, -L * Math.cos(a), -L * Math.sin(a) + 0.01));
+}
+function charArmBlend(arm, target, s, maxStretch) {
+    if (s <= 0.001)
+        return;
+    const o = arm.userData.origin, L = arm.userData.restLength, d = target.clone().sub(o), dist = d.length(), lim = L * (maxStretch || 1.3);
+    if (dist > lim)
+        target = o.clone().add(d.multiplyScalar(lim / dist));
+    const T = charArmTo(arm, target);
+    arm.quaternion.slerp(T.q, s);
+    arm.scale.y += (T.sy - arm.scale.y) * s;
+    arm.position.lerp(T.pos, s);
+}
+function charFixHands(pr) { pr.hands.forEach((h, i) => { const a = pr.arms[i], gs = h.userData.gs || 1; h.scale.set(gs, gs / Math.max(0.4, a.scale.y), gs); }); } // hands keep their shape when an arm is stretched or shortened
+function charStowPose(pr) {
+    if (pr.stowPose)
+        return pr.stowPose;
+    const F = pr.rodFrame, V = THREE.Vector3, a0 = F.dir.clone(), d0 = F.downW.clone(), c0 = new V().crossVectors(a0, d0);
+    const a1 = new V(-0.46, 0.89, -0.05).normalize(), want = new V(0.15, -0.35, -1).normalize(), d1 = want.sub(a1.clone().multiplyScalar(want.dot(a1))).normalize(), c1 = new V().crossVectors(a1, d1);
+    const B1 = new THREE.Matrix4().makeBasis(a1, d1, c1), B0 = new THREE.Matrix4().makeBasis(a0, d0, c0), R = B1.multiply(B0.transpose());
+    const M = new THREE.Matrix4().makeTranslation(0.11, 0.5, -0.17).multiply(R).multiply(new THREE.Matrix4().makeTranslation(-F.butt.x, -F.butt.y, -F.butt.z));
+    const pos = new V(), quat = new THREE.Quaternion(), sc = new V();
+    M.decompose(pos, quat, sc);
+    return (pr.stowPose = { pos, quat });
+}
+function charStowRod(pr, s) { const D = charStowPose(pr); pr.gearRoot.position.copy(D.pos).multiplyScalar(s); pr.gearRoot.quaternion.identity().slerp(D.quat, s); }
 // <<CHAR-END>>
 // ---------- Progression: levels, XP, perks, selling ----------
 // Time spent playing turns into XP (landing fish, first catches of a species, discovering fishing grounds, seeing wildlife, finishing
@@ -11043,6 +11138,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     spoke.position.y = columnHeight;
                     wheelGroup.add(spoke);
                 }
+                wheelGroup.userData.hubOff = new THREE.Vector3(0, columnHeight, 0);
+                wheelGroup.userData.rim = radius;
                 return wheelGroup;
             }
             // Console-mounted wheel — for the CC's block-style console, where the
@@ -11074,6 +11171,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     spoke.position.z = -stubLength;
                     wheelGroup.add(spoke);
                 }
+                wheelGroup.userData.hubOff = new THREE.Vector3(0, 0, -stubLength);
+                wheelGroup.userData.rim = radius;
+                wheelGroup.userData.spins = true; // (it turns with the steering)
                 return wheelGroup;
             }
             // Default torus orientation already faces along the boat's fore-aft
@@ -11087,6 +11187,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 wheel = buildWheel(0.38 * S, 1.15 * S);
                 wheel.position.set(0.4 * S, deckY, def.length * 0.32 - 0.55 * S);
                 group.add(wheel);
+                group.userData.helmWheel = wheel;
             }
             if (family === "skiff") {
                 const p = getSkiffCockpitParams(def);
@@ -11112,6 +11213,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const skiffWheel = buildConsoleWheel(wheelRadius, wheelStub, true);
                 skiffWheel.position.set(0, wheelY, consoleFrontZ);
                 group.add(skiffWheel);
+                group.userData.helmWheel = skiffWheel;
                 // Minimal raked dash — one gauge and a couple of switches, no
                 // chartplotter. A flats skiff's whole appeal is being light and
                 // simple; a CC-style dash would look wrong here.
@@ -11157,9 +11259,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Captain's seat — same leaning post as the CC, same scale (already
                 // calibrated to the angler's real proportions), positioned behind
                 // the wheel where the captain actually stands.
-                const captainSeat = buildLeaningPost(0.9);
-                captainSeat.position.set(0, deckY, -0.5 * S - 0.36);
-                group.add(captainSeat);
+                // (the captain's chair is added below, once the wheel is placed: see helmSeat)
                 // Two stern bench seats, one each side — forward-facing (backrest on
                 // the aft side, same orientation principle as the CC's companion
                 // seats), positioned well clear of the poling platform, rod holders,
@@ -11319,6 +11419,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const wheel = buildConsoleWheel(wheelRadius, wheelStub);
                 wheel.position.set(0, wheelY, consoleFrontZ);
                 group.add(wheel);
+                group.userData.helmWheel = wheel;
                 // Dash — raked panel on top of the console block, angled back toward
                 // the captain, dominated by a chartplotter with gauges and switches
                 // beside it, offset to clear the wheel mounted just below.
@@ -11378,9 +11479,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 group.add(windshield);
                 // Leaning post: padded bolster the captain leans against while
                 // standing at the wheel, not a seat you sit in — matches reference photos.
-                const leaningPost = buildLeaningPost(0.9); // was scale S (1.8), making it 1.98 units tall — taller than the angler's entire 1.69-unit height. 0.9 gives ~1.0, a realistic waist-to-chest leaning height.
-                leaningPost.position.set(0, deckY, -0.1 * S);
-                group.add(leaningPost);
+                // (no leaning post any more: the captain sits in the helm chair added below)
                 // Grab rail removed — it was sitting between the leaning post and the
                 // wheel, right where the captain needs clear space.
                 // Companion seating forward of the console — between the helm and
@@ -12012,6 +12111,22 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     holder.rotation.x = 0.35;
                     group.add(holder);
                 });
+            }
+            {
+                const hw = group.userData.helmWheel; // the captain's chair: far enough behind the wheel that a seated driver can just reach the rim
+                if (hw) {
+                    const hub = hw.position.clone().add(hw.userData.hubOff), seatPos = new THREE.Vector3(hub.x, deckY, hub.z - 0.58);
+                    const frameMat = new THREE.MeshPhongMaterial({ color: 0x22262b, flatShading: true }), padMat = new THREE.MeshPhongMaterial({ color: 0x2f3a46, flatShading: true });
+                    const chair = new THREE.Group();
+                    chair.position.copy(seatPos);
+                    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); chair.add(m); return m; };
+                    add(new THREE.CylinderGeometry(0.07, 0.1, 0.32, 8), frameMat, 0, 0.16, 0);
+                    add(new THREE.CylinderGeometry(0.25, 0.25, 0.09, 12), padMat, 0, 0.375, 0);
+                    add(new THREE.BoxGeometry(0.46, 0.36, 0.07), padMat, 0, 0.64, -0.29);
+                    [-1, 1].forEach((sx) => add(new THREE.BoxGeometry(0.06, 0.05, 0.3), frameMat, sx * 0.28, 0.55, -0.05));
+                    group.add(chair);
+                    group.userData.helmSeat = { pos: seatPos, top: deckY + 0.42, hub, rim: hw.userData.rim, wheel: hw };
+                }
             }
             const addons = buildBoatAddons(def, R, group.userData.anchors, shell);
             group.add(addons); // the fittings this look has switched on
@@ -14580,6 +14695,71 @@ function DeepWaterPrototype({ onExit, newLook }) {
         renderer.domElement.addEventListener("wheel", onWheel, { passive: true });
         const clock = new THREE.Clock();
         // The rod-hand animation for an angler standing still (casting, bite, fight, landed): used by the captain on the boat and by the one on the dock.
+        // The captain at the helm: sits in the chair with both hands on the wheel while the boat is under way, and carries the rod on the back whenever no fishing is going on.
+        let capRestT = 0, capStow = 0, capSit = 0, walkRestT = 0, walkStow = 0, ashoreRestT = 0, ashoreStow = 0;
+        const _capInv = new THREE.Matrix4(), _capV = new THREE.Vector3();
+        function wrapAng(a) { while (a > Math.PI)
+            a -= Math.PI * 2; while (a < -Math.PI)
+            a += Math.PI * 2; return a; }
+        function captainPose(an, dt) {
+            const pr = an.userData.parts, fs = fishingState, grp = currentBoatGroup, hs = grp && grp.userData.helmSeat;
+            if (!pr || !pr.gearRoot || !grp)
+                return;
+            const busy = fs.mode !== "idle";
+            capRestT = busy ? 0 : capRestT + dt;
+            const wantStow = !busy && capRestT > 1.2, moving = Math.abs(boatSpeed) > 0.4 || Math.abs(throttle) > 0.04, wantSit = !!hs && wantStow && moving;
+            capStow += ((wantStow ? 1 : 0) - capStow) * Math.min(1, dt * (wantStow ? 4 : 12));
+            if (capStow < 0.003)
+                capStow = 0;
+            else if (capStow > 0.997)
+                capStow = 1;
+            capSit += ((wantSit ? 1 : 0) - capSit) * Math.min(1, dt * (wantSit ? 3.5 : 5));
+            if (capSit < 0.003)
+                capSit = 0;
+            else if (capSit > 0.997)
+                capSit = 1;
+            const hp = grp.userData.helmPosition, hy = grp.userData.helmRotationY || 0;
+            if (hp) {
+                const sp = hs ? hs.pos : hp, sy = hs ? hs.top - 0.567 : hp.y;
+                an.position.set(hp.x + (sp.x - hp.x) * capSit, hp.y + (sy - hp.y) * capSit, hp.z + (sp.z - hp.z) * capSit);
+                an.rotation.y = hy + wrapAng(-hy) * capStow; // fishing side-on to the water, driving square to the bow
+            }
+            charLegsPose(pr, { sit: capSit, amount: 0, phase: 0 });
+            charStowRod(pr, capStow);
+            if (hs && hs.wheel.userData.spins)
+                hs.wheel.rotation.z += (wheelAngle * 1.1 - hs.wheel.rotation.z) * Math.min(1, dt * 10);
+            [pr.armR, pr.armL].forEach((a) => { if (fs.mode !== "fighting") {
+                a.scale.y = 1;
+                a.position.copy(a.userData.restPosition);
+            } }); // (back to the hold the fishing code posed, then blended)
+            if (capStow > 0) {
+                an.updateMatrix();
+                _capInv.copy(an.matrix).invert();
+                const th = hs ? (hs.wheel.userData.spins ? hs.wheel.rotation.z : 0) : 0, ct = Math.cos(th), st = Math.sin(th);
+                [[pr.armR, 1], [pr.armL, -1]].forEach(([arm, side]) => {
+                    const tgt = charArmRelaxed(arm, side, 0);
+                    if (hs) {
+                        const r = hs.rim * 0.92, x = side * r, y = 0.16 * r;
+                        _capV.set(hs.hub.x + x * ct - y * st, hs.hub.y + x * st + y * ct, hs.hub.z).applyMatrix4(_capInv);
+                        tgt.lerp(_capV, Math.max(capSit, 0.85));
+                    } // (standing at the helm, the hands rest on the wheel too)
+                    charArmBlend(arm, tgt, capStow, 1.4);
+                });
+            }
+            charFixHands(pr);
+        }
+        function carryPose(pr, stow, swing, lap) {
+            charStowRod(pr, stow);
+            [pr.armR, pr.armL].forEach((a) => { if (fishingState.mode !== "fighting") {
+                a.scale.y = 1;
+                a.position.copy(a.userData.restPosition);
+            } }); // (back to the hold the fishing code posed, then blended)
+            if (stow > 0) {
+                charArmBlend(pr.armR, charArmRelaxed(pr.armR, 1, swing + lap), stow);
+                charArmBlend(pr.armL, charArmRelaxed(pr.armL, -1, -swing + lap), stow);
+            }
+            charFixHands(pr);
+        }
         function animateRodAngler(an, dt, t, keysNow) {
             const fs = fishingState;
             an.rotation.z = Math.sin(t * 0.8) * 0.03; // subtle idle sway, always on
@@ -15855,19 +16035,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         // phase per leg) — this replaces what was a static, sliding gait
                         // with actual footfalls.
                         if (parts && parts.legs) {
-                            const sitBendAngle = -sitAngle * (Math.PI / 2); // negative: legs swing toward +Z (forward), not -Z (backward)
-                            parts.legs.forEach((leg, i) => {
-                                const swingPhase = walkPhase + (i === 0 ? 0 : Math.PI);
-                                const walkSwingAngle = Math.sin(swingPhase) * 0.55 * walkCycleAmount * (1 - sitAngle);
-                                const totalAngle = sitBendAngle + walkSwingAngle;
-                                const cosB = Math.cos(totalAngle), sinB = Math.sin(totalAngle);
-                                const hip = leg.userData.hip;
-                                const restLocal = leg.userData.restPos.clone().sub(hip); // (0, -0.25, 0) relative to hip
-                                const rotatedLocal = new THREE.Vector3(restLocal.x, restLocal.y * cosB - restLocal.z * sinB, restLocal.y * sinB + restLocal.z * cosB);
-                                leg.position.copy(hip).add(rotatedLocal);
-                                const bendQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), totalAngle);
-                                leg.quaternion.copy(leg.userData.restQuat).premultiply(bendQuat);
-                            });
+                            charLegsPose(parts, { sit: sitAngle, amount: walkCycleAmount, phase: walkPhase }); // thighs, knees and the walk swing
                         }
                         // Stow the rod when inside the cabin — carrying a fishing rod
                         // through the salon doesn't make sense, so it's lowered and put
@@ -15949,10 +16117,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
                                 parts.reelBody.visible = toolVisible;
                             if (parts.crankGroup)
                                 parts.crankGroup.visible = toolVisible;
+                            const walkBusy = fs.mode !== "idle" || netEquipped || netThrowPhase !== "none";
+                            walkRestT = walkBusy ? 0 : walkRestT + dt;
+                            const wantWS = !walkBusy && walkRestT > 1.0;
+                            walkStow += ((wantWS ? 1 : 0) - walkStow) * Math.min(1, dt * (wantWS ? 4 : 12));
+                            if (walkStow < 0.003)
+                                walkStow = 0;
+                            else if (walkStow > 0.997)
+                                walkStow = 1;
+                            carryPose(parts, walkStow, Math.sin(walkPhase) * 0.5 * walkCycleAmount * (1 - sitAngle), sitAngle * 0.95);
                         }
                     }
                     else if (angler) {
                         animateRodAngler(angler, dt, t, keysNow);
+                        captainPose(angler, dt);
                     }
                     // Door animation — eases toward open/closed, runs regardless of walk
                     // mode since the door's state persists whether you're walking or driving.
@@ -16148,18 +16326,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         ashoreLeanX = ashoreAngler.rotation.x;
                     }
                     const ashoreParts = ashoreAngler.userData.parts;
-                    if (ashoreParts && ashoreParts.legs) {
-                        ashoreParts.legs.forEach((leg, i) => {
-                            const swingPhase = ashoreWalkPhase + (i === 0 ? 0 : Math.PI);
-                            const walkSwingAngle = Math.sin(swingPhase) * 0.55 * ashoreWalkCycleAmount;
-                            const cosB = Math.cos(walkSwingAngle), sinB = Math.sin(walkSwingAngle);
-                            const hip = leg.userData.hip;
-                            const restLocal = leg.userData.restPos.clone().sub(hip);
-                            const rotatedLocal = new THREE.Vector3(restLocal.x, restLocal.y * cosB - restLocal.z * sinB, restLocal.y * sinB + restLocal.z * cosB);
-                            leg.position.copy(hip).add(rotatedLocal);
-                            const bendQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), walkSwingAngle);
-                            leg.quaternion.copy(leg.userData.restQuat).premultiply(bendQuat);
-                        });
+                    if (ashoreParts && ashoreParts.legs)
+                        charLegsPose(ashoreParts, { sit: 0, amount: ashoreWalkCycleAmount, phase: ashoreWalkPhase });
+                    if (ashoreParts && ashoreParts.gearRoot) {
+                        ashoreRestT = fs.mode !== "idle" ? 0 : ashoreRestT + dt;
+                        const wantAS = fs.mode === "idle" && ashoreRestT > 1.0;
+                        ashoreStow += ((wantAS ? 1 : 0) - ashoreStow) * Math.min(1, dt * (wantAS ? 4 : 12));
+                        if (ashoreStow < 0.003)
+                            ashoreStow = 0;
+                        else if (ashoreStow > 0.997)
+                            ashoreStow = 1;
+                        carryPose(ashoreParts, ashoreStow, Math.sin(ashoreWalkPhase) * 0.5 * ashoreWalkCycleAmount, 0);
                     }
                     // Quest givers: the nearest one in reach can be talked to (E, or tap them).
                     let nearGiverNpc = null, nearGiverD = 2.8;

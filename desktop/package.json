@@ -1,7 +1,7 @@
 {
   "name": "charter-life-demo",
   "productName": "Charter Life Demo",
-  "version": "0.28",
+  "version": "0.29",
   "main": "main.js",
   "private": true,
   "description": "Charter Life desktop wrapper",
