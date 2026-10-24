@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.21", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.22", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "23 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -4681,7 +4681,7 @@ const FISH_LOOKS = {
         pat: [{ type: "spots", n: 26, r: 0.028, t0: 0.18, t1: 0.9, c0: -0.15, c1: 0.85, color: 0xdeaa80, a: 0.4 }, { type: "spots", n: 9, r: 0.055, t0: 0.25, t1: 0.88, c0: 0.1, c1: 0.9, color: 0x5e301c, a: 0.4 }, { type: "scales", a: 0.025 }],
         fins: [{ kind: "dorsal", t0: 0.22, t1: 0.52, h: 0.1, shape: "spiny", color: 0x93472a, edge: 0x6b3320 }, { kind: "dorsal", t0: 0.53, t1: 0.8, h: 0.115, shape: "soft", color: 0x9c4e2e },
             { kind: "anal", t0: 0.62, t1: 0.8, h: 0.09, shape: "lobe", color: 0xa5532f }, { kind: "pec", t: 0.2, len: 0.17, out: 0.08, drop: 0.08, base: 0.05, color: 0xb05e35 },
-            { kind: "pelvic", t: 0.28, len: 0.11, out: 0.05, drop: 0.08, color: 0xb05e35 }, { kind: "tail", style: "round", lobe: 0.16, span: 0.14, color: 0x90472a, edge: 0x3d2418 }],
+            { kind: "pelvic", t: 0.28, len: 0.11, out: 0.05, drop: 0.08, color: 0xb05e35 }, { kind: "tail", style: "trunc", lobe: 0.16, span: 0.14, color: 0x90472a, edge: 0x3d2418 }],
         eye: { t: 0.11, c: 0.2, r: 0.024, iris: 0xd09040 }, mouth: { end: 0.2, c: -0.1 },
     },
     "Amberjack": {
@@ -4739,8 +4739,8 @@ const FISH_LOOKS = {
         prof: [[0, 0, 0, 0, 0], [0.04, 0.06, 0.05, 0.035], [0.12, 0.14, 0.12, 0.072], [0.3, 0.185, 0.165, 0.088], [0.5, 0.19, 0.17, 0.09], [0.72, 0.13, 0.11, 0.063], [0.88, 0.06, 0.055, 0.034], [1, 0.045, 0.045, 0.027]],
         pal: { back: 0x5d97b5, flank: 0xbcd6de, belly: 0xf6f8f4 },
         pat: [{ type: "stripe", c0: 0.12, hw: 0.28, t0: 0.03, t1: 0.99, color: 0xf3c515, a: 0.97 }, { type: "spots", n: 14, r: 0.014, t0: 0.2, t1: 0.7, c0: -0.4, c1: -0.05, color: 0xf0d24a, a: 0.5 }, { type: "scales", a: 0.03 }],
-        fins: [{ kind: "dorsal", t0: 0.28, t1: 0.62, h: 0.1, shape: "soft", color: 0xe8ce46 }, { kind: "anal", t0: 0.6, t1: 0.74, h: 0.075, shape: "soft", color: 0xecd24a },
-            { kind: "pec", t: 0.2, len: 0.12, out: 0.05, drop: 0.06, color: 0xefd860 }, { kind: "pelvic", t: 0.27, len: 0.09, out: 0.04, drop: 0.08, color: 0xf0d234 },
+        fins: [{ kind: "dorsal", t0: 0.28, t1: 0.62, h: 0.1, shape: "soft", color: 0xe8ce46 }, { kind: "anal", t0: 0.6, t1: 0.74, h: 0.075, shape: "soft", color: 0xe8e8dc },
+            { kind: "pec", t: 0.2, len: 0.12, out: 0.05, drop: 0.06, color: 0xefd860 }, { kind: "pelvic", t: 0.27, len: 0.09, out: 0.04, drop: 0.08, color: 0xeeeee0 },
             { kind: "tail", style: "deep", lobe: 0.18, span: 0.17, notch: 0.5, color: 0xf0c424, edge: 0xd8a010 }],
         eye: { t: 0.09, c: 0.12, r: 0.026, iris: 0xe8a040 }, mouth: { end: 0.09 },
     },
@@ -4748,10 +4748,10 @@ const FISH_LOOKS = {
         len: 3.4, seed: 29,
         prof: [[0, 0, 0, 0, 0], [0.04, 0.07, 0.06, 0.04], [0.12, 0.17, 0.15, 0.09], [0.3, 0.235, 0.22, 0.115], [0.5, 0.245, 0.225, 0.12], [0.7, 0.18, 0.15, 0.09], [0.88, 0.085, 0.075, 0.045], [1, 0.06, 0.06, 0.035]],
         pal: { back: 0x8e7a50, flank: 0xd78a66, belly: 0xf4dccb },
-        pat: [{ type: "stripe", c0: -0.12, hw: 0.14, t0: 0.03, t1: 0.17, color: 0x3f8ccc, a: 0.95 }, { type: "spots", list: [[0.58, 0.55, 0.035]], color: 0x2a1c14, a: 0.95 }, { type: "scales", a: 0.04 }],
+        pat: [{ type: "stripe", c0: -0.12, hw: 0.14, t0: 0.03, t1: 0.17, color: 0x3f8ccc, a: 0.95 }, { type: "stripe", c0: 0.02, hw: 0.08, t0: 0.05, t1: 0.2, color: 0x3f8ccc, a: 0.7 }, { type: "spots", list: [[0.58, 0.55, 0.035]], color: 0x2a1c14, a: 0.95 }, { type: "scales", a: 0.04 }],
         fins: [{ kind: "dorsal", t0: 0.26, t1: 0.56, h: 0.11, shape: "spiny", color: 0xc6704a }, { kind: "dorsal", t0: 0.57, t1: 0.73, h: 0.1, shape: "soft", color: 0xcf6d46 },
             { kind: "anal", t0: 0.6, t1: 0.74, h: 0.085, shape: "soft", color: 0xd45a3a }, { kind: "pec", t: 0.2, len: 0.14, out: 0.06, drop: 0.07, color: 0xd9724e },
-            { kind: "pelvic", t: 0.28, len: 0.1, out: 0.05, drop: 0.09, color: 0xd9553a }, { kind: "tail", style: "fork", lobe: 0.16, span: 0.15, notch: 0.62, color: 0xc4603f, edge: 0x8a3a24 }],
+            { kind: "pelvic", t: 0.28, len: 0.1, out: 0.05, drop: 0.09, color: 0xd9553a }, { kind: "tail", style: "deep", lobe: 0.16, span: 0.16, notch: 0.5, color: 0xc4603f, edge: 0x1f1210 }],
         eye: { t: 0.09, c: 0.12, r: 0.026, iris: 0xd06a40 }, mouth: { end: 0.1 },
     },
     "Gag Grouper": {
@@ -4761,7 +4761,7 @@ const FISH_LOOKS = {
         pat: [{ type: "spots", n: 40, r: 0.026, t0: 0.15, t1: 0.92, c0: -0.15, c1: 0.9, color: 0x35312a, a: 0.6 }, { type: "spots", n: 6, r: 0.06, t0: 0.25, t1: 0.85, c0: 0.2, c1: 0.9, color: 0x403b32, a: 0.4 }, { type: "scales", a: 0.025 }],
         fins: [{ kind: "dorsal", t0: 0.22, t1: 0.52, h: 0.1, shape: "spiny", color: 0x6b6555, edge: 0x1c1a16 }, { kind: "dorsal", t0: 0.53, t1: 0.8, h: 0.11, shape: "soft", color: 0x716b5a, edge: 0x1c1a16 },
             { kind: "anal", t0: 0.64, t1: 0.8, h: 0.085, shape: "lobe", color: 0x6e6858, edge: 0x1c1a16 }, { kind: "pec", t: 0.2, len: 0.17, out: 0.08, drop: 0.08, base: 0.05, color: 0x7a7361, edge: 0x2a2822 },
-            { kind: "pelvic", t: 0.28, len: 0.11, out: 0.05, drop: 0.08, color: 0x6e6858 }, { kind: "tail", style: "trunc", lobe: 0.16, span: 0.15, color: 0x5f5949, edge: 0x15130f }],
+            { kind: "pelvic", t: 0.28, len: 0.11, out: 0.05, drop: 0.08, color: 0x6e6858 }, { kind: "tail", style: "trunc", lobe: 0.16, span: 0.15, color: 0x7a7464, edge: 0x15130f }],
         eye: { t: 0.11, c: 0.2, r: 0.022, iris: 0xc8a050 }, mouth: { end: 0.21, c: -0.1 },
     },
     "King Mackerel": {
@@ -4791,8 +4791,8 @@ const FISH_LOOKS = {
         pal: { back: 0x486f78, flank: 0xbcc58c, belly: 0xeaecd2 },
         pat: [{ type: "spots", list: [[0.2, 0.15, 0.03], [0.25, -0.45, 0.02]], color: 0x15191a, a: 0.95 }, { type: "scales", a: 0.06 }],
         fins: [{ kind: "dorsal", t0: 0.3, t1: 0.42, h: 0.09, shape: "spiny", color: 0x4a6b70 }, { kind: "dorsal", t0: 0.48, t1: 0.74, h: 0.13, shape: "lobe", color: 0x5c8085 },
-            { kind: "anal", t0: 0.56, t1: 0.74, h: 0.1, shape: "lobe", color: 0xb2b87c }, { kind: "pec", t: 0.23, len: 0.2, out: 0.06, drop: 0.09, base: 0.05, color: 0xc2c88c },
-            { kind: "pelvic", t: 0.3, len: 0.08, out: 0.04, drop: 0.08, color: 0xd5d8a4 }, { kind: "tail", style: "deep", lobe: 0.2, span: 0.24, notch: 0.4, color: 0x6c8c88, edge: 0x2f4a4a }],
+            { kind: "anal", t0: 0.56, t1: 0.74, h: 0.1, shape: "falcate", color: 0xe0c030, edge: 0xc8a820 }, { kind: "pec", t: 0.23, len: 0.22, out: 0.06, drop: 0.09, base: 0.05, color: 0xc2c88c },
+            { kind: "pelvic", t: 0.3, len: 0.08, out: 0.04, drop: 0.08, color: 0xeeeeda }, { kind: "tail", style: "deep", lobe: 0.2, span: 0.24, notch: 0.4, color: 0xc8b44a, edge: 0x2a3a30 }],
         eye: { t: 0.1, c: 0.15, r: 0.026, iris: 0xe0c070 }, mouth: { end: 0.14, c: -0.1 },
     },
     "Flounder": {
@@ -5231,7 +5231,7 @@ const SEA_SPECIES = (() => {
             desc: "A long, silver-green predator with an underslung jaw full of fangs, dark blotches along the lower sides and a forked tail. It lies still, then strikes in a blur.",
             look: { len: 5.0, seed: 119, prof: FP.slender, pal: { back: 0x4f5f5a, flank: 0xaebbb8, belly: 0xeef2ee },
                 pat: [fn.bars([0.35, 0.42, 0.49, 0.56, 0.63], 0.014, 0.1, 0x2a302e, 0.5, -0.1), fn.dots(14, 0.012, 0.3, 0.8, -0.35, 0.1, 0x2a302e, 0.6), fn.scl(0.05)],
-                fins: [fn.dor(0.4, 0.47, 0.05, "spiny", 0x4a5652, 0x2a302e), fn.dor(0.68, 0.76, 0.05, "soft", 0x4a5652), fn.ana(0.68, 0.76, 0.05, "soft", 0x9aa8a4), fn.pec(0.22, 0.08, 0.03, 0.04, 0x8a9894), fn.pel(0.45, 0.05, 0.02, 0.04, 0x9aa8a4), fn.tail("lunate", 0.12, 0.15, 0.45, 0x3a4642, 0xd8dcd8)],
+                fins: [fn.dor(0.4, 0.47, 0.05, "spiny", 0x4a5652, 0x2a302e), fn.dor(0.68, 0.76, 0.06, "soft", 0x2e2a3c, 0xe4e6ea), fn.ana(0.68, 0.76, 0.06, "soft", 0x2e2a3c, 0xe4e6ea), fn.pec(0.22, 0.08, 0.03, 0.04, 0x6a7470), fn.pel(0.45, 0.05, 0.02, 0.04, 0x9aa8a4), fn.tail("lunate", 0.12, 0.15, 0.45, 0x2e2a3c, 0xe4e6ea)],
                 eye: { t: 0.1, c: 0.2, r: 0.014, iris: 0xd8c060 }, mouth: { end: 0.2, c: -0.3 } } },
         { n: "Atlantic Spadefish", hex: 0xa7b3b3, L: 1.5, w: [1, 8], zone: "wreck", pull: [8, 14], bw: 0.8, dr: 1.2, ri: 1.0, d0: 1.0, cd: [2.0, 3.4], mk: [{ type: "verticalBars", color: 0x2a3236 }],
             fight: ["Runner", 0.8, 1.0, 0, 0.4, 0.15, false, "flat-sided, uses its whole body as a sail"], px: 1.8,
@@ -5239,8 +5239,8 @@ const SEA_SPECIES = (() => {
             how: "Small pieces of clam, shrimp or small jellyfish near wrecks. It is a strong fighter for its size because of its flat body.",
             desc: "A tall, silver, disc-shaped fish with several dark vertical bars and the long, trailing dorsal and anal tips that give it its name.",
             look: { len: 2.7, seed: 120, prof: FP.disc, pal: { back: 0x808c90, flank: 0xc8d0d0, belly: 0xeef0ee },
-                pat: [fn.bars([0.16, 0.32, 0.5, 0.66], 0.04, 0.0, 0x2a3236, 0.75, -0.9), fn.scl(0.04)],
-                fins: [fn.dor(0.2, 0.6, 0.2, "sail", 0x5a666a, 0x2a3236), fn.ana(0.5, 0.76, 0.2, "sail", 0x5a666a, 0x2a3236), fn.pec(0.2, 0.1, 0.04, 0.04, 0x8a9498), fn.pel(0.28, 0.12, 0.03, 0.08, 0x2a3236), fn.tail("trunc", 0.12, 0.14, undefined, 0x6a767a, 0x2a3236)],
+                pat: [fn.bars([0.095, 0.25, 0.42, 0.59, 0.82], 0.035, 0.0, 0x2a3236, 0.75, -0.9), fn.scl(0.04)],
+                fins: [fn.dor(0.22, 0.62, 0.3, "falcate", 0x5a666a, 0x2a3236), fn.ana(0.48, 0.78, 0.3, "falcate", 0x5a666a, 0x2a3236), fn.pec(0.2, 0.1, 0.04, 0.04, 0x8a9498), fn.pel(0.28, 0.12, 0.03, 0.08, 0x2a3236), fn.tail("trunc", 0.12, 0.14, undefined, 0x6a767a, 0x2a3236)],
                 eye: { t: 0.09, c: 0.15, r: 0.026, iris: 0x808878 }, mouth: { end: 0.06, c: -0.2 } } },
         // ---- the offshore ledges and wrecks: big snappers, groupers and jacks ----
         { n: "Vermilion Snapper", hex: 0xd9806c, L: 1.3, w: [0.5, 3], zone: "deepSea", pull: [7, 11], bw: 0.8, dr: 1.5, ri: 0.9, d0: 1.4, cd: [1.8, 3.0], mk: [{ type: "stripe", color: 0xe8b070, thickness: 0.05, opacity: 0.4 }],
@@ -5249,8 +5249,8 @@ const SEA_SPECIES = (() => {
             how: "Small cut baits or a bank of small hooks near the bottom on a ledge. A good fish for a first run offshore.",
             desc: "A slim red snapper with a bright vermilion back, a silvery pink belly and red eyes; often called a beeliner.",
             look: { len: 2.9, seed: 121, prof: FP.snap, pal: { back: 0xc2604a, flank: 0xe9a090, belly: 0xf6e8e0 },
-                pat: [fn.band(0.3, 0.06, 0.1, 0.9, 0xe8b070, 0.35), fn.band(0.08, 0.06, 0.1, 0.9, 0xe8b070, 0.3), fn.scl(0.04)],
-                fins: [fn.dor(0.27, 0.58, 0.1, "spiny", 0xc86a52, 0xe8b070), fn.dor(0.59, 0.74, 0.09, "soft", 0xd07a62), fn.ana(0.6, 0.74, 0.075, "soft", 0xe08a78), fn.pec(0.2, 0.12, 0.05, 0.06, 0xe89a88), fn.pel(0.27, 0.09, 0.04, 0.08, 0xe88a78), fn.tail("fork", 0.15, 0.14, 0.6, 0xc4604a, 0x8a3a2a)],
+                pat: [fn.band(0.34, 0.07, 0.15, 0.9, 0x7ab0d8, 0.3), fn.band(0.1, 0.06, 0.1, 0.9, 0xe8c070, 0.3), fn.scl(0.04)],
+                fins: [fn.dor(0.27, 0.58, 0.1, "spiny", 0xc86a52, 0xe8b070), fn.dor(0.59, 0.74, 0.09, "soft", 0xd07a62), fn.ana(0.6, 0.74, 0.075, "soft", 0xe08a78), fn.pec(0.2, 0.12, 0.05, 0.06, 0xe89a88), fn.pel(0.27, 0.09, 0.04, 0.08, 0xe88a78), fn.tail("fork", 0.15, 0.14, 0.6, 0xc4604a, 0x1f1410)],
                 eye: { t: 0.09, c: 0.12, r: 0.027, iris: 0xd03a2a }, mouth: { end: 0.09 } } },
         { n: "Red Snapper", hex: 0xd66a58, L: 2.2, w: [3, 25], zone: "deepSea", pull: [15, 24], bw: 0.9, dr: 1.0, ri: 1.2, d0: 0.8, cd: [2.0, 3.4], mk: [{ type: "stripe", color: 0xe88a78, thickness: 0.06, opacity: 0.4 }],
             fight: ["Diver", 1.0, 1.1, 0, 0.5, 0.4, false, "a strong dive, then dead weight"], px: 3.8,
@@ -5259,7 +5259,7 @@ const SEA_SPECIES = (() => {
             desc: "A deep-bodied, brilliant red fish with a pinkish belly, a sloped forehead and bright red eyes. The most sought-after snapper of the Gulf.",
             look: { len: 3.4, seed: 122, prof: FP.snap, pal: { back: 0xb04a3a, flank: 0xd66a58, belly: 0xf2d8cc },
                 pat: [fn.head(0.25, 0xc85a4a, 0.4), fn.scl(0.05)],
-                fins: [fn.dor(0.24, 0.72, 0.11, "spiny", 0xc85a4a, 0xe88a78), fn.ana(0.6, 0.74, 0.09, "soft", 0xd87a68), fn.pec(0.2, 0.14, 0.06, 0.07, 0xe08a78), fn.pel(0.27, 0.1, 0.05, 0.09, 0xd86a58), fn.tail("round", 0.15, 0.15, undefined, 0xc04a3a, 0x7a2a20)],
+                fins: [fn.dor(0.24, 0.72, 0.11, "spiny", 0xc85a4a, 0xe88a78), fn.ana(0.6, 0.74, 0.09, "soft", 0xd87a68), fn.pec(0.2, 0.14, 0.06, 0.07, 0xe08a78), fn.pel(0.27, 0.1, 0.05, 0.09, 0xd86a58), fn.tail("trunc", 0.15, 0.15, undefined, 0xc04a3a, 0x7a2a20)],
                 eye: { t: 0.1, c: 0.14, r: 0.026, iris: 0xd02a20 }, mouth: { end: 0.11 } } },
         { n: "Scamp", hex: 0x8a6f50, L: 2.2, w: [2, 12], zone: "deepSea", pull: [14, 22], bw: 0.9, dr: 1.0, ri: 1.4, d0: 0.4, cd: [2.2, 3.8], mk: [{ type: "blotches", color: 0x5a4228 }],
             fight: ["Diver", 0.7, 1.15, 0, 0.3, 0.4, false, "explodes for the ledge the moment it is hooked"], px: 4.2,
@@ -5277,7 +5277,7 @@ const SEA_SPECIES = (() => {
             desc: "A big, olive-brown grouper with dark rectangular blotches, pale bronze spots and a squared-off tail with a pale margin.",
             look: { len: 4.6, seed: 124, prof: FP.stout, pal: { back: 0x3f423c, flank: 0x6b6a58, belly: 0xc0bda8 },
                 pat: [fn.dots(9, 0.06, 0.25, 0.85, 0.1, 0.9, 0x2a2c26, 0.55), fn.dots(26, 0.02, 0.15, 0.9, -0.15, 0.9, 0x8a7050, 0.45), fn.scl(0.025)],
-                fins: [fn.dor(0.22, 0.52, 0.1, "spiny", 0x4a4c44, 0x1c1c18), fn.dor(0.53, 0.8, 0.11, "soft", 0x50524a, 0x1c1c18), fn.ana(0.64, 0.8, 0.085, "lobe", 0x4a4c44, 0x1c1c18), fn.pec(0.2, 0.17, 0.08, 0.08, 0x5a5a4c, 0x2a2a22), fn.pel(0.28, 0.11, 0.05, 0.08, 0x4a4c44), fn.tail("trunc", 0.16, 0.16, undefined, 0x3f423c, 0xb8b49c)],
+                fins: [fn.dor(0.22, 0.52, 0.1, "spiny", 0x4a4c44, 0x1c1c18), fn.dor(0.53, 0.8, 0.11, "soft", 0x50524a, 0x1c1c18), fn.ana(0.64, 0.8, 0.085, "lobe", 0x4a4c44, 0x1c1c18), fn.pec(0.2, 0.17, 0.08, 0.08, 0x5a5a4c), fn.pel(0.28, 0.11, 0.05, 0.08, 0x4a4c44), fn.tail("trunc", 0.16, 0.16, undefined, 0x3f423c, 0xb8b49c)],
                 eye: { t: 0.11, c: 0.2, r: 0.02, iris: 0xc8a050 }, mouth: { end: 0.22, c: -0.1 } } },
         { n: "Almaco Jack", hex: 0x84939a, L: 2.8, w: [5, 30], zone: "deepSea", pull: [20, 30], bw: 1.1, dr: 0.8, ri: 1.2, d0: 0.5, cd: [1.6, 3.0], mk: [{ type: "diagonalEyeStripe", color: 0x1f2a2f }],
             fight: ["Grinder", 1.0, 1.05, 0, 1.0, 0.4, true, "won't quit; wears you down"], px: 1.8,
