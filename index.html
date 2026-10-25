@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.32", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.33", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "25 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -10926,12 +10926,27 @@ function DeepWaterPrototype({ onExit, newLook }) {
             group.add(armR);
             return group;
         }
-        // A gunwale-mounted rod holder: an angled tube any fishing boat needs.
-        function buildRodHolder(scale, mat) {
+        // A flush-mount rod holder: a flanged base plate sunk into whatever it sits on
+        // (origin = the mounting surface), with a tube that leans on a pivot above it.
+        // tiltZ leans it sideways (positive = toward -x), tiltX fore/aft.
+        function buildRodHolder(scale, mat, tiltZ, tiltX) {
             const holderMat = mat || new THREE.MeshPhongMaterial({ color: 0x2b2f33 });
-            const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * scale, 0.045 * scale, 0.32 * scale, 10), holderMat);
-            holder.rotation.z = 0.35; // angled outward, not standing straight up
-            return holder;
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.085 * scale, 0.095 * scale, 0.07 * scale, 14), holderMat);
+            base.position.y = 0.005 * scale; // half sunk, so there's never a crack under it
+            group.add(base);
+            const pivot = new THREE.Group();
+            pivot.position.y = 0.0;
+            pivot.rotation.z = tiltZ || 0;
+            pivot.rotation.x = tiltX || 0;
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.055 * scale, 0.36 * scale, 12), holderMat);
+            tube.position.y = 0.17 * scale; // starts below the base top, so it's welded in
+            pivot.add(tube);
+            const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.066 * scale, 0.066 * scale, 0.03 * scale, 12), holderMat);
+            lip.position.y = 0.345 * scale;
+            pivot.add(lip);
+            group.add(pivot);
+            return group;
         }
         function buildCooler(scale) {
             const group = new THREE.Group();
@@ -11465,9 +11480,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Rod holders mount on the raised side deck (the actual gunwale
                 // level), well inside its width so they can't overhang either.
                 [-1, 1].forEach((side) => {
-                    const holder = buildRodHolder(S);
-                    holder.position.set(side * def.beam * 0.3, p.raisedY + 0.15 * S, -def.length * 0.1);
-                    holder.rotation.z = side * 0.4;
+                    const holder = buildRodHolder(S, null, -side * 0.26);
+                    holder.position.set(side * def.beam * 0.3, p.raisedY, -def.length * 0.1);
                     group.add(holder);
                 });
                 // Captain's seat — same leaning post as the CC, same scale (already
@@ -11721,9 +11735,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 group.userData.cooler = { x: ccCoolerX, y: deckY, z: ccCoolerZ };
                 group.userData.coolerMesh = cooler;
                 [-1, 1].forEach((side) => {
-                    const holder = buildRodHolder(S);
-                    holder.position.set(side * def.beam * 0.44, deckY + 0.55 * S, -def.length * 0.2);
-                    holder.rotation.z = side * 0.4;
+                    const holder = buildRodHolder(S, null, -side * 0.26);
+                    holder.position.set(side * def.beam * 0.44, deckY + 0.3 * S, -def.length * 0.2);
                     group.add(holder);
                 });
                 // Raised bow casting deck, a bow rail around it, and an anchor locker
@@ -12036,12 +12049,19 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // slightly, so using the station's own wider value would have left
                 // it floating about 0.1 units outside the actual wall.
                 const windowMat = new THREE.MeshPhongMaterial({ color: 0x1a2a33, transparent: true, opacity: 0.7 });
+                const windowFrameMat = new THREE.MeshPhongMaterial({ color: 0xb8c0c4 });
                 [backZ + 0.5 * S, mid1Z, mid2Z].forEach((z) => {
                     const w = stage1WidthAt(z);
                     [-1, 1].forEach((side) => {
                         const win = new THREE.Mesh(new BoatRBox(0.02 * S, 0.32 * S, 0.55 * S), windowMat);
                         win.position.set(side * w, cabinCenterY + 0.15 * S, z);
                         group.add(win);
+                        // a slim aluminium frame, a little proud of the glass, so the window reads as set into the wall
+                        [[0.035, 0.04, 0.62, 0, 0.18, 0], [0.035, 0.04, 0.62, 0, -0.18, 0], [0.035, 0.36, 0.04, 0, 0, 0.29], [0.035, 0.36, 0.04, 0, 0, -0.29]].forEach(([fx, fy, fz, ox, oy, oz]) => {
+                            const fr = new THREE.Mesh(new BoatRBox(fx * S, fy * S, fz * S), windowFrameMat);
+                            fr.position.set(side * w, cabinCenterY + 0.15 * S + oy * S, z + oz * S);
+                            group.add(fr);
+                        });
                     });
                 });
                 // Door — on the BACK wall (facing aft, toward the cockpit), matching
@@ -12081,6 +12101,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const setteeCushion = new THREE.Mesh(new BoatRBox(setteeDepth, 0.18 * S, setteeLen), setteeMat);
                 setteeCushion.position.set(setteeX, interiorFloorY + 0.22 * S, setteeCenterZ);
                 group.add(setteeCushion);
+                // the settee's boxed-in base, so the cushion sits on something instead of hovering over the cabin sole
+                const setteeBase = new THREE.Mesh(new BoatRBox(setteeDepth * 0.96, 0.17 * S, setteeLen * 0.98), new THREE.MeshPhongMaterial({ color: 0x4a3a2c }));
+                setteeBase.position.set(setteeX, interiorFloorY + 0.075 * S, setteeCenterZ);
+                group.add(setteeBase);
                 const setteeBack = new THREE.Mesh(new BoatRBox(0.12 * S, 0.4 * S, setteeLen), setteeMat);
                 setteeBack.position.set(setteeX - setteeDepth / 2 + 0.06 * S, interiorFloorY + 0.5 * S, setteeCenterZ);
                 group.add(setteeBack);
@@ -12194,38 +12218,43 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const towerFrontZ = flyFrontZ - 0.3 * S;
                 const towerBackZ = flyBackZ + 0.5 * S;
                 const towerLegHeight = 2.6 * S;
-                const towerLegGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, towerLegHeight, 14);
                 const towerLegBaseY = flyFloorTopY;
                 const towerLegTopY = towerLegBaseY + towerLegHeight;
-                [[-towerLegX, towerFrontZ], [towerLegX, towerFrontZ], [-towerLegX, towerBackZ], [towerLegX, towerBackZ]].forEach(([dx, tz]) => {
-                    const leg = new THREE.Mesh(towerLegGeo, towerMat);
-                    leg.position.set(dx, towerLegBaseY + towerLegHeight / 2, tz);
-                    group.add(leg);
+                // The legs lean in toward the top, like a real tuna tower, so every leg lands on the
+                // platform instead of ending in the air beside it. towerLegAt(corner, t) is the point
+                // on a leg t of the way up (0 = flybridge floor, 1 = the platform).
+                const towerTopZ = (towerFrontZ + towerBackZ) / 2, towerTopInX = 1.15 * S * 0.62, towerTopInZ = 0.5 * S;
+                const towerLegAt = (dx, tz, t) => {
+                    const topX = Math.sign(dx) * towerTopInX, topZ = towerTopZ + Math.sign(tz - towerTopZ) * towerTopInZ;
+                    return new THREE.Vector3(dx + (topX - dx) * t, towerLegBaseY - 0.04 * S + (towerLegHeight + 0.04 * S) * t, tz + (topZ - tz) * t);
+                };
+                const towerLegDefs = [[-towerLegX, towerFrontZ], [towerLegX, towerFrontZ], [-towerLegX, towerBackZ], [towerLegX, towerBackZ]];
+                towerLegDefs.forEach(([dx, tz]) => {
+                    group.add(limbBetween(towerLegAt(dx, tz, 0), towerLegAt(dx, tz, 1.0), 0.06 * S, 0.055 * S, towerMat));
                 });
                 // Cross-bracing — diagonal struts between adjacent legs, the detail
                 // that makes a tuna tower read as a real structural frame.
                 const braceMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
-                const braceMidY = towerLegBaseY + towerLegHeight * 0.45;
-                const towerCorners = {
-                    fl: new THREE.Vector3(-towerLegX, 0, towerFrontZ), fr: new THREE.Vector3(towerLegX, 0, towerFrontZ),
-                    bl: new THREE.Vector3(-towerLegX, 0, towerBackZ), br: new THREE.Vector3(towerLegX, 0, towerBackZ),
-                };
-                [["fl", "fr"], ["bl", "br"], ["fl", "bl"], ["fr", "br"]].forEach(([a, b]) => {
-                    const pa = towerCorners[a], pb = towerCorners[b];
-                    group.add(limbBetween(new THREE.Vector3(pa.x, braceMidY, pa.z), new THREE.Vector3(pb.x, towerLegBaseY + 0.15 * S, pb.z), 0.025 * S, 0.025 * S, braceMat));
-                    group.add(limbBetween(new THREE.Vector3(pb.x, braceMidY, pb.z), new THREE.Vector3(pa.x, towerLegBaseY + 0.15 * S, pa.z), 0.025 * S, 0.025 * S, braceMat));
+                const tLow = 0.2 / 2.6, tMid = 0.45;
+                const [cFL, cFR, cBL, cBR] = towerLegDefs.map(([dx, tz]) => ({ dx, tz }));
+                [[cFL, cFR], [cBL, cBR], [cFL, cBL], [cFR, cBR]].forEach(([pa, pb]) => {
+                    group.add(limbBetween(towerLegAt(pa.dx, pa.tz, tMid), towerLegAt(pb.dx, pb.tz, tLow), 0.025 * S, 0.025 * S, braceMat));
+                    group.add(limbBetween(towerLegAt(pb.dx, pb.tz, tMid), towerLegAt(pa.dx, pa.tz, tLow), 0.025 * S, 0.025 * S, braceMat));
                 });
-                // Ladder up the aft face.
+                // Ladder up the aft face, parallel to the leaning back legs and running right up under the platform.
                 const ladderMat = new THREE.MeshPhongMaterial({ color: 0xb0b0b0 });
+                const ladAt = (dx, t) => {
+                    const bz = towerBackZ - 0.05 * S, tz = towerTopZ - towerTopInZ + 0.12 * S;
+                    return new THREE.Vector3(dx * S, towerLegBaseY + (towerLegHeight + 0.02 * S) * t, bz + (tz - bz) * t);
+                };
                 [-0.25, 0.25].forEach((dx) => {
-                    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * S, 0.02 * S, towerLegHeight * 0.9, 14), ladderMat);
-                    rail.position.set(dx * S, towerLegBaseY + towerLegHeight * 0.45, towerBackZ - 0.05 * S);
-                    group.add(rail);
+                    group.add(limbBetween(ladAt(dx, 0), ladAt(dx, 1), 0.02 * S, 0.02 * S, ladderMat));
                 });
-                for (let i = 0; i < 6; i++) {
-                    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 14), ladderMat);
+                for (let i = 0; i < 7; i++) {
+                    const t = (i + 0.6) / 7.4, c = ladAt(0, t);
+                    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.52 * S, 14), ladderMat);
                     rung.rotation.z = Math.PI / 2;
-                    rung.position.set(0, towerLegBaseY + 0.15 * S + i * (towerLegHeight * 0.75 / 6), towerBackZ - 0.05 * S);
+                    rung.position.copy(c);
                     group.add(rung);
                 }
                 // Upper platform + electronics.
@@ -12319,10 +12348,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // fights fish from.
                 const rodHolderMat = new THREE.MeshPhongMaterial({ color: 0x2b2f33 });
                 [-0.35, -0.12, 0.12, 0.35].forEach((frac) => {
-                    const holder = buildRodHolder(S, rodHolderMat);
-                    holder.position.set(frac * def.beam, deckY + 0.35 * S, -def.length * 0.42);
-                    holder.rotation.z = 0;
-                    holder.rotation.x = 0.35;
+                    const holder = buildRodHolder(S, rodHolderMat, 0, -0.35);
+                    holder.position.set(frac * def.beam, deckY, -def.length * 0.42);
                     group.add(holder);
                 });
             }
@@ -12337,7 +12364,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     add(new THREE.CylinderGeometry(0.07, 0.1, 0.32, 14), frameMat, 0, 0.16, 0);
                     add(new THREE.CylinderGeometry(0.25, 0.25, 0.09, 14), padMat, 0, 0.375, 0);
                     add(new BoatRBox(0.46, 0.36, 0.07), padMat, 0, 0.64, -0.29);
-                    [-1, 1].forEach((sx) => add(new BoatRBox(0.06, 0.05, 0.3), frameMat, sx * 0.28, 0.55, -0.05));
+                    add(new BoatRBox(0.08, 0.2, 0.06), frameMat, 0, 0.45, -0.275); // the strut that ties the backrest to the seat
+                    [-1, 1].forEach((sx) => {
+                        add(new BoatRBox(0.06, 0.05, 0.3), frameMat, sx * 0.25, 0.55, -0.15); // armrest runs into the backrest
+                        add(new BoatRBox(0.045, 0.17, 0.045), frameMat, sx * 0.25, 0.47, -0.03); // its post sits on the seat edge
+                    });
                     group.add(chair);
                     group.userData.helmSeat = { pos: seatPos, top: deckY + 0.42, hub, rim: hw.userData.rim, wheel: hw };
                 }
