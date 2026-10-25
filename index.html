@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.30", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.31", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "24 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -12330,6 +12330,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         let walkHeading = 0;
         // ---------- Docking: ease the hull alongside the marina dock, tie off, step out; cast off again later ----------
         let dockAnim = null; // while the boat is being eased in or away: { kind, path, fromH, toX, toZ, toH, t, dur }
+        let undockHold = false; // set when casting off: the Dock button stays hidden until the boat has left the dock zone once
         let dockBerth = null; // where the boat is tied up: { x, z, h, side } (side = which side of the walkway: -1 west, +1 east)
         let boatBump = 0; // hull-knock shake, fades out
         let bumpToastT = 0;
@@ -12372,7 +12373,19 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 }
                 fs.docked = false;
                 shopOpen = false;
-                dockAnim = { kind: "undock", path: [{ x: boatPos.x, z: boatPos.z }, { x: boatPos.x + dockBerth.side * 5, z: boatPos.z }], fromH: boatHeading, toX: boatPos.x + dockBerth.side * 5, toZ: boatPos.z, toH: boatHeading, t: 0, dur: 1.4 };
+                // Push off far enough to clear the dock zone, so the Dock button does not pop straight back up over the throttle. Go as far out to the side as the water is clear.
+                const sd = dockBerth.side, hcU = hullCapsule(boatDef.length, boatDef.beam);
+                let push = 5;
+                for (let d = 6; d <= 60; d++) {
+                    const x1 = boatPos.x + sd * d;
+                    if (hullHitsRects(x1, boatPos.z, boatHeading, hcU, DOCK_RECTS) || hullHitsDiscs(x1, boatPos.z, boatHeading, hcU, SOLID_DISCS) || hullHitsTerrain(x1, boatPos.z, boatHeading, hcU, isTerrainAt))
+                        break;
+                    push = d;
+                    if (Math.abs(boatPos.x + sd * d - dockX) >= 27)
+                        break;
+                }
+                undockHold = true;
+                dockAnim = { kind: "undock", path: [{ x: boatPos.x, z: boatPos.z }, { x: boatPos.x + sd * push, z: boatPos.z }], fromH: boatHeading, toX: boatPos.x + sd * push, toZ: boatPos.z, toH: boatHeading, t: 0, dur: 1.4 + (push - 5) / 14 };
                 marineShowToast("⛵ Casting off", "#8fd9e6", 2);
                 return;
             }
@@ -15888,8 +15901,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         ds = dockAnim.kind === "dock" ? "docking" : "undocking";
                     else if (fs.docked)
                         ds = "docked";
-                    else if (!ashoreMode && dockNearZone())
-                        ds = Math.abs(boatSpeed) > DOCK_MAX_SPEED ? "fast" : "near";
+                    else if (!ashoreMode && dockNearZone()) {
+                        if (!undockHold)
+                            ds = Math.abs(boatSpeed) > DOCK_MAX_SPEED ? "fast" : "near";
+                    }
+                    if (undockHold && !dockAnim && !fs.docked && !dockNearZone())
+                        undockHold = false;
                     if (ds !== prevDockUi) {
                         prevDockUi = ds;
                         setUiDock(ds);

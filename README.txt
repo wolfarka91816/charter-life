@@ -1,4 +1,4 @@
-Charter Life Demo  -  app package  (build 0.30, demo)
+Charter Life Demo  -  app package  (build 0.31, demo)
 
 THREE WAYS TO RUN IT
 ====================
