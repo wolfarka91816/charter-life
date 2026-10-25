@@ -49,8 +49,8 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.31", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "24 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    version: "0.32", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "25 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
@@ -209,32 +209,21 @@ function boatPolyHalfWidth(z, L, B) {
     return 0;
 }
 function boatPlanner(L, B) {
-    const xs = [-L, -0.55 * L, -0.05 * L, 0.55 * L, 0.86 * L, L], ys = [0.85 * B, B, B, 0.55 * B, 0.27 * B, 0];
-    const n = xs.length, h = [], d = [], m = new Array(n).fill(0);
-    for (let i = 0; i < n - 1; i++) {
-        h[i] = xs[i + 1] - xs[i];
-        d[i] = (ys[i + 1] - ys[i]) / h[i];
-    }
-    for (let i = 1; i < n - 1; i++) {
-        if (d[i - 1] * d[i] <= 0)
-            m[i] = 0;
-        else {
-            const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1];
-            m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
-        }
-    }
-    m[0] = d[0];
-    m[n - 1] = d[n - 2] * 1.0;
+    const z0 = 0.05 * L, zs0 = -0.55 * L;
     return function (z) {
-        if (z <= xs[0])
-            return ys[0];
-        if (z >= xs[n - 1])
+        let w;
+        if (z >= L)
             return 0;
-        let i = 0;
-        while (i < n - 2 && z > xs[i + 1])
-            i++;
-        const t = (z - xs[i]) / h[i], t2 = t * t, t3 = t2 * t;
-        const w = (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h[i] * m[i + 1];
+        if (z >= z0) {
+            const t = (z - z0) / (L - z0);
+            w = B * (1 - Math.pow(t, 1.7));
+        }
+        else if (z >= zs0)
+            w = B;
+        else {
+            const sN = Math.min(1, (zs0 - z) / (L + zs0));
+            w = B - 0.15 * B * Math.pow(sN, 1.5);
+        }
         return Math.max(w, boatPolyHalfWidth(z, L, B), 0);
     };
 }
@@ -288,12 +277,91 @@ function boatHullBands(r, y0, y1, depth) {
     }
     return out;
 }
+// A box with softly rounded edges and corners (the hard-edged boxes on the boats and buildings read as plastic blocks). Same size, same UVs as BoxGeometry;
+// the rounding radius is about a fifth of the thinnest side, at most maxR, and boxes thinner than 0.1 stay flat panels. Normals follow the rounding.
+function BoatRBox(w, h, d, maxR) {
+    const m = Math.min(w, h, d), r = Math.min(maxR || 0.14, m * 0.2);
+    if (m < 0.1 || r < 0.012)
+        return new THREE.BoxGeometry(w, h, d);
+    const geo = new THREE.BoxGeometry(w, h, d, 5, 5, 5), P = geo.attributes.position, Nn = geo.attributes.normal, half = [w / 2, h / 2, d / 2];
+    if (!P || !Nn || P.count !== 216)
+        return geo; // not a segmented box (a stand-in in the tests): leave it square
+    const lines = (hx) => [-hx, -hx + 0.293 * r, -hx + r, hx - r, hx - 0.293 * r, hx];
+    const C = half.map(lines), cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    for (let i = 0; i < P.count; i++) {
+        const q = [P.array[i * 3], P.array[i * 3 + 1], P.array[i * 3 + 2]], out = [0, 0, 0], dv = [0, 0, 0];
+        for (let a = 0; a < 3; a++) {
+            const idx = Math.round(((q[a] + half[a]) / (2 * half[a])) * 5);
+            q[a] = C[a][Math.max(0, Math.min(5, idx))];
+        }
+        let len = 0;
+        for (let a = 0; a < 3; a++) {
+            const inner = cl(q[a], -(half[a] - r), half[a] - r);
+            dv[a] = q[a] - inner;
+            out[a] = inner;
+            len += dv[a] * dv[a];
+        }
+        len = Math.sqrt(len);
+        if (len > 1e-6) {
+            for (let a = 0; a < 3; a++) {
+                const nn = dv[a] / len;
+                out[a] += nn * r;
+                dv[a] = nn;
+            }
+            Nn.array[i * 3] = dv[0];
+            Nn.array[i * 3 + 1] = dv[1];
+            Nn.array[i * 3 + 2] = dv[2];
+        }
+        P.array[i * 3] = out[0];
+        P.array[i * 3 + 1] = out[1];
+        P.array[i * 3 + 2] = out[2];
+    }
+    P.needsUpdate = true;
+    Nn.needsUpdate = true;
+    if (geo.computeBoundingSphere) {
+        geo.computeBoundingSphere();
+        geo.computeBoundingBox();
+    }
+    return geo;
+}
+// Soft shading across the hull: normals at the same point are averaged across meshes and across the centre line (bow stem, chine, transom corner)
+// whenever the surfaces meet at less than maxDeg, so the panels read as one rounded shell. A real fold (deck edge, gunwale) stays crisp.
+function boatSmoothNormals(meshes, maxDeg) {
+    const cosT = Math.cos((maxDeg * Math.PI) / 180), map = new Map(), key = (x, y, z) => Math.round((Math.abs(x) < 0.0026 ? 0 : x) * 400) + "," + Math.round(y * 400) + "," + Math.round(z * 400);
+    meshes.forEach((m) => { const P = m.geometry.attributes.position.array, Nn = m.geometry.attributes.normal.array; for (let i = 0; i < P.length; i += 3) {
+        const k = key(P[i], P[i + 1], P[i + 2]);
+        let a = map.get(k);
+        if (!a) {
+            a = [];
+            map.set(k, a);
+        }
+        a.push(Nn[i], Nn[i + 1], Nn[i + 2]);
+    } });
+    meshes.forEach((m) => {
+        const P = m.geometry.attributes.position.array, Nn = m.geometry.attributes.normal.array, out = new Float32Array(Nn.length);
+        for (let i = 0; i < P.length; i += 3) {
+            const a = map.get(key(P[i], P[i + 1], P[i + 2])), nx = Nn[i], ny = Nn[i + 1], nz = Nn[i + 2];
+            let sx = 0, sy = 0, sz = 0;
+            for (let j = 0; j < a.length; j += 3)
+                if (a[j] * nx + a[j + 1] * ny + a[j + 2] * nz >= cosT) {
+                    sx += a[j];
+                    sy += a[j + 1];
+                    sz += a[j + 2];
+                }
+            const l = Math.hypot(sx, sy, sz) || 1;
+            out[i] = sx / l;
+            out[i + 1] = sy / l;
+            out[i + 2] = sz / l;
+        }
+        m.geometry.setAttribute("normal", new THREE.BufferAttribute(out, 3));
+    });
+}
 // One hull shell. def: { length, beam, freeboardRatio, gunwaleHeight, hs: hull-style numbers }; r: resolved look. Returns a Group; userData.hull has the key heights.
 // Forward is +Z, y = 0 is the old hull bottom (the deck is still at length * freeboardRatio, so every builder keeps working), the keel now reaches below that.
 function buildHullShell(def, r) {
     const L = def.length / 2, B = def.beam / 2, depth = def.length * def.freeboardRatio, gw = def.gunwaleHeight;
     const hs = Object.assign({ keel: 0.55, chineW: 0.62, chineY: 0.34, bowRise: 0.34, sternRise: 0.06, bowKeel: 0.6, flat: 0, cat: 0, rake: 0.075 }, def.hs || {});
-    const plan = boatPlanner(L, B), wallT = 0.1, N = 50, rm = hs.rake * L, topY = depth + gw + hs.bowRise;
+    const plan = boatPlanner(L, B), wallT = 0.1, N = 84, rm = hs.rake * L, topY = depth + gw + hs.bowRise;
     // the stem leans forward with height (a raked bow): the outline at height y is the plan outline pushed forward by rake(z, y)
     const rakeAt = (z, y) => rm * Math.pow(Math.max(0, Math.min(1, y / topY)), 1.25) * Math.max(0, Math.min(1, (z - 0.05 * L) / (0.55 * L)));
     const pw = (z, y) => plan(z - rakeAt(z, y));
@@ -303,8 +371,9 @@ function buildHullShell(def, r) {
         zs.push(-L + (2 * L + rm) * (1 - Math.pow(1 - u, 1.65)));
     }
     const sheerAt = (z) => { const u = Math.min(1, (z + L) / (2 * L)); return depth + gw + hs.bowRise * Math.pow(Math.max(0, u - 0.3) / 0.7, 2.2) + hs.sternRise * Math.pow(1 - u, 2); };
-    const keelAt = (z) => { const u = Math.min(1, (z + L) / (2 * L)); const k = -hs.keel * (u < 0.12 ? 0.72 + 2.3 * u : 1); const bowY = depth * hs.bowKeel; const s = Math.max(0, (u - 0.46) / 0.54); return k + (bowY - k) * Math.pow(s, 2.1); };
-    const chineAt = (z) => { const yk = keelAt(z), y = Math.max(yk + 0.1, hs.chineY); return Math.min(y, sheerAt(z) - 0.9); };
+    const keelAt = (z) => { const u = Math.min(1, (z + L) / (2 * L)); const sm = Math.max(0, Math.min(1, u / 0.2)), k = -hs.keel * (0.72 + 0.28 * sm * sm * (3 - 2 * sm)); const bowY = depth * hs.bowKeel; const s = Math.max(0, (u - 0.46) / 0.54); return k + (bowY - k) * Math.pow(s, 2.1); };
+    const smax = (a, b, k) => 0.5 * (a + b + Math.sqrt((a - b) * (a - b) + k * k)), smin = (a, b, k) => 0.5 * (a + b - Math.sqrt((a - b) * (a - b) + k * k)); // soft max / min: no knuckle where the chine meets the rising keel
+    const chineAt = (z) => { const yk = keelAt(z), y = smax(yk + 0.1, hs.chineY, 0.3); return smin(y, sheerAt(z) - 0.9, 0.3); };
     const tunGeo = { pos: [], idx: [] }, topGeo = { pos: [], col: [], idx: [] }, botGeo = { pos: [], idx: [] }, deckGeo = { pos: [], idx: [] }, inGeo = { pos: [], idx: [] }, capGeo = { pos: [], idx: [] };
     const pushV = (g, x, y, z, c) => { g.pos.push(x, y, z); if (c !== undefined && g.col) {
         g.col.push(((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255);
@@ -321,9 +390,9 @@ function buildHullShell(def, r) {
         const wc = wcAt(yc);
         const topX = (y) => { const t = Math.max(0, Math.min(1, (y - yc) / Math.max(1e-6, ys - yc))); const wy = pw(z, y); return wc + (wy - wc) * (1 - Math.pow(1 - t, 1.9)); };
         const bands = boatHullBands(r, yc, ys, depth);
-        topRings.push({ z, w, bands: bands.map((b) => ({ ...b, pts: [b.a, (b.a + b.b) / 2, b.b].map((y) => [topX(y), y]) })) });
+        topRings.push({ z, w, bands: bands.map((b) => ({ ...b, pts: [0, 0.25, 0.5, 0.75, 1].map((f) => b.a + (b.b - b.a) * f).map((y) => [topX(y), y]) })) });
         // bottom: keel -> chine, bulging a little downward
-        const nb = 5;
+        const nb = 9;
         let pts = [];
         for (let k = 0; k <= nb; k++) {
             const t = k / nb, x = wc * t, y = yk + (yc - yk) * (Math.pow(t, 1.35) * 0.92 + 0.08 * t);
@@ -437,6 +506,7 @@ function buildHullShell(def, r) {
     mk(deckGeo, new THREE.MeshPhongMaterial({ color: r.deck, side: THREE.DoubleSide }), "deck");
     mk(inGeo, new THREE.MeshPhongMaterial({ color: boatMix(r.hull, 0xffffff, 0.35), side: THREE.DoubleSide }), "inner");
     mk(capGeo, new THREE.MeshPhongMaterial({ color: r.cap, side: THREE.DoubleSide, ...gloss }), "cap");
+    boatSmoothNormals(group.children.filter((m) => m.name === "topsides" || m.name === "bottom" || m.name === "tunnel"), 80);
     group.userData.hull = { L, B, depth, gw, plan, pw, sheerAt, keelAt, wallT, rm, topY };
     return group;
 }
@@ -729,22 +799,22 @@ function buildBoatAddons(def, R, anch, shell) {
     const ad = R.addons || [], has = (id) => ad.indexOf(id) >= 0 && boatAddonOk(def, id);
     const H = shell.userData.hull, L = H.L, pw = H.pw, sheerAt = H.sheerAt, a = anch || {};
     const S = 1.8, V = (x, y, z) => new THREE.Vector3(x, y, z);
-    const steel = new THREE.MeshPhongMaterial({ color: 0xc9ced2, shininess: 80, flatShading: true }), dark = new THREE.MeshPhongMaterial({ color: 0x24282c, flatShading: true });
-    const rod = (p, q, r, mat) => { const d = V(q.x - p.x, q.y - p.y, q.z - p.z), len = d.length(); const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), mat); m.position.set((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2); m.quaternion.setFromUnitVectors(V(0, 1, 0), V(d.x / len, d.y / len, d.z / len)); return m; };
+    const steel = new THREE.MeshPhongMaterial({ color: 0xc9ced2, shininess: 80 }), dark = new THREE.MeshPhongMaterial({ color: 0x24282c });
+    const rod = (p, q, r, mat) => { const d = V(q.x - p.x, q.y - p.y, q.z - p.z), len = d.length(); const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 14), mat); m.position.set((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2); m.quaternion.setFromUnitVectors(V(0, 1, 0), V(d.x / len, d.y / len, d.z / len)); return m; };
     if (has("holders")) { // four holders a side along the gunwale cap, leaning out
-        const z0 = a.holderZ0 !== undefined ? a.holderZ0 : -0.5 * L, z1 = a.holderZ1 !== undefined ? a.holderZ1 : 0.1 * L, geo = new THREE.CylinderGeometry(0.075, 0.06, 0.55, 8);
+        const z0 = a.holderZ0 !== undefined ? a.holderZ0 : -0.5 * L, z1 = a.holderZ1 !== undefined ? a.holderZ1 : 0.1 * L, geo = new THREE.CylinderGeometry(0.075, 0.06, 0.55, 14);
         for (let i = 0; i < 4; i++) {
             const z = z0 + (z1 - z0) * (i / 3), sh = sheerAt(z);
-            [1, -1].forEach((sd) => { const m = new THREE.Mesh(geo, dark); m.position.set(sd * (pw(z, sh) - 0.26), sh + 0.22, z); m.rotation.z = -sd * 0.32; g.add(m); const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 8), steel); ring.position.set(sd * (pw(z, sh) - 0.27 + 0.0), sh + 0.46, z); ring.position.x += sd * 0.07; g.add(ring); });
+            [1, -1].forEach((sd) => { const m = new THREE.Mesh(geo, dark); m.position.set(sd * (pw(z, sh) - 0.26), sh + 0.22, z); m.rotation.z = -sd * 0.32; g.add(m); const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 14), steel); ring.position.set(sd * (pw(z, sh) - 0.27 + 0.0), sh + 0.46, z); ring.position.x += sd * 0.07; g.add(ring); });
         }
     }
     if (has("bimini") && a.cock) { // canvas shade over the cockpit on a stainless frame
         const c = a.cock, w = c.halfW * 2, d = c.z1 - c.z0, zc = (c.z0 + c.z1) / 2, y = c.roofY;
-        const mat = new THREE.MeshPhongMaterial({ color: R.canvas === null ? R.accent : R.canvas, flatShading: true, side: THREE.DoubleSide });
-        const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), mat);
+        const mat = new THREE.MeshPhongMaterial({ color: R.canvas === null ? R.accent : R.canvas, side: THREE.DoubleSide });
+        const top = new THREE.Mesh(new BoatRBox(w, 0.05, d), mat);
         top.position.set(0, y, zc);
         g.add(top);
-        const lip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.28, 0.04), mat);
+        const lip = new THREE.Mesh(new BoatRBox(w, 0.28, 0.04), mat);
         lip.position.set(0, y - 0.13, c.z1);
         g.add(lip);
         [[-1, c.z0], [1, c.z0], [-1, c.z1], [1, c.z1]].forEach(([sd, z]) => g.add(rod(V(sd * c.halfW * 0.96, c.floorY, z), V(sd * c.halfW * 0.96, y, z), 0.035, steel)));
@@ -752,10 +822,10 @@ function buildBoatAddons(def, R, anch, shell) {
     }
     if (has("spots") && a.hasTop) { // a pair of spreader lights on the front edge of the roof
         const lens = new THREE.MeshBasicMaterial({ color: 0xfff0b8 });
-        [-1, 1].forEach((sd) => { const b = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.3), dark); b.position.set(sd * a.roofHalfW * 0.72, a.roofY + 0.14, a.roofZ + a.roofD / 2 - 0.1); b.rotation.x = 0.3; g.add(b); const l = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.14), lens); l.position.set(0, 0, 0.152); b.add(l); });
+        [-1, 1].forEach((sd) => { const b = new THREE.Mesh(new BoatRBox(0.24, 0.2, 0.3), dark); b.position.set(sd * a.roofHalfW * 0.72, a.roofY + 0.14, a.roofZ + a.roofD / 2 - 0.1); b.rotation.x = 0.3; g.add(b); const l = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.14), lens); l.position.set(0, 0, 0.152); b.add(l); });
     }
     if (has("rocket") && a.hasTop) { // a rack of rod tubes across the back of the roof
-        const n = 7, w = a.roofHalfW * 1.8, zb = a.roofZ - a.roofD / 2 + 0.12, geo = new THREE.CylinderGeometry(0.06, 0.05, 0.85, 8);
+        const n = 7, w = a.roofHalfW * 1.8, zb = a.roofZ - a.roofD / 2 + 0.12, geo = new THREE.CylinderGeometry(0.06, 0.05, 0.85, 14);
         for (let i = 0; i < n; i++) {
             const t = new THREE.Mesh(geo, dark);
             t.position.set(-w / 2 + w * (i / (n - 1)), a.roofY + 0.5, zb);
@@ -766,19 +836,19 @@ function buildBoatAddons(def, R, anch, shell) {
     }
     if (has("outrig") && a.hasTop) { // two poles swung out and up from the roof corners
         const len = 3.4 * S;
-        [1, -1].forEach((sd) => { const p = V(sd * (a.rigX || a.roofHalfW), a.rigY !== undefined ? a.rigY : a.roofY, a.rigZ !== undefined ? a.rigZ : a.roofZ); const dx = sd * 0.66, dy = 0.62, dz = -0.42, n = Math.sqrt(dx * dx + dy * dy + dz * dz); const q = V(p.x + dx / n * len, p.y + dy / n * len, p.z + dz / n * len); g.add(rod(p, q, 0.04, steel)); const foot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), dark); foot.position.copy(p); g.add(foot); });
+        [1, -1].forEach((sd) => { const p = V(sd * (a.rigX || a.roofHalfW), a.rigY !== undefined ? a.rigY : a.roofY, a.rigZ !== undefined ? a.rigZ : a.roofZ); const dx = sd * 0.66, dy = 0.62, dz = -0.42, n = Math.sqrt(dx * dx + dy * dy + dz * dz); const q = V(p.x + dx / n * len, p.y + dy / n * len, p.z + dz / n * len); g.add(rod(p, q, 0.04, steel)); const foot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), dark); foot.position.copy(p); g.add(foot); });
     }
     if (has("bowrail")) { // a stainless roller and pulpit that reach past the stem
         const zr = L * 0.86, y = sheerAt(zr) + 0.06, zt = L + 0.38;
         [-0.16, 0.16].forEach((x) => g.add(rod(V(x, y, zr), V(x, y + 0.02, zt), 0.04, steel)));
-        const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 10), dark);
+        const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 14), dark);
         roller.rotation.z = Math.PI / 2;
         roller.position.set(0, y + 0.04, zt);
         g.add(roller);
         g.add(rod(V(-0.16, y, zt), V(0.16, y, zt), 0.04, steel));
     }
     if (has("bumpers")) { // fenders hung on short lines along both sides
-        const fm = new THREE.MeshPhongMaterial({ color: 0xe9ecee, flatShading: true }), cm = new THREE.MeshPhongMaterial({ color: R.accent, flatShading: true }), geo = new THREE.CylinderGeometry(0.15, 0.15, 0.62, 10), cap = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 8);
+        const fm = new THREE.MeshPhongMaterial({ color: 0xe9ecee }), cm = new THREE.MeshPhongMaterial({ color: R.accent }), geo = new THREE.CylinderGeometry(0.15, 0.15, 0.62, 14), cap = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 14);
         [-0.2, 0.18, 0.5].forEach((f) => { const z = L * f, sh = sheerAt(z), y = sh - 0.85; [1, -1].forEach((sd) => { const x = sd * (pw(z, y) + 0.17); const m = new THREE.Mesh(geo, fm); m.position.set(x, y, z); g.add(m); const c = new THREE.Mesh(cap, cm); c.position.set(x, y + 0.34, z); g.add(c); g.add(rod(V(sd * (pw(z, sh) - 0.05), sh, z), V(x, y + 0.36, z), 0.012, steel)); }); });
     }
     return g;
@@ -1718,7 +1788,7 @@ function envRockGeo(kind, variant, detail) {
         const k = 1 + 0.16 * (envFbm(u[0] * 1.4 + seedO, u[1] * 1.4, u[2] * 1.4, 3) - 0.5) * 2;
         p = [p[0] * k * sx, p[1] * k * sy, p[2] * k * sz];
         cuts.forEach((c) => { const dd = p[0] * c.n[0] + p[1] * c.n[1] + p[2] * c.n[2] - c.d; if (dd > 0)
-            p = [p[0] - c.n[0] * dd, p[1] - c.n[1] * dd, p[2] - c.n[2] * dd]; });
+            p = [p[0] - c.n[0] * dd * 0.82, p[1] - c.n[1] * dd * 0.82, p[2] - c.n[2] * dd * 0.82]; }); // 0.82: the cut planes bite most of the way, so the edges are worn rather than razor sharp
         const r = 0.035 * (envFbm(u[0] * 6 + seedO, u[1] * 6, u[2] * 6, 2) - 0.5) * 2;
         p = [p[0] + u[0] * r, p[1] + u[1] * r, p[2] + u[2] * r];
         if (p[1] < -0.36 * sy)
@@ -1729,7 +1799,7 @@ function envRockGeo(kind, variant, detail) {
     const fn = F.map(([a, b, c]) => { const ax = pos[a * 3], ay = pos[a * 3 + 1], az = pos[a * 3 + 2], u = [pos[b * 3] - ax, pos[b * 3 + 1] - ay, pos[b * 3 + 2] - az], v = [pos[c * 3] - ax, pos[c * 3 + 1] - ay, pos[c * 3 + 2] - az]; return envNorm([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]); });
     const adj = V.map(() => []);
     F.forEach((f, i) => f.forEach((vi) => adj[vi].push(i)));
-    const P = [], Nn = [], C = [], cosA = Math.cos(0.66);
+    const P = [], Nn = [], C = [], cosA = Math.cos(0.95);
     F.forEach((f, fi) => f.forEach((vi) => {
         let m = [0, 0, 0];
         adj[vi].forEach((j) => { if (fn[j][0] * fn[fi][0] + fn[j][1] * fn[fi][1] + fn[j][2] * fn[fi][2] > cosA) {
@@ -8953,12 +9023,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const n = Math.max(1, Math.round(len / 2.6));
                 for (let i = 0; i <= n; i++) {
                     const pz = za + (i / n) * len;
-                    const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1.0, 0.11), dockRailPostMat);
+                    const post = new THREE.Mesh(new BoatRBox(0.11, 1.0, 0.11), dockRailPostMat);
                     post.position.set(dockX + side, dockDeckY + 0.5, pz);
                     scene.add(post);
                 }
                 // a low toe board along the edge keeps feet and gear on the deck
-                const toe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, len), dockRailPostMat);
+                const toe = new THREE.Mesh(new BoatRBox(0.08, 0.14, len), dockRailPostMat);
                 toe.position.set(dockX + side, dockDeckY + 0.19, (za + zb) / 2);
                 scene.add(toe);
             });
@@ -8972,14 +9042,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const gazeboGroundY = keyShoreHeightAt(dockX, gazeboZ);
         [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].forEach(([px, pz]) => {
             const postHeight = Math.max(0.15, dockDeckY - 0.1 - gazeboGroundY);
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, postHeight, 6), dockPilingMat);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, postHeight, 10), dockPilingMat);
             post.position.set(dockX + px, gazeboGroundY + postHeight / 2, gazeboZ + pz);
             scene.add(post);
-            const roofPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.1, 6), dockRailPostMat);
+            const roofPost = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.1, 10), dockRailPostMat);
             roofPost.position.set(dockX + px, dockDeckY + 1.05, gazeboZ + pz);
             scene.add(roofPost);
         });
-        const roofMat = new THREE.MeshPhongMaterial({ color: 0x7a4530, flatShading: true });
+        const roofMat = new THREE.MeshPhongMaterial({ color: 0x7a4530 });
         const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.8, 4), roofMat);
         roof.position.set(dockX, dockDeckY + 2.5, gazeboZ);
         roof.rotation.y = Math.PI / 4;
@@ -8987,7 +9057,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const gazeboWalkCircles = [];
         {
             // the gazebo finished: a beam frame under the roof, side rails with an open entry and a gap at the seaward end, benches, a lantern and a burgee
-            const gz = (x, y, z, w, h, d, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, gazeboZ + z); scene.add(b); return b; };
+            const gz = (x, y, z, w, h, d, m) => { const b = new THREE.Mesh(new BoatRBox(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, gazeboZ + z); scene.add(b); return b; };
             [-1.8, 1.8].forEach((c) => { gz(c, 2.0, 0, 0.14, 0.14, 3.7, dockRailPostMat); gz(0, 2.0, c, 3.7, 0.14, 0.14, dockRailPostMat); });
             [-1.8, 1.8].forEach((x) => {
                 [0.9, 0.5].forEach((hy) => gz(x, hy, 0.5, 0.06, 0.06, 2.6, dockRailMat));
@@ -8997,20 +9067,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 [0.9, 0.5].forEach((hy) => gz((xa + xb) / 2 + (xa < 0 ? -0.25 : 0.25), hy, 1.8, 1.1, 0.06, 0.06, dockRailMat));
             });
             [-1.5, -0.8, 0.8, 1.5].forEach((x) => gz(x, 0.5, 1.8, 0.1, 1.0, 0.1, dockRailPostMat));
-            const benchM = new THREE.MeshPhongMaterial({ color: 0x9a7c56, flatShading: true });
+            const benchM = new THREE.MeshPhongMaterial({ color: 0x9a7c56 });
             [-1.45, 1.45].forEach((x) => {
                 gz(x, 0.45, 0.6, 0.42, 0.07, 1.7, benchM);
                 gz(x, 0.22, 1.3, 0.34, 0.4, 0.08, dockRailPostMat);
                 gz(x, 0.22, -0.1, 0.34, 0.4, 0.08, dockRailPostMat);
                 gazeboWalkCircles.push([dockX + x, gazeboZ + 0.2, 0.3], [dockX + x, gazeboZ + 1.0, 0.3]); // (handed to WALK_CIRCLES further down, once that exists)
             });
-            const lanternGlow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
+            const lanternGlow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9 });
             gz(0, 1.75, 0, 0.03, 0.4, 0.03, dockRailPostMat);
             gz(0, 1.45, 0, 0.26, 0.3, 0.26, lanternGlow);
             const finial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), dockRailPostMat);
             finial.position.set(dockX, dockDeckY + 3.5, gazeboZ);
             scene.add(finial);
-            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.0, 5), dockRailPostMat);
+            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.0, 10), dockRailPostMat);
             mast.position.set(dockX, dockDeckY + 3.95, gazeboZ);
             scene.add(mast);
             const burgee = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.4), new THREE.MeshPhongMaterial({ color: 0x2f6f78, side: THREE.DoubleSide }));
@@ -9037,19 +9107,19 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // overhangs (and a front gable over the porch on single-storey homes), a railed porch with steps, a framed door, shuttered windows
         // and a brick chimney. Built facing +Z with the origin at the centre of the footprint, like the older buildHouse it replaces.
         const homeMatCache = {};
-        function homeMat(c, extra) { const k = c + (extra ? JSON.stringify(extra) : ""); return homeMatCache[k] || (homeMatCache[k] = new THREE.MeshPhongMaterial(Object.assign({ color: c, flatShading: true }, extra || {}))); }
+        function homeMat(c, extra) { const k = c + (extra ? JSON.stringify(extra) : ""); return homeMatCache[k] || (homeMatCache[k] = new THREE.MeshPhongMaterial(Object.assign({ color: c }, extra || {}))); }
         function shadeColor(c, f) { return (Math.round(((c >> 16) & 255) * f) << 16) | (Math.round(((c >> 8) & 255) * f) << 8) | Math.round((c & 255) * f); }
         function buildHome(o) {
             const g = new THREE.Group();
             const w = o.w || 7, d = o.d || 5.5, floors = o.floors || 1, fh = 2.9, raised = o.raised || 0;
             const wallM = homeMat(o.wall), sideM = homeMat(shadeColor(o.wall, 0.88)), roofM = homeMat(o.roof), trimM = homeMat(o.trim || 0xf4efe4), shutM = homeMat(o.shutter || 0x3f6a78);
             const baseM = homeMat(0x8d887c), doorM = homeMat(o.door || 0x6a3b2a), glassM = homeMat(0xaed4e0, { emissive: 0x20323a }), woodM = homeMat(0x9a7c56), brickM = homeMat(0x9a5a48);
-            const box = (bw, bh, bd, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), m); b.position.set(x, y, z); g.add(b); return b; };
+            const box = (bw, bh, bd, m, x, y, z) => { const b = new THREE.Mesh(new BoatRBox(bw, bh, bd), m); b.position.set(x, y, z); g.add(b); return b; };
             const floorY = 0.6 + raised, wallTop = floorY + fh * floors;
             // foundation: a deep plinth (hides any slope in the ground) or stilts
             if (raised > 0) {
                 [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1]].forEach(([sx, sz]) => {
-                    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, floorY + 1.4, 6), woodM);
+                    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, floorY + 1.4, 10), woodM);
                     p.position.set(sx * (w / 2 - 0.3), (floorY - 1.4) / 2, sz * (d / 2 - 0.3));
                     g.add(p);
                 });
@@ -9092,7 +9162,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if (raised <= 0)
                     box(w + 0.1, 1.6, pd, baseM, 0, -0.4, pz); // solid base under the porch, like the house's own plinth
                 if (raised > 0)
-                    [-1, 1].forEach((sx) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, floorY + 1.4, 6), woodM); p.position.set(sx * (w / 2 - 0.3), (floorY - 1.4) / 2, d / 2 + pd - 0.25); g.add(p); });
+                    [-1, 1].forEach((sx) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, floorY + 1.4, 10), woodM); p.position.set(sx * (w / 2 - 0.3), (floorY - 1.4) / 2, d / 2 + pd - 0.25); g.add(p); });
                 const postZ = d / 2 + pd - 0.2, postH = floors === 1 ? fh + 0.15 : fh - 0.3;
                 [-w / 2 + 0.2, -1.15, 1.15, w / 2 - 0.2].forEach((x) => box(0.18, postH, 0.18, trimM, x, floorY + postH / 2, postZ));
                 [[-w / 2 + 0.2, -1.15], [1.15, w / 2 - 0.2]].forEach(([a, b]) => {
@@ -9161,30 +9231,30 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         function buildBaitShop() {
             const group = new THREE.Group();
-            const wallMat = new THREE.MeshPhongMaterial({ color: 0xc4b088, flatShading: true });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2.6, 4.5), wallMat);
+            const wallMat = new THREE.MeshPhongMaterial({ color: 0xc4b088 });
+            const body = new THREE.Mesh(new BoatRBox(5.5, 2.6, 4.5), wallMat);
             body.position.y = 1.3;
             group.add(body);
-            const roofM = new THREE.MeshPhongMaterial({ color: 0x4a6b52, flatShading: true });
-            const shopRoof = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.3, 5.2), roofM);
+            const roofM = new THREE.MeshPhongMaterial({ color: 0x4a6b52 });
+            const shopRoof = new THREE.Mesh(new BoatRBox(6.2, 0.3, 5.2), roofM);
             shopRoof.position.y = 2.75;
             group.add(shopRoof);
             // Covered porch — a small overhang out front, common on real bait shops.
-            const porchRoof = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.2, 2.0), roofM);
+            const porchRoof = new THREE.Mesh(new BoatRBox(5.8, 0.2, 2.0), roofM);
             porchRoof.position.set(0, 2.35, 3.25);
             group.add(porchRoof);
             [-2.5, 2.5].forEach((px) => {
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.35, 6), new THREE.MeshPhongMaterial({ color: 0x5a4a32, flatShading: true }));
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.35, 10), new THREE.MeshPhongMaterial({ color: 0x5a4a32 }));
                 post.position.set(px, 1.175, 4.1);
                 group.add(post);
             });
-            const doorMat = new THREE.MeshPhongMaterial({ color: 0x3a2a1a, flatShading: true });
-            const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.7, 0.08), doorMat);
+            const doorMat = new THREE.MeshPhongMaterial({ color: 0x3a2a1a });
+            const door = new THREE.Mesh(new BoatRBox(1.0, 1.7, 0.08), doorMat);
             door.position.set(0, 0.85, 2.26);
             group.add(door);
             // Sign
-            const signMat = new THREE.MeshPhongMaterial({ color: 0xe8dcc0, flatShading: true });
-            const sign = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.6, 0.1), signMat);
+            const signMat = new THREE.MeshPhongMaterial({ color: 0xe8dcc0 });
+            const sign = new THREE.Mesh(new BoatRBox(3.0, 0.6, 0.1), signMat);
             sign.position.set(0, 2.2, 3.3);
             group.add(sign);
             return group;
@@ -9200,7 +9270,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // ---------- Marina expansion — finger docks creating real boat slips,
         // with small decorative boats tied up, turning the bare dock into an
         // actual working marina.
-        const dockIronMat = new THREE.MeshPhongMaterial({ color: 0x2f3236, flatShading: true });
+        const dockIronMat = new THREE.MeshPhongMaterial({ color: 0x2f3236 });
         function buildFingerDock(startPoint, dirX, length) {
             const group = new THREE.Group();
             const deck = new THREE.Mesh(woodBox(length, 0.22, 1.4, "dock"), dockMat);
@@ -9209,18 +9279,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
             group.add(deck);
             const endGround = keyShoreHeightAt(startPoint.x + dirX * length, startPoint.z);
             const pilingHeight = Math.max(0.15, dockDeckY - 0.1 - endGround);
-            const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, pilingHeight, 6), dockPilingMat);
+            const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, pilingHeight, 10), dockPilingMat);
             piling.position.set(dirX * length * 0.85, -(dockDeckY - endGround - pilingHeight / 2), 0);
             group.add(piling);
             [-0.5, 0.5].forEach((oz) => {
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 6), dockRailPostMat);
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 10), dockRailPostMat);
                 post.position.set(dirX * (length - 0.2), 0.4, oz);
                 group.add(post);
-                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.07, 6), dockIronMat);
+                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.07, 10), dockIronMat);
                 cap.position.set(dirX * (length - 0.2), 0.78, oz);
                 group.add(cap);
             });
-            const bump = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 1.0), dockIronMat); // a rubber bumper across the tip
+            const bump = new THREE.Mesh(new BoatRBox(0.1, 0.3, 1.0), dockIronMat); // a rubber bumper across the tip
             bump.position.set(dirX * (length + 0.04), -0.05, 0);
             group.add(bump);
             group.position.copy(startPoint);
@@ -9238,15 +9308,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // shapes, distinct from the player's actual boats, just set dressing.
         function buildDecorativeBoat(color) {
             const group = new THREE.Group();
-            const hullMat = new THREE.MeshPhongMaterial({ color, flatShading: true });
+            const hullMat = new THREE.MeshPhongMaterial({ color });
             // Stretched sphere instead of CapsuleGeometry (not available in this
             // project's THREE.js version) — same technique already used
             // successfully for every fish body in this file.
             const hull = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), hullMat);
             hull.scale.set(1, 0.5, 1.9);
             group.add(hull);
-            const consoleMat = new THREE.MeshPhongMaterial({ color: 0xe8e4d8, flatShading: true });
-            const consoleBox = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.5), consoleMat);
+            const consoleMat = new THREE.MeshPhongMaterial({ color: 0xe8e4d8 });
+            const consoleBox = new THREE.Mesh(new BoatRBox(0.6, 0.7, 0.5), consoleMat);
             consoleBox.position.set(-0.5, 0.5, 0);
             group.add(consoleBox);
             return group;
@@ -9261,15 +9331,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
             scene.add(boat);
         });
         // Marina sign, near the shop/dock approach.
-        const signPostMat = new THREE.MeshPhongMaterial({ color: 0x5a4a32, flatShading: true });
-        const signBoardMat = new THREE.MeshPhongMaterial({ color: 0xe8dcc0, flatShading: true });
+        const signPostMat = new THREE.MeshPhongMaterial({ color: 0x5a4a32 });
+        const signBoardMat = new THREE.MeshPhongMaterial({ color: 0xe8dcc0 });
         const signPos = { x: -4.5, z: 6 };
         const signH = keyHeightAt(signPos.x, signPos.z);
         if (signH !== null) {
-            const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.2, 6), signPostMat);
+            const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.2, 10), signPostMat);
             signPost.position.set(keyCenter.x + signPos.x, signH + 1.1, keyCenter.z + signPos.z);
             scene.add(signPost);
-            const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 0.1), signBoardMat);
+            const signBoard = new THREE.Mesh(new BoatRBox(2.4, 0.7, 0.1), signBoardMat);
             signBoard.position.set(keyCenter.x + signPos.x, signH + 2.0, keyCenter.z + signPos.z);
             scene.add(signBoard);
         }
@@ -9277,7 +9347,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // slope from underwater at x=-14 to solid ground by x=-9, with enough
         // clearance from the nearest house), dressed with umbrellas and chairs
         // to read as a distinct beach area rather than more of the same sand.
-        const umbrellaPoleMat = new THREE.MeshPhongMaterial({ color: 0x8a7a5a, flatShading: true });
+        const umbrellaPoleMat = new THREE.MeshPhongMaterial({ color: 0x8a7a5a });
         const umbrellaColors = [0xd85a4a, 0xe8c848];
         const beachSpots = [{ x: -21, z: -5 }, { x: -21, z: 5 }];
         beachSpots.forEach((pos, i) => {
@@ -9285,15 +9355,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
             if (h === null)
                 return;
             const wx = keyCenter.x + pos.x, wz = keyCenter.z + pos.z;
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), umbrellaPoleMat);
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 10), umbrellaPoleMat);
             pole.position.set(wx, h + 0.8, wz);
             scene.add(pole);
-            const canopyMat = new THREE.MeshPhongMaterial({ color: umbrellaColors[i % umbrellaColors.length], flatShading: true, side: THREE.DoubleSide });
+            const canopyMat = new THREE.MeshPhongMaterial({ color: umbrellaColors[i % umbrellaColors.length], side: THREE.DoubleSide });
             const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.5, 8), canopyMat);
             canopy.position.set(wx, h + 1.65, wz);
             scene.add(canopy);
-            const chairMat = new THREE.MeshPhongMaterial({ color: 0xf0ece0, flatShading: true });
-            const chair = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 1.5), chairMat);
+            const chairMat = new THREE.MeshPhongMaterial({ color: 0xf0ece0 });
+            const chair = new THREE.Mesh(new BoatRBox(0.6, 0.15, 1.5), chairMat);
             chair.position.set(wx + 0.9, h + 0.15, wz);
             chair.rotation.x = -0.25;
             scene.add(chair);
@@ -9326,16 +9396,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
             return new THREE.Mesh(new THREE.PlaneGeometry(6, 1.31), new THREE.MeshPhongMaterial(map ? { map, side: THREE.DoubleSide } : { color: 0x4a3626, side: THREE.DoubleSide }));
         }
         const portMats = {
-            isleRock: new THREE.MeshPhongMaterial({ color: 0x7c7a72, flatShading: true }),
+            isleRock: new THREE.MeshPhongMaterial({ color: 0x7c7a72 }),
             isleGround: new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, map: getGroundTexture(), shininess: 4, specular: 0x0a0a0a }),
-            grass: new THREE.MeshPhongMaterial({ color: 0x5d7a45, flatShading: true }),
-            white: new THREE.MeshPhongMaterial({ color: 0xf0ece0, flatShading: true }),
-            red: new THREE.MeshPhongMaterial({ color: 0xb8402e, flatShading: true }),
-            dark: new THREE.MeshPhongMaterial({ color: 0x3a3a40, flatShading: true }),
-            lamp: new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.8, flatShading: true }),
-            crate: new THREE.MeshPhongMaterial({ color: 0x8a6842, flatShading: true }),
-            barrel: new THREE.MeshPhongMaterial({ color: 0x4a6b8a, flatShading: true }),
-            buoy: new THREE.MeshPhongMaterial({ color: 0xe8742e, flatShading: true }),
+            grass: new THREE.MeshPhongMaterial({ color: 0x5d7a45 }),
+            white: new THREE.MeshPhongMaterial({ color: 0xf0ece0 }),
+            red: new THREE.MeshPhongMaterial({ color: 0xb8402e }),
+            dark: new THREE.MeshPhongMaterial({ color: 0x3a3a40 }),
+            lamp: new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.8 }),
+            crate: new THREE.MeshPhongMaterial({ color: 0x8a6842 }),
+            barrel: new THREE.MeshPhongMaterial({ color: 0x4a6b8a }),
+            buoy: new THREE.MeshPhongMaterial({ color: 0xe8742e }),
         };
         const portSaleSigns = {}, portOwnerFlags = {}; // the FOR SALE sign and the owner's pennant at each home, switched by homeSyncScenery()
         function homeSyncScenery() { PORTS.forEach((p) => { if (p.kind !== "home")
@@ -9414,7 +9484,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if (gy(a, b) !== null)
                     return; // on the islet already
                 const q = portPoint(p, a, b), fl = seafloorHeightAt(q.x, q.z), h = P.deckY - 0.1 - fl;
-                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, h, 6), dockPilingMat);
+                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, h, 10), dockPilingMat);
                 m.position.set(a, fl + h / 2, b);
                 group.add(m);
             };
@@ -9425,25 +9495,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
             [-3.6, 3.6].forEach((b) => { piling(P.tHead - 1.5, b); piling(P.tHead + 1.5, b); });
             piling(P.fingerAt, P.halfW + P.fingerLen - 0.3);
             [[-1.3, -3.6], [1.3, -3.6], [-1.3, 3.6], [1.3, 3.6]].forEach(([da, b]) => {
-                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 6), dockPilingMat);
+                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), dockPilingMat);
                 m.position.set(P.tHead + da, P.deckY + 0.3, b);
                 group.add(m);
             });
             // a lamp at the end of the pier, with a stack of crates and barrels
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 6), dockPilingMat);
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), dockPilingMat);
             pole.position.set(P.tHead + 1.2, P.deckY + 1.6, 0);
             group.add(pole);
-            const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), portMats.lamp);
+            const lamp = new THREE.Mesh(new BoatRBox(0.4, 0.4, 0.4), portMats.lamp);
             lamp.position.set(P.tHead + 1.2, P.deckY + 3.4, 0);
             group.add(lamp);
             [[P.tHead - 0.6, 3.0, 0.9, 0.4], [P.tHead - 0.6, 3.0, 0.8, 1.3], [P.tHead - 1.0, 2.0, 0.8, 0.4]].forEach(([a, b, sz, y]) => {
-                const m = new THREE.Mesh(new THREE.BoxGeometry(sz, sz * 0.8, sz), portMats.crate);
+                const m = new THREE.Mesh(new BoatRBox(sz, sz * 0.8, sz), portMats.crate);
                 m.position.set(a, P.deckY + y * 0.8, b);
                 m.rotation.y = a * 2.1;
                 group.add(m);
             });
             [[P.tHead - 0.5, -3.0], [P.tHead - 0.9, -2.2]].forEach(([a, b]) => {
-                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.85, 8), portMats.barrel);
+                const m = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.85, 10), portMats.barrel);
                 m.position.set(a, P.deckY + 0.5, b);
                 group.add(m);
             });
@@ -9467,7 +9537,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             sign.rotation.y = Math.PI / 2;
             group.add(sign);
             [-3.1, 3.1].forEach((b) => {
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 4.6, 6), dockPilingMat);
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 4.6, 10), dockPilingMat);
                 post.position.set(17, (gy(17, b) === null ? 0.3 : gy(17, b)) + 1.6, b);
                 group.add(post);
             });
@@ -9495,16 +9565,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 home(-6, 11.5, 2, 0xe8d4b0, 0xb85a3a, Math.PI / 2 + 0.1, { shutter: 0xd8744a }); // beach house on stilts
                 palms([[6, -10], [6, 10], [-12, -4.5], [-12, 4.5], [-14.5, -0.5], [10, 0.5]]);
                 const g1 = gy(3.5, -6.5) === null ? 2.5 : gy(3.5, -6.5); // flagpole: the red pennant flies once you own the place
-                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 8, 6), portMats.white);
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 8, 10), portMats.white);
                 pole.position.set(3.5, g1 + 3.8, -6.5);
                 group.add(pole);
-                const flag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 1.8), portMats.red);
+                const flag = new THREE.Mesh(new BoatRBox(0.05, 0.9, 1.8), portMats.red);
                 flag.position.set(3.5, g1 + 7.4, -7.4);
                 flag.visible = false;
                 group.add(flag);
                 portOwnerFlags[p.id] = flag;
                 const g2 = gy(8.5, 5) === null ? 2 : gy(8.5, 5); // FOR SALE sign on its post, in the front garden
-                const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.6, 6), dockPilingMat);
+                const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.6, 10), dockPilingMat);
                 fp.position.set(8.5, g2 + 1.1, 5);
                 group.add(fp);
                 const fsign = makePortSign("FOR SALE");
@@ -9523,10 +9593,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const g0 = gy(a, b);
                     if (g0 === null)
                         return;
-                    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), umbrellaPoleMat);
+                    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 10), umbrellaPoleMat);
                     up.position.set(a, g0 + 0.7, b);
                     group.add(up);
-                    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.5, 8), new THREE.MeshPhongMaterial({ color, flatShading: true, side: THREE.DoubleSide }));
+                    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.5, 8), new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide }));
                     canopy.position.set(a, g0 + 1.55, b);
                     group.add(canopy);
                 });
@@ -9548,7 +9618,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 gal.position.y = y + 0.12;
                 lh.add(gal);
                 y += 0.25;
-                const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.3, 8), portMats.lamp);
+                const lan = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.3, 10), portMats.lamp);
                 lan.position.y = y + 0.65;
                 lh.add(lan);
                 y += 1.3;
@@ -9560,7 +9630,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const g0 = gy(a, b);
                     if (g0 === null)
                         return;
-                    const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.9), portMats.crate);
+                    const m = new THREE.Mesh(new BoatRBox(0.9, 0.7, 0.9), portMats.crate);
                     m.position.set(a, g0 + 0.3, b);
                     m.rotation.y = i;
                     group.add(m);
@@ -9679,7 +9749,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         ];
         const TOWN = townPlan();
         const WALK_CIRCLES = [], WALK_HOUSES = []; // what the player cannot walk through (world coordinates): round things, and the houses
-        const townPalmTrunkGeo = new THREE.CylinderGeometry(0.12, 0.2, 1, 5), townFrondGeo = new THREE.ConeGeometry(0.25, 2.2, 4);
+        const townPalmTrunkGeo = new THREE.CylinderGeometry(0.12, 0.2, 1, 10), townFrondGeo = new THREE.ConeGeometry(0.25, 2.2, 4);
         function addTownPalm(kx, kz, trunkH, lean, sabal) {
             const gh = townGroundH(kx, kz);
             if (gh === null)
@@ -9702,7 +9772,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         TOWN.palms.forEach((q, i) => addTownPalm(q[0], q[1], 3 + hash2(q[0], q[1]) * 1.5, (hash2(q[1], q[0]) - 0.5) * 0.2));
         TOWN.yardTrees.forEach((q) => addTownPalm(q[0], q[1], 2.6 + hash2(q[0], q[1]) * 1.2, 0, true));
         {
-            const shrubGeo = new THREE.IcosahedronGeometry(1, 0), shrubMats = [0x3f7a45, 0x4a8a4c, 0x356b3d].map((c) => new THREE.MeshPhongMaterial({ color: c, flatShading: true }));
+            const shrubGeo = new THREE.IcosahedronGeometry(1, 0), shrubMats = [0x3f7a45, 0x4a8a4c, 0x356b3d].map((c) => new THREE.MeshPhongMaterial({ color: c }));
             TOWN.shrubs.forEach((q, i) => {
                 const gh = townGroundH(q[0], q[1]);
                 if (gh === null)
@@ -9713,8 +9783,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             });
         }
         // Scattered trees across the countryside — kept off the road and out of the town, spread a little thinner near it.
-        const farTrunkMat = new THREE.MeshPhongMaterial({ color: 0x4a3a2a, flatShading: true });
-        const farLeafMat = new THREE.MeshPhongMaterial({ color: 0x3a6b45, flatShading: true, fog: true });
+        const farTrunkMat = new THREE.MeshPhongMaterial({ color: 0x4a3a2a });
+        const farLeafMat = new THREE.MeshPhongMaterial({ color: 0x3a6b45, fog: true });
         TOWN.farTrees.forEach((t) => {
             const hv = hash2(t.x, t.z), kind = hv < 0.55 ? "oak" : hv < 0.82 ? "pine" : "sabal";
             envForest.add(kind, Math.floor(hash2(t.z, t.x) * 4), false, keyCenter.x + t.x, t.h, keyCenter.z + t.z, kind === "oak" ? t.canopy / 2.7 : kind === "pine" ? 0.8 + t.canopy * 0.12 : 0.9 + t.canopy * 0.15, hash2(t.x, 3) * 6.28, 0.88 + hash2(3, t.z) * 0.12);
@@ -9882,12 +9952,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // pair of piles at the shoreline marking where a dock would run. These are placeholders for the
         // "start a marina" feature: they make each lot something you can see and sail up to.
         {
-            const stakeMat = new THREE.MeshPhongMaterial({ color: 0x8a6a42, flatShading: true });
-            const capMat = new THREE.MeshPhongMaterial({ color: 0xff8a3d, flatShading: true });
-            const ropeMat = new THREE.MeshPhongMaterial({ color: 0xece0c2, flatShading: true });
-            const poleMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d0, flatShading: true });
-            const flagMat = new THREE.MeshPhongMaterial({ color: 0x1fa6b8, flatShading: true, side: THREE.DoubleSide });
-            const pileMat = new THREE.MeshPhongMaterial({ color: 0x5f4a33, flatShading: true });
+            const stakeMat = new THREE.MeshPhongMaterial({ color: 0x8a6a42 });
+            const capMat = new THREE.MeshPhongMaterial({ color: 0xff8a3d });
+            const ropeMat = new THREE.MeshPhongMaterial({ color: 0xece0c2 });
+            const poleMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d0 });
+            const flagMat = new THREE.MeshPhongMaterial({ color: 0x1fa6b8, side: THREE.DoubleSide });
+            const pileMat = new THREE.MeshPhongMaterial({ color: 0x5f4a33 });
             const signCache = {};
             const signMaterial = (label) => {
                 if (!signCache[label]) {
@@ -9931,7 +10001,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const ix = site.hw - 2, iz = site.hd - 2; // stakes sit a little inside the lot, where the ground is certainly level
                 const corners = [[-ix, -iz], [ix, -iz], [ix, iz], [-ix, iz]];
                 corners.forEach(([a, b], i) => {
-                    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 1.8, 5), stakeMat);
+                    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 1.8, 10), stakeMat);
                     post.position.copy(at(a, b, gy + 0.3));
                     scene.add(post);
                     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.3, 5), capMat);
@@ -9942,7 +10012,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 });
                 // Flag at the back (landward) edge, centred.
                 const flagBase = at(0, -iz, gy);
-                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 5.5, 6), poleMat);
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 5.5, 10), poleMat);
                 pole.position.set(flagBase.x, gy + 2.6, flagBase.z);
                 scene.add(pole);
                 const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.1), flagMat);
@@ -9953,7 +10023,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const faceYaw = Math.atan2(site.nx, site.nz); // a plane faces +Z by default; turn it to face the water
                 const signCentre = at(0, iz + 0.5, gy + 1.5);
                 [-1.4, 1.4].forEach((a) => {
-                    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 3.0, 5), stakeMat);
+                    const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 3.0, 10), stakeMat);
                     sp.position.copy(at(a, iz + 0.5, gy + 1.2));
                     scene.add(sp);
                 });
@@ -9964,7 +10034,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Dock-line piles at the water's edge.
                 [-3.5, 3.5].forEach((a) => {
                     const px = site.coastX + site.tx * a + site.nx * 1.5, pz = site.coastZ + site.tz * a + site.nz * 1.5;
-                    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 6), pileMat);
+                    const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), pileMat);
                     pile.position.set(px, -0.9, pz);
                     scene.add(pile);
                 });
@@ -10180,21 +10250,21 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     qp.setY(i, (h === null ? QUAY.y : h) + 0.03);
                 }
                 qGeo.computeVertexNormals();
-                const mesh = new THREE.Mesh(qGeo, new THREE.MeshPhongMaterial(payTex ? { map: payTex, color: 0xffffff } : { color: 0xc8c1b0, flatShading: true }));
+                const mesh = new THREE.Mesh(qGeo, new THREE.MeshPhongMaterial(payTex ? { map: payTex, color: 0xffffff } : { color: 0xc8c1b0 }));
                 mesh.position.set(keyCenter.x + cx, 0, keyCenter.z + cz);
                 scene.add(mesh);
             };
             pave(QUAY);
             pave(QUAY_APRON);
-            const wallMat = new THREE.MeshPhongMaterial({ color: 0x8d887c, flatShading: true }), capMat = new THREE.MeshPhongMaterial({ color: 0xa9a496, flatShading: true });
+            const wallMat = new THREE.MeshPhongMaterial({ color: 0x8d887c }), capMat = new THREE.MeshPhongMaterial({ color: 0xa9a496 });
             const wallBox = (x0, z0, x1, z1, top) => {
                 const ty = top === undefined ? QUAY.y : top;
                 const len = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, ang = Math.atan2(x1 - x0, z1 - z0);
-                const wl = new THREE.Mesh(new THREE.BoxGeometry(0.7, ty + 2.2, len), wallMat);
+                const wl = new THREE.Mesh(new BoatRBox(0.7, ty + 2.2, len), wallMat);
                 wl.position.set(keyCenter.x + cx, (ty - 2.2) / 2, keyCenter.z + cz);
                 wl.rotation.y = ang;
                 scene.add(wl);
-                const cp = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, len + 0.1), capMat);
+                const cp = new THREE.Mesh(new BoatRBox(0.95, 0.16, len + 0.1), capMat);
                 cp.position.set(keyCenter.x + cx, ty + 0.02, keyCenter.z + cz);
                 cp.rotation.y = ang;
                 scene.add(cp);
@@ -10235,34 +10305,34 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     wallBox(x, QUAY_APRON.z1 - 0.3, xb, QUAY_APRON.z1 - 0.3, top);
             }
             // mooring bollards and lamps along the water side, a flagpole and a couple of benches
-            const iron = new THREE.MeshPhongMaterial({ color: 0x2f3236, flatShading: true }), lampGlow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
-            const woodM = new THREE.MeshPhongMaterial({ color: 0x9a7c56, flatShading: true });
+            const iron = new THREE.MeshPhongMaterial({ color: 0x2f3236 }), lampGlow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9 });
+            const woodM = new THREE.MeshPhongMaterial({ color: 0x9a7c56 });
             for (let x = QUAY.x0 + 2.5; x < QUAY.x1; x += 5) {
-                const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 8), iron);
+                const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 10), iron);
                 b.position.set(keyCenter.x + x, QUAY.y + 0.3, keyCenter.z + QUAY.z1 - 1.0);
                 scene.add(b);
             }
-            [3.4, 6.4].forEach((x) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 8), iron); b.position.set(keyCenter.x + x, causewayY(x) + 0.3, keyCenter.z + QUAY_APRON.z1 - 0.95); scene.add(b); WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + QUAY_APRON.z1 - 0.95, 0.25]); });
+            [3.4, 6.4].forEach((x) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 10), iron); b.position.set(keyCenter.x + x, causewayY(x) + 0.3, keyCenter.z + QUAY_APRON.z1 - 0.95); scene.add(b); WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + QUAY_APRON.z1 - 0.95, 0.25]); });
             {
                 const lx = 7.6, lz = QUAY_APRON.z0 + 0.3;
-                const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 6), iron);
+                const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 10), iron);
                 p.position.set(keyCenter.x + lx, causewayY(lx) + 1.6, keyCenter.z + lz);
                 scene.add(p);
                 WALK_CIRCLES.push([keyCenter.x + lx, keyCenter.z + lz, 0.25]);
-                const l = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), lampGlow);
+                const l = new THREE.Mesh(new BoatRBox(0.42, 0.42, 0.42), lampGlow);
                 l.position.set(keyCenter.x + lx, causewayY(lx) + 3.4, keyCenter.z + lz);
                 scene.add(l);
             }
             [-22, -12.5, -4.5].forEach((x) => {
-                const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 6), iron);
+                const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 10), iron);
                 p.position.set(keyCenter.x + x, QUAY.y + 1.6, keyCenter.z + QUAY.z1 - 1.6);
                 scene.add(p);
                 WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + QUAY.z1 - 1.6, 0.25]);
-                const l = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), lampGlow);
+                const l = new THREE.Mesh(new BoatRBox(0.42, 0.42, 0.42), lampGlow);
                 l.position.set(keyCenter.x + x, QUAY.y + 3.4, keyCenter.z + QUAY.z1 - 1.6);
                 scene.add(l);
             });
-            const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 7, 6), iron);
+            const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 7, 10), iron);
             fp.position.set(keyCenter.x - 24, QUAY.y + 3.5, keyCenter.z + 17.5);
             scene.add(fp);
             WALK_CIRCLES.push([keyCenter.x - 24, keyCenter.z + 17.5, 0.25]);
@@ -10271,14 +10341,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
             flag.rotation.y = Math.PI / 2;
             scene.add(flag);
             [[-20, 24.4], [-5.5, 22.2]].forEach(([x, z], i) => {
-                const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), woodM);
+                const seat = new THREE.Mesh(new BoatRBox(2.2, 0.12, 0.6), woodM);
                 seat.position.set(keyCenter.x + x, QUAY.y + 0.5, keyCenter.z + z);
                 scene.add(seat);
                 [-0.7, 0, 0.7].forEach((dx) => WALK_CIRCLES.push([keyCenter.x + x + dx, keyCenter.z + z, 0.4]));
-                const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.08), woodM);
+                const back = new THREE.Mesh(new BoatRBox(2.2, 0.5, 0.08), woodM);
                 back.position.set(keyCenter.x + x, QUAY.y + 0.85, keyCenter.z + z - 0.3);
                 scene.add(back);
-                [-0.9, 0.9].forEach((dx) => { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.5), iron); leg.position.set(keyCenter.x + x + dx, QUAY.y + 0.25, keyCenter.z + z); scene.add(leg); });
+                [-0.9, 0.9].forEach((dx) => { const leg = new THREE.Mesh(new BoatRBox(0.1, 0.5, 0.5), iron); leg.position.set(keyCenter.x + x + dx, QUAY.y + 0.25, keyCenter.z + z); scene.add(leg); });
             });
         }
         // ---- a low stone kerb along the line where the island's sand runs down onto the quay's paving, so beach and promenade read as two things
@@ -10306,28 +10376,28 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         // ---- street lamps along the harbor road
         {
-            const iron = new THREE.MeshPhongMaterial({ color: 0x2f3236, flatShading: true }), glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
+            const iron = new THREE.MeshPhongMaterial({ color: 0x2f3236 }), glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9 });
             ROAD_LAMPS.forEach(([lx, lz]) => {
                 const gh = groundHeightAt(keyCenter.x + lx, keyCenter.z + lz);
                 if (gh === null)
                     return;
-                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 6), iron);
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 10), iron);
                 pole.position.set(keyCenter.x + lx, gh + 1.7, keyCenter.z + lz);
                 scene.add(pole);
                 WALK_CIRCLES.push([keyCenter.x + lx, keyCenter.z + lz, 0.25]);
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.38, 0.4), glow);
+                const lamp = new THREE.Mesh(new BoatRBox(0.4, 0.38, 0.4), glow);
                 lamp.position.set(keyCenter.x + lx, gh + 3.55, keyCenter.z + lz);
                 scene.add(lamp);
             });
             // a few palms along the road
-            const pm = new THREE.MeshPhongMaterial({ color: 0x6b5438, flatShading: true }), pl = new THREE.MeshPhongMaterial({ color: 0x3a7a3f, flatShading: true });
+            const pm = new THREE.MeshPhongMaterial({ color: 0x6b5438 }), pl = new THREE.MeshPhongMaterial({ color: 0x3a7a3f });
             ROAD_PALMS.forEach(([x, z]) => {
                 const gh = groundHeightAt(keyCenter.x + x, keyCenter.z + z);
                 if (gh === null || roadDist(x, z) < 3.2)
                     return;
                 WALK_CIRCLES.push([keyCenter.x + x, keyCenter.z + z, 0.4]);
                 const th = 3.2 + ((x * 7) % 10) / 10 * 1.4;
-                const t = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, th, 5), pm);
+                const t = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, th, 10), pm);
                 t.position.set(keyCenter.x + x, gh + th / 2, keyCenter.z + z);
                 scene.add(t);
                 for (let f = 0; f < 5; f++) {
@@ -10342,7 +10412,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // ---- directional signposts where the road forks to the pier and the store
         function buildSignpost(boards) {
             const g = new THREE.Group();
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 6), new THREE.MeshPhongMaterial({ color: 0x5a4a32, flatShading: true }));
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 10), new THREE.MeshPhongMaterial({ color: 0x5a4a32 }));
             post.position.y = 1.6;
             g.add(post);
             boards.forEach((b) => {
@@ -10384,17 +10454,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         // ---- the dock dressed: an entrance gate with the marina's name, lamps, cleats, fenders, life rings, crates and rope
         {
-            const D = (w, h, d, m, x, y, z, ry) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, dockStartZ + z); if (ry)
+            const D = (w, h, d, m, x, y, z, ry) => { const b = new THREE.Mesh(new BoatRBox(w, h, d), m); b.position.set(dockX + x, dockDeckY + y, dockStartZ + z); if (ry)
                 b.rotation.y = ry; scene.add(b); return b; };
             gazeboWalkCircles.forEach((c) => WALK_CIRCLES.push(c));
-            const iron = dockIronMat, wood = dockRailPostMat, glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9, flatShading: true });
+            const iron = dockIronMat, wood = dockRailPostMat, glow = new THREE.MeshPhongMaterial({ color: 0xfff0b0, emissive: 0xffd870, emissiveIntensity: 0.9 });
             // the gate: two stout posts, a cross beam, and a painted board hung under it (readable from the street and from the water)
             [-1.9, 1.9].forEach((x) => {
                 const gh = Math.min(keyShoreHeightAt(dockX + x, dockStartZ + 0.2), dockDeckY - 0.2), top = dockDeckY + 3.2;
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, top - gh, 7), wood);
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, top - gh, 10), wood);
                 post.position.set(dockX + x, (top + gh) / 2, dockStartZ + 0.2);
                 scene.add(post);
-                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 7), iron);
+                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 10), iron);
                 cap.position.set(dockX + x, top + 0.04, dockStartZ + 0.2);
                 scene.add(cap);
                 WALK_CIRCLES.push([dockX + x, dockStartZ + 0.2, 0.28]);
@@ -10419,7 +10489,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             [-1.0, 1.0].forEach((x) => D(0.05, 0.3, 0.05, iron, x, 2.85, 0.2));
             // lamps on the rail line: a pole, an arm and a glowing lantern, clear of the finger docks
             [5.6, 16, 28].forEach((lz) => [-1, 1].forEach((sd) => {
-                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.5, 6), iron);
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.5, 10), iron);
                 pole.position.set(dockX + sd * (dockHalfW - 0.05), dockDeckY + 1.25, dockStartZ + lz);
                 scene.add(pole);
                 D(0.5, 0.06, 0.06, iron, sd * (dockHalfW - 0.3), 2.45, lz);
@@ -10433,34 +10503,34 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 D(0.1, 0.1, 0.07, iron, cx, 0.22, cz - 0.1);
                 D(0.1, 0.1, 0.07, iron, cx, 0.22, cz + 0.1);
                 if (cz !== 32)
-                    D(0.1, 0.34, 0.34, new THREE.MeshPhongMaterial({ color: 0x1c1f22, flatShading: true }), sd * (dockHalfW + 0.07), -0.12, cz);
+                    D(0.1, 0.34, 0.34, new THREE.MeshPhongMaterial({ color: 0x1c1f22 }), sd * (dockHalfW + 0.07), -0.12, cz);
             }));
             // life rings on the rail
             [[-1, 8.2], [1, 19.8], [-1, 30]].forEach(([sd, lz]) => {
-                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), new THREE.MeshPhongMaterial({ color: 0xd8532e, flatShading: true }));
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), new THREE.MeshPhongMaterial({ color: 0xd8532e }));
                 ring.rotation.y = Math.PI / 2;
                 ring.position.set(dockX + sd * (dockHalfW - 0.16), dockDeckY + 0.78, dockStartZ + lz);
                 scene.add(ring);
-                const hook = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.06), iron);
+                const hook = new THREE.Mesh(new BoatRBox(0.06, 0.12, 0.06), iron);
                 hook.position.set(dockX + sd * (dockHalfW - 0.1), dockDeckY + 1.03, dockStartZ + lz);
                 scene.add(hook);
             });
             // a crate stack and a barrel by the gate, a coil of rope opposite, and a bait bucket
-            const crateM = new THREE.MeshPhongMaterial({ color: 0xa88a5c, flatShading: true }), crateD = new THREE.MeshPhongMaterial({ color: 0x7a6040, flatShading: true });
+            const crateM = new THREE.MeshPhongMaterial({ color: 0xa88a5c }), crateD = new THREE.MeshPhongMaterial({ color: 0x7a6040 });
             D(0.7, 0.5, 0.55, crateM, 0.85, 0.37, 6.4, 0.15);
             D(0.6, 0.45, 0.5, crateD, 0.9, 0.84, 6.45, -0.2);
             D(0.55, 0.4, 0.45, crateM, 0.9, 0.35, 7.35, 0.3);
             WALK_CIRCLES.push([dockX + 0.85, dockStartZ + 6.4, 0.4], [dockX + 0.9, dockStartZ + 7.35, 0.35]);
-            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 0.7, 10), new THREE.MeshPhongMaterial({ color: 0x3a5f78, flatShading: true }));
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 0.7, 10), new THREE.MeshPhongMaterial({ color: 0x3a5f78 }));
             barrel.position.set(dockX - 0.9, dockDeckY + 0.47, dockStartZ + 6.5);
             scene.add(barrel);
             [0.2, 0.6].forEach((y) => { const band = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.265, 0.05, 10), iron); band.position.set(dockX - 0.9, dockDeckY + 0.12 + y, dockStartZ + 6.5); scene.add(band); });
             WALK_CIRCLES.push([dockX - 0.9, dockStartZ + 6.5, 0.32]);
-            const coil = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 6, 14), new THREE.MeshPhongMaterial({ color: 0xc8a878, flatShading: true }));
+            const coil = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 6, 14), new THREE.MeshPhongMaterial({ color: 0xc8a878 }));
             coil.rotation.x = Math.PI / 2;
             coil.position.set(dockX - 0.85, dockDeckY + 0.2, dockStartZ + 7.6);
             scene.add(coil);
-            const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.32, 8), new THREE.MeshPhongMaterial({ color: 0xe0b83a, flatShading: true }));
+            const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.32, 10), new THREE.MeshPhongMaterial({ color: 0xe0b83a }));
             bucket.position.set(dockX - 0.95, dockDeckY + 0.29, dockStartZ + 8.3);
             scene.add(bucket);
         }
@@ -10491,7 +10561,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const g = new THREE.Group(), W = STORE.w, D = STORE.d, H = STORE.h;
             const wallC = 0xe8e0cc, teal = 0x2f6f78;
             const mat = (c, extra) => homeMat(c, extra);
-            const box = (bw, bh, bd, m, x, y, z, rx, ry, rz) => { const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), m); b.position.set(x, y, z); if (rx || ry || rz)
+            const box = (bw, bh, bd, m, x, y, z, rx, ry, rz) => { const b = new THREE.Mesh(new BoatRBox(bw, bh, bd), m); b.position.set(x, y, z); if (rx || ry || rz)
                 b.rotation.set(rx || 0, ry || 0, rz || 0); g.add(b); return b; };
             const wall = mat(wallC), seam = mat(shadeColor(wallC, 0.86)), trim = mat(0xf6f1e4), tealM = mat(teal), dark = mat(0x3a3f45), wood = mat(0x9a7c56), stone = mat(0x8d887c);
             const glass = mat(0xaed4e0, { emissive: 0x2a4048 }), roofM = mat(0x474c52), red = mat(0xb8402e), whiteM = mat(0xf0ece0);
@@ -10565,7 +10635,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             [[3.0, 2.1, 0.8, 0], [3.9, 2.4, 0.7, 0.4], [3.35, 2.25, 0.65, 0.8]].forEach(([x, z, s, up]) => box(s, s * 0.75, s, mat(0x8a6842), x, 0.14 + s * 0.375 + up * 0.75, D / 2 + z - 0.4, 0, x * 3));
             [[-1.3, 2.0], [-0.5, 2.3]].forEach(([x, z]) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.85, 10), mat(0x4a6b8a)); b.position.set(x, 0.14 + 0.43, D / 2 + z); g.add(b); });
             for (let i = 0; i < 4; i++) {
-                const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 3.2, 5), dark);
+                const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 3.2, 10), dark);
                 rod.position.set(W / 2 + 0.05 + i * 0.0, y0 + 1.6, -1.2 + i * 0.35);
                 rod.rotation.z = -0.05;
                 rod.position.x = W / 2 + 0.1;
@@ -10585,19 +10655,19 @@ function DeepWaterPrototype({ onExit, newLook }) {
             [[-1, 0xe8742e], [-0.4, 0xf0ece0], [0.2, 0xb8402e], [0.8, 0xe8c848]].forEach(([z, c]) => { const bu = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(c)); bu.position.set(-W / 2 - 0.2, y0 + 2.4 - Math.abs(z) * 0.15, z - 0.3); g.add(bu); });
             // fuel pump on the quay beside the store
             const pump = new THREE.Group();
-            const pb = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.6), dark);
+            const pb = new THREE.Mesh(new BoatRBox(0.8, 0.2, 0.6), dark);
             pb.position.y = 0.1;
             pump.add(pb);
-            const pbody = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.45, 0.42), red);
+            const pbody = new THREE.Mesh(new BoatRBox(0.62, 1.45, 0.42), red);
             pbody.position.y = 0.92;
             pump.add(pbody);
-            const pcap = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.14, 0.5), dark);
+            const pcap = new THREE.Mesh(new BoatRBox(0.7, 0.14, 0.5), dark);
             pcap.position.y = 1.72;
             pump.add(pcap);
-            const pdisp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.28, 0.05), mat(0xbfe8c0, { emissive: 0x3a6a40 }));
+            const pdisp = new THREE.Mesh(new BoatRBox(0.4, 0.28, 0.05), mat(0xbfe8c0, { emissive: 0x3a6a40 }));
             pdisp.position.set(0, 1.35, 0.23);
             pump.add(pdisp);
-            const hose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 5), dark);
+            const hose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 10), dark);
             hose.position.set(0.38, 0.8, 0.05);
             hose.rotation.z = 0.15;
             pump.add(hose);
@@ -10641,10 +10711,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // ---------- Anchor ----------
         function buildAnchor() {
             const group = new THREE.Group();
-            const mat = new THREE.MeshPhongMaterial({ color: 0x2b2f33, flatShading: true });
-            const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 6), mat);
+            const mat = new THREE.MeshPhongMaterial({ color: 0x2b2f33 });
+            const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 10), mat);
             group.add(shank);
-            const stock = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mat);
+            const stock = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 10), mat);
             stock.rotation.z = Math.PI / 2;
             stock.position.y = 0.32;
             group.add(stock);
@@ -10680,11 +10750,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const mooringSpot = new THREE.Vector3(dockX + dockHalfW + 3, 0, dockStartZ + 16);
         const mooringPilingHeight = dockDeckY + 0.6; // sticks up above the deck, unlike the structural pilings which top out just below it
         const mooringPilingBaseY = keyShoreHeightAt(mooringSpot.x, mooringSpot.z); // the actual seafloor depth here (verified: -12.42), not a walkable-land height — this spot is deliberately in the water alongside the dock
-        const mooringPiling = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, mooringPilingHeight - mooringPilingBaseY, 8), new THREE.MeshPhongMaterial({ color: 0x4a3a26, flatShading: true }));
+        const mooringPiling = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, mooringPilingHeight - mooringPilingBaseY, 10), new THREE.MeshPhongMaterial({ color: 0x4a3a26 }));
         mooringPiling.position.set(mooringSpot.x, (mooringPilingBaseY + mooringPilingHeight) / 2, mooringSpot.z);
         scene.add(mooringPiling);
         // A simple cap ring near the top, reading as a cleat/tie-off point.
-        const mooringCap = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 6, 10), new THREE.MeshPhongMaterial({ color: 0x2a2a2a, flatShading: true }));
+        const mooringCap = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 6, 10), new THREE.MeshPhongMaterial({ color: 0x2a2a2a }));
         mooringCap.position.set(mooringSpot.x, mooringPilingHeight - 0.15, mooringSpot.z);
         mooringCap.rotation.x = Math.PI / 2;
         scene.add(mooringCap);
@@ -10716,7 +10786,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 depth, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 1, steps: 1,
             });
             geo.rotateX(-Math.PI / 2);
-            const hullMat = new THREE.MeshPhongMaterial({ color: hullColor, flatShading: true });
+            const hullMat = new THREE.MeshPhongMaterial({ color: hullColor });
             const hullMesh = new THREE.Mesh(geo, hullMat);
             // Layer two: the gunwale. Without this, the hull is just a flat solid
             // slab — the deck has no actual sides, so anyone standing near the edge
@@ -10746,20 +10816,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // points as buildHull's own perimeter above — so anything checking
         // clearance against "the hull" is checking against the real geometry,
         // not a separate approximation that could drift out of sync with it.
+        const hullPlanCache = {};
         function hullHalfWidthAt(z, L, B) {
-            const pts = [[L, 0], [0.55 * L, 0.55 * B], [0.05 * L, B], [-0.55 * L, B], [-L, 0.85 * B]];
-            if (z > pts[0][0])
-                return 0;
-            if (z < pts[pts.length - 1][0])
-                return pts[pts.length - 1][1];
-            for (let i = 0; i < pts.length - 1; i++) {
-                const [z1, w1] = pts[i], [z2, w2] = pts[i + 1];
-                if (z <= z1 && z >= z2) {
-                    const t = (z1 - z) / (z1 - z2);
-                    return w1 + (w2 - w1) * t;
-                }
-            }
-            return 0;
+            const k = L + "|" + B;
+            const f = hullPlanCache[k] || (hullPlanCache[k] = boatPlanner(L, B));
+            return f(z);
         }
         // Cabin collision check for the walk system — is local point (x,z)
         // inside the cabin's actual footprint? Uses the exact same station data
@@ -10799,7 +10860,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         function wallBetween(a, b, height, thickness, mat) {
             const dir = new THREE.Vector3(b.x - a.x, 0, b.z - a.z);
             const len = dir.length();
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, height, thickness), mat);
+            const mesh = new THREE.Mesh(new BoatRBox(len, height, thickness), mat);
             mesh.position.set((a.x + b.x) / 2, a.y + height / 2, (a.z + b.z) / 2);
             const baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir.clone().normalize());
             mesh.quaternion.copy(baseQuat);
@@ -10810,7 +10871,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         function limbBetween(a, b, radiusTop, radiusBottom, mat) {
             const dir = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z);
             const length = dir.length();
-            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 6), mat);
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 10), mat);
             mesh.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
             const baseQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
             mesh.quaternion.copy(baseQuat);
@@ -10831,14 +10892,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // standing at the wheel, not a chair you sit in. Matches the reference photos.
         function buildLeaningPost(scale) {
             const group = new THREE.Group();
-            const padMat = new THREE.MeshPhongMaterial({ color: 0x23262b, flatShading: true });
-            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * scale, 0.13 * scale, 0.5 * scale, 8), padMat);
+            const padMat = new THREE.MeshPhongMaterial({ color: 0x23262b });
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * scale, 0.13 * scale, 0.5 * scale, 10), padMat);
             base.position.y = 0.25 * scale;
             group.add(base);
-            const bolster = new THREE.Mesh(new THREE.BoxGeometry(0.5 * scale, 0.16 * scale, 0.32 * scale), padMat);
+            const bolster = new THREE.Mesh(new BoatRBox(0.5 * scale, 0.16 * scale, 0.32 * scale), padMat);
             bolster.position.y = 0.58 * scale;
             group.add(bolster);
-            const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5 * scale, 0.4 * scale, 0.1 * scale), padMat);
+            const backrest = new THREE.Mesh(new BoatRBox(0.5 * scale, 0.4 * scale, 0.1 * scale), padMat);
             backrest.position.set(0, 0.9 * scale, -0.16 * scale);
             group.add(backrest);
             return group;
@@ -10846,17 +10907,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // A pedestal-mounted flybridge helm chair: bolster seat, backrest, armrests.
         function buildHelmChair(scale) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshPhongMaterial({ color: 0x22262b, flatShading: true });
-            const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * scale, 0.09 * scale, 0.55 * scale, 8), mat);
+            const mat = new THREE.MeshPhongMaterial({ color: 0x22262b });
+            const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * scale, 0.09 * scale, 0.55 * scale, 10), mat);
             pedestal.position.y = 0.275 * scale;
             group.add(pedestal);
             const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.28 * scale, 0.28 * scale, 0.1 * scale, 10), mat);
             seat.position.y = 0.6 * scale;
             group.add(seat);
-            const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5 * scale, 0.45 * scale, 0.1 * scale), mat);
+            const backrest = new THREE.Mesh(new BoatRBox(0.5 * scale, 0.45 * scale, 0.1 * scale), mat);
             backrest.position.set(0, 0.9 * scale, -0.22 * scale);
             group.add(backrest);
-            const armGeo = new THREE.BoxGeometry(0.08 * scale, 0.08 * scale, 0.35 * scale);
+            const armGeo = new BoatRBox(0.08 * scale, 0.08 * scale, 0.35 * scale);
             const armL = new THREE.Mesh(armGeo, mat);
             armL.position.set(-0.24 * scale, 0.72 * scale, -0.05 * scale);
             group.add(armL);
@@ -10867,16 +10928,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         // A gunwale-mounted rod holder: an angled tube any fishing boat needs.
         function buildRodHolder(scale, mat) {
-            const holderMat = mat || new THREE.MeshPhongMaterial({ color: 0x2b2f33, flatShading: true });
-            const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * scale, 0.045 * scale, 0.32 * scale, 8), holderMat);
+            const holderMat = mat || new THREE.MeshPhongMaterial({ color: 0x2b2f33 });
+            const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * scale, 0.045 * scale, 0.32 * scale, 10), holderMat);
             holder.rotation.z = 0.35; // angled outward, not standing straight up
             return holder;
         }
         function buildCooler(scale) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
-            const lidMat = new THREE.MeshPhongMaterial({ color: 0xb8c9d0, flatShading: true });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.42 * scale, 0.28 * scale, 0.3 * scale), mat);
+            const mat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
+            const lidMat = new THREE.MeshPhongMaterial({ color: 0xb8c9d0 });
+            const body = new THREE.Mesh(new BoatRBox(0.42 * scale, 0.28 * scale, 0.3 * scale), mat);
             body.position.y = 0.14 * scale;
             group.add(body);
             // Lid is hinged at the back edge (not a fixed box) so it can prop open
@@ -10885,14 +10946,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const lidPivot = new THREE.Group();
             lidPivot.position.set(0, 0.28 * scale, -0.15 * scale);
             group.add(lidPivot);
-            const lid = new THREE.Mesh(new THREE.BoxGeometry(0.44 * scale, 0.05 * scale, 0.32 * scale), lidMat);
+            const lid = new THREE.Mesh(new BoatRBox(0.44 * scale, 0.05 * scale, 0.32 * scale), lidMat);
             lid.position.set(0, 0.025 * scale, 0.16 * scale); // offset forward from the hinge by half its own depth
             lidPivot.add(lid);
             // Placeholder contents — a few simple fish shapes sitting in the
             // opening, hidden until the cooler actually has something stored.
             // Deliberately generic (not per-species) since this is a placeholder
             // for "there's something in here," not a detailed inventory display.
-            const fishMat = new THREE.MeshPhongMaterial({ color: 0x7a94a3, flatShading: true });
+            const fishMat = new THREE.MeshPhongMaterial({ color: 0x7a94a3 });
             const fishGeo = new THREE.OctahedronGeometry(0.09 * scale, 0);
             fishGeo.scale(1, 0.5, 2.0);
             const contentFish = [];
@@ -11006,16 +11067,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // part of why the skiff read as generic rather than a real flats boat.
         function buildPolingPlatform(scale, deckHeight) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshPhongMaterial({ color: 0xd6d2c4, flatShading: true });
-            const railMat = new THREE.MeshPhongMaterial({ color: 0xc9c9c9, flatShading: true });
+            const mat = new THREE.MeshPhongMaterial({ color: 0xd6d2c4 });
+            const railMat = new THREE.MeshPhongMaterial({ color: 0xc9c9c9 });
             const legHeight = 0.55 * scale;
-            const legGeo = new THREE.CylinderGeometry(0.035 * scale, 0.04 * scale, legHeight, 6);
+            const legGeo = new THREE.CylinderGeometry(0.035 * scale, 0.04 * scale, legHeight, 10);
             [[-0.35, -0.15], [0.35, -0.15], [-0.35, 0.15], [0.35, 0.15]].forEach(([dx, dz]) => {
                 const leg = new THREE.Mesh(legGeo, mat);
                 leg.position.set(dx * scale, deckHeight + legHeight / 2, dz * scale);
                 group.add(leg);
             });
-            const platform = new THREE.Mesh(new THREE.BoxGeometry(0.8 * scale, 0.05 * scale, 0.45 * scale), mat);
+            const platform = new THREE.Mesh(new BoatRBox(0.8 * scale, 0.05 * scale, 0.45 * scale), mat);
             platform.position.set(0, deckHeight + legHeight, 0);
             group.add(platform);
             // Waist-high rail around the front and sides, standard on every real one.
@@ -11037,13 +11098,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // but no actual motor for them to represent.
         function buildOutboardMotor(scale) {
             const group = new THREE.Group();
-            const cowlMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b, flatShading: true });
-            const accentMat = new THREE.MeshPhongMaterial({ color: 0x14424f, flatShading: true });
-            const motorMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
-            const propMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a, flatShading: true });
+            const cowlMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b });
+            const accentMat = new THREE.MeshPhongMaterial({ color: 0x14424f });
+            const motorMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
+            const propMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a });
             // Cowling: a rounded-top hood instead of a plain cylinder — box body
             // with a dome cap, matching how real outboard covers are actually shaped.
-            const cowlLower = new THREE.Mesh(new THREE.BoxGeometry(0.58 * scale, 0.55 * scale, 0.4 * scale), cowlMat);
+            const cowlLower = new THREE.Mesh(new BoatRBox(0.58 * scale, 0.55 * scale, 0.4 * scale), cowlMat);
             cowlLower.position.y = 0.85 * scale;
             group.add(cowlLower);
             const cowlTop = new THREE.Mesh(new THREE.SphereGeometry(0.3 * scale, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), cowlMat);
@@ -11051,22 +11112,22 @@ function DeepWaterPrototype({ onExit, newLook }) {
             cowlTop.position.y = 0.85 * scale + 0.275 * scale;
             group.add(cowlTop);
             // Accent band — nearly every real outboard has a contrasting stripe or badge area.
-            const accentBand = new THREE.Mesh(new THREE.BoxGeometry(0.6 * scale, 0.09 * scale, 0.42 * scale), accentMat);
+            const accentBand = new THREE.Mesh(new BoatRBox(0.6 * scale, 0.09 * scale, 0.42 * scale), accentMat);
             accentBand.position.y = 0.62 * scale;
             group.add(accentBand);
             // Transom clamp bracket — made tall enough to clearly straddle the
             // entire transom wall height (deckY to deckY+gunwaleHeight) with margin
             // on both ends, so it robustly overlaps the hull instead of trying to
             // touch an exact seam.
-            const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.3 * scale, 0.85 * scale, 0.34 * scale), motorMat);
+            const bracket = new THREE.Mesh(new BoatRBox(0.3 * scale, 0.85 * scale, 0.34 * scale), motorMat);
             bracket.position.y = 0.275 * scale;
             group.add(bracket);
             // Leg/midsection, tapered slightly rather than a flat box.
-            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * scale, 0.1 * scale, 1.15 * scale, 8), motorMat);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * scale, 0.1 * scale, 1.15 * scale, 10), motorMat);
             leg.position.y = -0.3 * scale;
             group.add(leg);
             // Gearcase: tapered torpedo shape with a pointed nose, not a plain drum.
-            const gearcase = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.065 * scale, 0.5 * scale, 8), motorMat);
+            const gearcase = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * scale, 0.065 * scale, 0.5 * scale, 10), motorMat);
             gearcase.rotation.x = Math.PI / 2;
             gearcase.position.set(0, -0.95 * scale, 0.03 * scale);
             group.add(gearcase);
@@ -11075,15 +11136,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
             nose.position.set(0, -0.95 * scale, -0.25 * scale);
             group.add(nose);
             // Skeg — the protective fin below/behind the prop, standard on any lower unit.
-            const skeg = new THREE.Mesh(new THREE.BoxGeometry(0.045 * scale, 0.24 * scale, 0.22 * scale), motorMat);
+            const skeg = new THREE.Mesh(new BoatRBox(0.045 * scale, 0.24 * scale, 0.22 * scale), motorMat);
             skeg.position.set(0, -1.16 * scale, 0.32 * scale);
             group.add(skeg);
             // Propeller: hub plus 3 actual angled blades instead of a 3-sided cylinder.
             const propGroup = new THREE.Group();
-            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.055 * scale, 0.12 * scale, 8), propMat);
+            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.055 * scale, 0.12 * scale, 10), propMat);
             hub.rotation.x = Math.PI / 2;
             propGroup.add(hub);
-            const bladeGeo = new THREE.BoxGeometry(0.1 * scale, 0.17 * scale, 0.016 * scale);
+            const bladeGeo = new BoatRBox(0.1 * scale, 0.17 * scale, 0.016 * scale);
             for (let i = 0; i < 3; i++) {
                 const bladePivot = new THREE.Group();
                 const blade = new THREE.Mesh(bladeGeo, propMat);
@@ -11103,12 +11164,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // simpler single-engine skiff motor.
         function buildOutboardMotorPremium(scale) {
             const group = new THREE.Group();
-            const cowlMat = new THREE.MeshPhongMaterial({ color: 0xf2f2f0, flatShading: true }); // white/light cowl
-            const skirtMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true }); // dark lower skirt band
-            const motorMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
-            const propMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a, flatShading: true });
+            const cowlMat = new THREE.MeshPhongMaterial({ color: 0xf2f2f0 }); // white/light cowl
+            const skirtMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c }); // dark lower skirt band
+            const motorMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
+            const propMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a });
             // Cowling: taller and sleeker than the skiff's, with a two-tone split.
-            const cowlLower = new THREE.Mesh(new THREE.BoxGeometry(0.56 * scale, 0.7 * scale, 0.42 * scale), cowlMat);
+            const cowlLower = new THREE.Mesh(new BoatRBox(0.56 * scale, 0.7 * scale, 0.42 * scale), cowlMat);
             cowlLower.position.y = 0.95 * scale;
             group.add(cowlLower);
             const cowlTop = new THREE.Mesh(new THREE.SphereGeometry(0.29 * scale, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), cowlMat);
@@ -11117,25 +11178,25 @@ function DeepWaterPrototype({ onExit, newLook }) {
             group.add(cowlTop);
             // Dark skirt band at the base of the cowl — the two-tone split every
             // modern 300hp-class outboard has.
-            const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.58 * scale, 0.16 * scale, 0.44 * scale), skirtMat);
+            const skirt = new THREE.Mesh(new BoatRBox(0.58 * scale, 0.16 * scale, 0.44 * scale), skirtMat);
             skirt.position.y = 0.62 * scale;
             group.add(skirt);
             // Transom clamp bracket — tall enough to overlap the transom wall with
             // real margin, same robust approach verified on the skiff.
-            const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.3 * scale, 0.85 * scale, 0.34 * scale), motorMat);
+            const bracket = new THREE.Mesh(new BoatRBox(0.3 * scale, 0.85 * scale, 0.34 * scale), motorMat);
             bracket.position.y = 0.275 * scale;
             group.add(bracket);
             // Visible hydraulic trim ram alongside the leg — present on every real
             // outboard this size, absent on the skiff's smaller motor.
-            const trimRam = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * scale, 0.045 * scale, 0.55 * scale, 8), skirtMat);
+            const trimRam = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * scale, 0.045 * scale, 0.55 * scale, 10), skirtMat);
             trimRam.position.set(0.14 * scale, 0.05 * scale, -0.05 * scale);
             group.add(trimRam);
             // Leg/midsection.
-            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * scale, 0.11 * scale, 1.15 * scale, 8), motorMat);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * scale, 0.11 * scale, 1.15 * scale, 10), motorMat);
             leg.position.y = -0.3 * scale;
             group.add(leg);
             // Gearcase: tapered torpedo shape with a pointed nose.
-            const gearcase = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * scale, 0.07 * scale, 0.55 * scale, 8), motorMat);
+            const gearcase = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * scale, 0.07 * scale, 0.55 * scale, 10), motorMat);
             gearcase.rotation.x = Math.PI / 2;
             gearcase.position.set(0, -0.95 * scale, 0.03 * scale);
             group.add(gearcase);
@@ -11144,15 +11205,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
             nose.position.set(0, -0.95 * scale, -0.28 * scale);
             group.add(nose);
             // Skeg.
-            const skeg = new THREE.Mesh(new THREE.BoxGeometry(0.05 * scale, 0.26 * scale, 0.24 * scale), motorMat);
+            const skeg = new THREE.Mesh(new BoatRBox(0.05 * scale, 0.26 * scale, 0.24 * scale), motorMat);
             skeg.position.set(0, -1.18 * scale, 0.34 * scale);
             group.add(skeg);
             // Propeller — slightly larger, more curved blades than the skiff's.
             const propGroup = new THREE.Group();
-            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * scale, 0.065 * scale, 0.14 * scale, 8), propMat);
+            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * scale, 0.065 * scale, 0.14 * scale, 10), propMat);
             hub.rotation.x = Math.PI / 2;
             propGroup.add(hub);
-            const bladeGeo = new THREE.BoxGeometry(0.12 * scale, 0.2 * scale, 0.018 * scale);
+            const bladeGeo = new BoatRBox(0.12 * scale, 0.2 * scale, 0.018 * scale);
             for (let i = 0; i < 3; i++) {
                 const bladePivot = new THREE.Group();
                 const blade = new THREE.Mesh(bladeGeo, propMat);
@@ -11172,11 +11233,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // across shallow water instead of running the motor.
         function buildPushPole(length, scale) {
             const group = new THREE.Group();
-            const poleMat = new THREE.MeshPhongMaterial({ color: 0x2f3a33, flatShading: true });
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * scale, 0.018 * scale, length, 6), poleMat);
+            const poleMat = new THREE.MeshPhongMaterial({ color: 0x2f3a33 });
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022 * scale, 0.018 * scale, length, 10), poleMat);
             pole.rotation.x = Math.PI / 2;
             group.add(pole);
-            const clipMat = new THREE.MeshPhongMaterial({ color: 0x555555, flatShading: true });
+            const clipMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
             [-0.35, 0.35].forEach((frac) => {
                 const clip = new THREE.Mesh(new THREE.TorusGeometry(0.045 * scale, 0.012 * scale, 6, 10, Math.PI * 1.4), clipMat);
                 clip.rotation.y = Math.PI / 2;
@@ -11198,7 +11259,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             group.userData.flagPivot = trim.userData.flagPivot || null; // name, flag and bow decals
             group.userData.look = look;
             group.userData.R = R;
-            const consoleMat = new THREE.MeshPhongMaterial({ color: def.accent, flatShading: true });
+            const consoleMat = new THREE.MeshPhongMaterial({ color: def.accent });
             const S = 1.8; // superstructure scale, matched to the boat length/beam bump above
             const deckY = def.length * def.freeboardRatio;
             if (family === "skiff") {
@@ -11208,21 +11269,21 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const cz0 = p.cockpitBackZ + 0.5, cz1 = p.cockpitBackZ + (p.cockpitFrontZ - p.cockpitBackZ) * 0.62;
                     group.userData.anchors = { hasTop: false, holderZ0: -0.62 * L, holderZ1: 0.18 * L, cock: { z0: cz0, z1: cz1, halfW: p.cockpitHalfWidth * 0.92, floorY: p.deckY, roofY: p.deckY + 1.6 * S } };
                 } // where the fittings go (read by buildBoatAddons)
-                const deckMat = new THREE.MeshPhongMaterial({ color: 0xd6d2c4, flatShading: true });
+                const deckMat = new THREE.MeshPhongMaterial({ color: 0xd6d2c4 });
                 // Raised bow deck — stops well before the bow's sharp point instead of
                 // trying to cover the full taper, so it never overhangs past the hull.
-                const bowDeck = new THREE.Mesh(new THREE.BoxGeometry(p.bowDeckHalfWidth * 2, p.deckRaise, p.bowDeckFrontZ - p.cockpitFrontZ), deckMat);
+                const bowDeck = new THREE.Mesh(new BoatRBox(p.bowDeckHalfWidth * 2, p.deckRaise, p.bowDeckFrontZ - p.cockpitFrontZ), deckMat);
                 bowDeck.position.set(0, p.deckY + p.deckRaise / 2, (p.bowDeckFrontZ + p.cockpitFrontZ) / 2);
                 group.add(bowDeck);
                 // Raised stern deck — the platform the poling platform actually stands on.
-                const sternDeck = new THREE.Mesh(new THREE.BoxGeometry(p.sternDeckHalfWidth * 2, p.deckRaise, p.cockpitBackZ - p.sternDeckBackZ), deckMat);
+                const sternDeck = new THREE.Mesh(new BoatRBox(p.sternDeckHalfWidth * 2, p.deckRaise, p.cockpitBackZ - p.sternDeckBackZ), deckMat);
                 sternDeck.position.set(0, p.deckY + p.deckRaise / 2, (p.cockpitBackZ + p.sternDeckBackZ) / 2);
                 group.add(sternDeck);
                 // Raised side decks connecting bow to stern along both gunwales. Uses
                 // the bow deck's narrower width as the outer edge (not the stern's
                 // wider one) so the bow-side seam is flush instead of leaving a gap.
                 [-1, 1].forEach((side) => {
-                    const sideDeck = new THREE.Mesh(new THREE.BoxGeometry(p.bowDeckHalfWidth - p.cockpitHalfWidth, p.deckRaise, p.cockpitFrontZ - p.cockpitBackZ), deckMat);
+                    const sideDeck = new THREE.Mesh(new BoatRBox(p.bowDeckHalfWidth - p.cockpitHalfWidth, p.deckRaise, p.cockpitFrontZ - p.cockpitBackZ), deckMat);
                     sideDeck.position.set(side * (p.cockpitHalfWidth + (p.bowDeckHalfWidth - p.cockpitHalfWidth) / 2), p.deckY + p.deckRaise / 2, (p.cockpitFrontZ + p.cockpitBackZ) / 2);
                     group.add(sideDeck);
                 });
@@ -11239,11 +11300,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 });
                 // Storage hatches on top of the bow and stern decks — sized well
                 // inside those decks' own footprint, so they can't overhang either.
-                const hatchMat = new THREE.MeshPhongMaterial({ color: 0xa89f8c, flatShading: true });
-                const bowHatch = new THREE.Mesh(new THREE.BoxGeometry(p.bowDeckHalfWidth * 1.3, 0.03 * S, (p.bowDeckFrontZ - p.cockpitFrontZ) * 0.55), hatchMat);
+                const hatchMat = new THREE.MeshPhongMaterial({ color: 0xa89f8c });
+                const bowHatch = new THREE.Mesh(new BoatRBox(p.bowDeckHalfWidth * 1.3, 0.03 * S, (p.bowDeckFrontZ - p.cockpitFrontZ) * 0.55), hatchMat);
                 bowHatch.position.set(0, p.deckY + p.deckRaise + 0.02 * S, (p.bowDeckFrontZ + p.cockpitFrontZ) / 2);
                 group.add(bowHatch);
-                const sternHatch = new THREE.Mesh(new THREE.BoxGeometry(p.sternDeckHalfWidth * 1.3, 0.03 * S, (p.cockpitBackZ - p.sternDeckBackZ) * 0.5), hatchMat);
+                const sternHatch = new THREE.Mesh(new BoatRBox(p.sternDeckHalfWidth * 1.3, 0.03 * S, (p.cockpitBackZ - p.sternDeckBackZ) * 0.5), hatchMat);
                 sternHatch.position.set(0, p.deckY + p.deckRaise + 0.02 * S, (p.cockpitBackZ + p.sternDeckBackZ) / 2);
                 group.add(sternHatch);
             }
@@ -11270,20 +11331,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
             // toy stuck on the console front.
             function buildWheel(radius, columnHeight) {
                 const wheelGroup = new THREE.Group();
-                const wheelMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
+                const wheelMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
                 // Mounting column from the deck up to the wheel — without this, the
                 // wheel was floating at hand height with nothing visibly holding it up.
-                const column = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.13, radius * 0.17, columnHeight, 8), wheelMat);
+                const column = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.13, radius * 0.17, columnHeight, 14), wheelMat);
                 column.position.y = columnHeight / 2;
                 wheelGroup.add(column);
                 const rim = new THREE.Mesh(new THREE.TorusGeometry(radius, radius * 0.09, 6, 12), wheelMat);
                 rim.position.y = columnHeight;
                 wheelGroup.add(rim);
-                const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, radius * 0.18, 8), wheelMat);
+                const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, radius * 0.18, 14), wheelMat);
                 hub.rotation.x = Math.PI / 2;
                 hub.position.y = columnHeight;
                 wheelGroup.add(hub);
-                const spokeGeo = new THREE.CylinderGeometry(radius * 0.05, radius * 0.05, radius * 0.86, 5);
+                const spokeGeo = new THREE.CylinderGeometry(radius * 0.05, radius * 0.05, radius * 0.86, 14);
                 for (let i = 0; i < 3; i++) {
                     const spoke = new THREE.Mesh(spokeGeo, wheelMat);
                     spoke.rotation.z = Math.PI / 2;
@@ -11302,9 +11363,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
             // (out of the console face) instead of Y (up from the deck).
             function buildConsoleWheel(radius, stubLength, showStub = false) {
                 const wheelGroup = new THREE.Group();
-                const wheelMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
+                const wheelMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
                 if (showStub) {
-                    const stub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.15, radius * 0.15, stubLength, 8), wheelMat);
+                    const stub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.15, radius * 0.15, stubLength, 14), wheelMat);
                     stub.rotation.x = Math.PI / 2;
                     stub.position.z = -stubLength / 2;
                     wheelGroup.add(stub);
@@ -11312,11 +11373,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const rim = new THREE.Mesh(new THREE.TorusGeometry(radius, radius * 0.09, 6, 12), wheelMat);
                 rim.position.z = -stubLength;
                 wheelGroup.add(rim);
-                const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, radius * 0.18, 8), wheelMat);
+                const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, radius * 0.18, 14), wheelMat);
                 hub.rotation.x = Math.PI / 2;
                 hub.position.z = -stubLength;
                 wheelGroup.add(hub);
-                const spokeGeo = new THREE.CylinderGeometry(radius * 0.05, radius * 0.05, radius * 0.86, 5);
+                const spokeGeo = new THREE.CylinderGeometry(radius * 0.05, radius * 0.05, radius * 0.86, 14);
                 for (let i = 0; i < 3; i++) {
                     const spoke = new THREE.Mesh(spokeGeo, wheelMat);
                     spoke.rotation.z = Math.PI / 2;
@@ -11354,7 +11415,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const cw = 1.1 * S * consoleScale, ch = 1.2 * S * consoleScale, cd = 0.9 * S * consoleScale;
                 const consoleFrontZ = -0.2 * S; // reuses the old wheel position as a clean anchor
                 const consoleCenterZ = consoleFrontZ + cd / 2;
-                const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), consoleMat);
+                const c = new THREE.Mesh(new BoatRBox(cw, ch, cd), consoleMat);
                 c.position.set(0, deckY + ch / 2, consoleCenterZ);
                 group.add(c);
                 // Console-mounted wheel — much smaller than the old floor-pedestal
@@ -11375,29 +11436,29 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 dashGroup.rotation.x = -0.25;
                 group.add(dashGroup);
                 const dashWidth = cw * 1.1;
-                const dashPanelMat = new THREE.MeshPhongMaterial({ color: 0x1a1d21, flatShading: true });
-                const dashPanel = new THREE.Mesh(new THREE.BoxGeometry(dashWidth, 0.22 * S, 0.03 * S), dashPanelMat);
+                const dashPanelMat = new THREE.MeshPhongMaterial({ color: 0x1a1d21 });
+                const dashPanel = new THREE.Mesh(new BoatRBox(dashWidth, 0.22 * S, 0.03 * S), dashPanelMat);
                 dashPanel.position.set(0, 0.11 * S, 0);
                 dashGroup.add(dashPanel);
-                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b, flatShading: true });
+                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b });
                 const gauge = buildGaugeDisc(0.055 * S, gaugeMat);
                 gauge.position.set(0, 0.11 * S, -0.02 * S);
                 dashGroup.add(gauge);
-                const switchMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
+                const switchMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
                 [-0.04, 0.04].forEach((dx) => {
-                    const sw = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * S, 0.008 * S, 0.035 * S, 6), switchMat);
+                    const sw = new THREE.Mesh(new THREE.CylinderGeometry(0.008 * S, 0.008 * S, 0.035 * S, 14), switchMat);
                     sw.rotation.x = Math.PI / 2;
                     sw.position.set(dashWidth * 0.32 + dx * S, 0.03 * S, -0.017 * S);
                     dashGroup.add(sw);
                 });
                 // Small throttle/shift pod on the side — every boat with an engine
                 // has one, and this had none.
-                const podMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
-                const throttlePod = new THREE.Mesh(new THREE.BoxGeometry(0.12 * S, 0.09 * S, 0.16 * S), podMat);
+                const podMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
+                const throttlePod = new THREE.Mesh(new BoatRBox(0.12 * S, 0.09 * S, 0.16 * S), podMat);
                 throttlePod.position.set(cw / 2 + 0.06 * S, deckY + ch * 0.65, consoleCenterZ);
                 group.add(throttlePod);
-                const leverMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, flatShading: true });
-                const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.018 * S, 0.16 * S, 8), leverMat);
+                const leverMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a });
+                const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.018 * S, 0.16 * S, 14), leverMat);
                 lever.position.set(cw / 2 + 0.06 * S, deckY + ch * 0.65 + 0.12 * S, consoleCenterZ);
                 lever.rotation.z = 0.15;
                 group.add(lever);
@@ -11417,13 +11478,13 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // the aft side, same orientation principle as the CC's companion
                 // seats), positioned well clear of the poling platform, rod holders,
                 // and the cockpit's own back boundary.
-                const skiffSeatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat, flatShading: true });
+                const skiffSeatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat });
                 const rearSeatZ = -3.6, rearSeatDepth = 0.35 * S;
                 [-1, 1].forEach((side) => {
-                    const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.34 * S, 0.1 * S, rearSeatDepth), skiffSeatMat);
+                    const cushion = new THREE.Mesh(new BoatRBox(0.34 * S, 0.1 * S, rearSeatDepth), skiffSeatMat);
                     cushion.position.set(side * 0.6 * S, deckY + 0.05 * S, rearSeatZ);
                     group.add(cushion);
-                    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.34 * S, 0.24 * S, 0.06 * S), skiffSeatMat);
+                    const backrest = new THREE.Mesh(new BoatRBox(0.34 * S, 0.24 * S, 0.06 * S), skiffSeatMat);
                     backrest.position.set(side * 0.6 * S, deckY + 0.15 * S, rearSeatZ - rearSeatDepth / 2);
                     group.add(backrest);
                 });
@@ -11443,7 +11504,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Height is anchored to the actual raised side-deck surface (p.raisedY)
                 // a person stands on there, not the lower cockpit floor (deckY) —
                 // that mismatch was why it looked wrong before.
-                const sideRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
+                const sideRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const sideRailY = p.raisedY + 0.55;
                 const railL = def.length / 2;
                 const bowApex = new THREE.Vector3(0, sideRailY, railL * 0.9); // short of the very tip, matching a real bow rail
@@ -11484,20 +11545,20 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 outboard.position.set(0, deckY, -def.length / 2 - 0.15 * S);
                 group.add(outboard);
                 // Nav lights — mounted on visible poles, not floating bare spheres.
-                const lightMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x333333, flatShading: true });
-                const poleMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b, flatShading: true });
+                const lightMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x333333 });
+                const poleMat = new THREE.MeshPhongMaterial({ color: 0x2b2b2b });
                 const bowLightPoleH = 0.15 * S;
-                const bowLightPole = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * S, 0.012 * S, bowLightPoleH, 6), poleMat);
+                const bowLightPole = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * S, 0.012 * S, bowLightPoleH, 14), poleMat);
                 bowLightPole.position.set(0, p.raisedY + bowLightPoleH / 2, p.bowDeckFrontZ - 0.1 * S);
                 group.add(bowLightPole);
-                const bowLight = new THREE.Mesh(new THREE.SphereGeometry(0.04 * S, 6, 6), lightMat);
+                const bowLight = new THREE.Mesh(new THREE.SphereGeometry(0.04 * S, 14, 10), lightMat);
                 bowLight.position.set(0, p.raisedY + bowLightPoleH, p.bowDeckFrontZ - 0.1 * S);
                 group.add(bowLight);
                 const sternLightPoleH = 0.9 * S;
-                const sternLightPole = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * S, 0.014 * S, sternLightPoleH, 6), poleMat);
+                const sternLightPole = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * S, 0.014 * S, sternLightPoleH, 14), poleMat);
                 sternLightPole.position.set(0, p.raisedY + sternLightPoleH / 2, -def.length * 0.4);
                 group.add(sternLightPole);
-                const sternLight = new THREE.Mesh(new THREE.SphereGeometry(0.04 * S, 6, 6), lightMat);
+                const sternLight = new THREE.Mesh(new THREE.SphereGeometry(0.04 * S, 14, 10), lightMat);
                 sternLight.position.set(0, p.raisedY + sternLightPoleH, -def.length * 0.4);
                 group.add(sternLight);
             }
@@ -11513,18 +11574,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const consoleFrontZ = 0.5 * S;
                 const consoleCenterZ = consoleFrontZ + cd / 2;
                 const consoleBackZ = consoleFrontZ + cd;
-                const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), consoleMat);
+                const c = new THREE.Mesh(new BoatRBox(cw, ch, cd), consoleMat);
                 c.position.set(0, deckY + ch / 2, consoleCenterZ);
                 group.add(c);
                 const ttopZ = ((consoleFrontZ - 0.1 * S) + (consoleBackZ + 0.05 * S)) / 2, ttopY = deckY + 1.6 * S; // where the T-top is (or would be): the anchor for the roof fittings
                 group.userData.anchors = { roofY: FIT.ttop ? ttopY + 0.04 * S : deckY + ch + 0.25, roofZ: ttopZ, roofD: 1.4 * S, roofHalfW: 0.8 * S, hasTop: FIT.ttop, rigX: 0.8 * S, rigY: ttopY, rigZ: ttopZ, holderZ0: -0.5 * def.length / 2, holderZ1: 0.1 * def.length / 2, cock: { z0: ttopZ - 2.3 * S, z1: ttopZ + 0.5 * S, halfW: Math.min(1.0 * S, hullHalfWidthAt(ttopZ - 2.3 * S, def.length / 2, def.beam / 2) - 0.5), floorY: deckY, roofY: deckY + 1.6 * S } };
                 if (FIT.ttop) {
-                    const toppMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true });
+                    const toppMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
                     const legX = 0.72;
                     const legHeight = 1.6 * S;
                     const legFrontZ = consoleFrontZ - 0.1 * S;
                     const legBackZ = consoleBackZ + 0.05 * S;
-                    const legGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, legHeight, 8);
+                    const legGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, legHeight, 14);
                     [[-legX, legBackZ], [legX, legBackZ], [-legX, legFrontZ], [legX, legFrontZ]].forEach(([dx, z]) => {
                         const leg = new THREE.Mesh(legGeo, toppMat);
                         leg.position.set(dx * S, deckY + legHeight / 2, z);
@@ -11540,16 +11601,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     [[cFL, cFR], [cBL, cBR], [cFL, cBL], [cFR, cBR]].forEach(([a, b]) => {
                         group.add(limbBetween(a, b, railR, railR, toppMat));
                     });
-                    const top = new THREE.Mesh(new THREE.BoxGeometry(1.6 * S, 0.08 * S, 1.4 * S), R.canvas === null ? toppMat : new THREE.MeshPhongMaterial({ color: R.canvas, flatShading: true })); // the roof takes the canvas colour when one is chosen
+                    const top = new THREE.Mesh(new BoatRBox(1.6 * S, 0.08 * S, 1.4 * S), R.canvas === null ? toppMat : new THREE.MeshPhongMaterial({ color: R.canvas })); // the roof takes the canvas colour when one is chosen
                     top.position.set(0, topY, topCenterZ);
                     group.add(top);
                     // Electronics box on top of the T-top — houses radar/antenna mounts,
                     // standard on a boat this size, absent on the small skiff.
-                    const boxMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5, flatShading: true });
-                    const electronicsBox = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 0.22 * S, 0.5 * S), boxMat);
+                    const boxMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5 });
+                    const electronicsBox = new THREE.Mesh(new BoatRBox(0.9 * S, 0.22 * S, 0.5 * S), boxMat);
                     electronicsBox.position.set(0, topY + 0.15 * S, topCenterZ);
                     group.add(electronicsBox);
-                    const antennaGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 6);
+                    const antennaGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 14);
                     [-0.3, 0.3].forEach((dx) => {
                         const antenna = new THREE.Mesh(antennaGeo, boxMat);
                         antenna.position.set(dx * S, topY + 0.26 * S + 0.27 * S, topCenterZ);
@@ -11559,8 +11620,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Console door — lower on the front face, well below the wheel
                 // (Y-separated, verified clear by 0.055 units) rather than beside it,
                 // which would have overlapped the wheel's lower edge.
-                const doorMat = new THREE.MeshPhongMaterial({ color: 0x0d2438, flatShading: true });
-                const consoleDoor = new THREE.Mesh(new THREE.BoxGeometry(cw * 0.5, ch * 0.22, 0.01 * S), doorMat);
+                const doorMat = new THREE.MeshPhongMaterial({ color: 0x0d2438 });
+                const consoleDoor = new THREE.Mesh(new BoatRBox(cw * 0.5, ch * 0.22, 0.01 * S), doorMat);
                 consoleDoor.position.set(0, deckY + ch * 0.13, consoleFrontZ - 0.005 * S);
                 group.add(consoleDoor);
                 // Console-mounted wheel — much smaller than before, mounted directly
@@ -11581,52 +11642,52 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 dashGroup.rotation.x = -0.25;
                 group.add(dashGroup);
                 const dashWidth = cw * 1.15; // flares a bit wider than the pedestal, like a real dash overhang
-                const dashPanelMat = new THREE.MeshPhongMaterial({ color: 0x1a1d21, flatShading: true });
-                const dashPanel = new THREE.Mesh(new THREE.BoxGeometry(dashWidth, 0.3 * S, 0.04 * S), dashPanelMat);
+                const dashPanelMat = new THREE.MeshPhongMaterial({ color: 0x1a1d21 });
+                const dashPanel = new THREE.Mesh(new BoatRBox(dashWidth, 0.3 * S, 0.04 * S), dashPanelMat);
                 dashPanel.position.set(0, 0.15 * S, 0);
                 dashGroup.add(dashPanel);
-                const screenMat = new THREE.MeshPhongMaterial({ color: 0x0d2a3a, flatShading: true, emissive: 0x0a2230, emissiveIntensity: 0.4 });
-                const chartplotter = new THREE.Mesh(new THREE.BoxGeometry(dashWidth * 0.34, 0.2 * S, 0.015 * S), screenMat);
+                const screenMat = new THREE.MeshPhongMaterial({ color: 0x0d2a3a, emissive: 0x0a2230, emissiveIntensity: 0.4 });
+                const chartplotter = new THREE.Mesh(new BoatRBox(dashWidth * 0.34, 0.2 * S, 0.015 * S), screenMat);
                 chartplotter.position.set(-dashWidth * 0.22, 0.17 * S, -0.023 * S);
                 dashGroup.add(chartplotter);
-                const bezelMat = new THREE.MeshPhongMaterial({ color: 0x050607, flatShading: true });
-                const chartplotterBezel = new THREE.Mesh(new THREE.BoxGeometry(dashWidth * 0.38, 0.24 * S, 0.01 * S), bezelMat);
+                const bezelMat = new THREE.MeshPhongMaterial({ color: 0x050607 });
+                const chartplotterBezel = new THREE.Mesh(new BoatRBox(dashWidth * 0.38, 0.24 * S, 0.01 * S), bezelMat);
                 chartplotterBezel.position.set(-dashWidth * 0.22, 0.17 * S, -0.025 * S);
                 dashGroup.add(chartplotterBezel);
-                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b, flatShading: true });
+                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b });
                 [dashWidth * 0.1, dashWidth * 0.32].forEach((gx) => {
                     const gauge = buildGaugeDisc(0.035 * S, gaugeMat);
                     gauge.position.set(gx, 0.18 * S, -0.023 * S);
                     dashGroup.add(gauge);
                 });
-                const switchMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
+                const switchMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
                 [-0.05, 0, 0.05].forEach((dx) => {
-                    const sw = new THREE.Mesh(new THREE.CylinderGeometry(0.01 * S, 0.01 * S, 0.045 * S, 6), switchMat);
+                    const sw = new THREE.Mesh(new THREE.CylinderGeometry(0.01 * S, 0.01 * S, 0.045 * S, 14), switchMat);
                     sw.rotation.x = Math.PI / 2;
                     sw.position.set(dashWidth * 0.24 + dx * S, 0.045 * S, -0.02 * S);
                     dashGroup.add(sw);
                 });
                 // Throttle/shift control pod, mounted to the side of the console.
-                const podMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
-                const throttlePod = new THREE.Mesh(new THREE.BoxGeometry(0.16 * S, 0.12 * S, 0.22 * S), podMat);
+                const podMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
+                const throttlePod = new THREE.Mesh(new BoatRBox(0.16 * S, 0.12 * S, 0.22 * S), podMat);
                 throttlePod.position.set(cw / 2 + 0.08 * S, deckY + ch * 0.65, consoleCenterZ);
                 group.add(throttlePod);
-                const leverMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, flatShading: true });
-                const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * S, 0.025 * S, 0.22 * S, 8), leverMat);
+                const leverMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a });
+                const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * S, 0.025 * S, 0.22 * S, 14), leverMat);
                 lever.position.set(cw / 2 + 0.08 * S, deckY + ch * 0.65 + 0.17 * S, consoleCenterZ);
                 lever.rotation.z = 0.15;
                 group.add(lever);
-                const leverKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035 * S, 8, 6), leverMat);
+                const leverKnob = new THREE.Mesh(new THREE.SphereGeometry(0.035 * S, 14, 10), leverMat);
                 leverKnob.position.set(cw / 2 + 0.08 * S + 0.033 * S, deckY + ch * 0.65 + 0.28 * S, consoleCenterZ);
                 group.add(leverKnob);
                 // Windshield — pushed further back from the console (bigger gap than
                 // before) and now actually mounted: two angled struts from the
                 // console top up to the glass's bottom corners, plus a bottom frame
                 // rail, instead of floating with nothing holding it up.
-                const windshieldMat = new THREE.MeshPhongMaterial({ color: 0x8fd0e0, flatShading: true, transparent: true, opacity: 0.35 });
+                const windshieldMat = new THREE.MeshPhongMaterial({ color: 0x8fd0e0, transparent: true, opacity: 0.35 });
                 const windshieldY = ch + 0.2 * S;
                 const windshieldZ = consoleFrontZ + 0.25 * S;
-                const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.9 * S, 0.4 * S, 0.03 * S), windshieldMat);
+                const windshield = new THREE.Mesh(new BoatRBox(0.9 * S, 0.4 * S, 0.03 * S), windshieldMat);
                 windshield.position.set(0, deckY + windshieldY, windshieldZ);
                 windshield.rotation.x = -0.35;
                 group.add(windshield);
@@ -11640,14 +11701,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // console's far face by 1.3 units and stays well short of the bow
                 // deck's start. Same forward-facing, backrest-toward-console
                 // orientation as the corrected bow seats.
-                const seatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat, flatShading: true });
+                const seatMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0xe4e1d6 : R.seat });
                 const companionDepth = 0.5 * S;
                 const companionZ = 1.4 * S; // pulled back slightly from console for more legroom toward the bow deck
                 [-1, 1].forEach((side) => {
-                    const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.5 * S, 0.12 * S, companionDepth), seatMat);
+                    const cushion = new THREE.Mesh(new BoatRBox(0.5 * S, 0.12 * S, companionDepth), seatMat);
                     cushion.position.set(side * 0.8 * S, deckY + 0.08 * S, companionZ);
                     group.add(cushion);
-                    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5 * S, 0.32 * S, 0.08 * S), seatMat);
+                    const backrest = new THREE.Mesh(new BoatRBox(0.5 * S, 0.32 * S, 0.08 * S), seatMat);
                     backrest.position.set(side * 0.8 * S, deckY + 0.2 * S, companionZ - companionDepth / 2);
                     group.add(backrest);
                 });
@@ -11672,7 +11733,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const ccP = getCCBowDeckParams(def);
                 const { bowDeckRaise, bowDeckBackZ, bowDeckAftHalfWidth, bowVertexZ, bowApexZ, wBack, wVertex } = ccP;
                 const L = def.length / 2, B = def.beam / 2;
-                const bowDeckMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df, flatShading: true });
+                const bowDeckMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df });
                 // Taper geometry (wBack/wVertex/bowVertexZ/bowApexZ) comes straight
                 // from getCCBowDeckParams — the same values deckHeightAt uses for
                 // the walking system — so the visual deck, the rail, and where the
@@ -11697,7 +11758,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // skiff's side rail — instead of the deck's own edge. Reuses the
                 // exact same taper points as the solid deck above, so rail and deck
                 // always agree with each other.
-                const bowRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
+                const bowRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const railY = deckY + bowDeckRaise + 0.42 * S;
                 const bowApex = new THREE.Vector3(0, railY, bowApexZ);
                 const railForwardPts = [];
@@ -11717,17 +11778,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 railForwardPts.forEach((pt) => {
                     group.add(limbBetween(pt, bowApex, 0.03 * S, 0.03 * S, bowRailMat));
                 });
-                const hatchMat = new THREE.MeshPhongMaterial({ color: 0xa89f8c, flatShading: true });
-                const anchorHatch = new THREE.Mesh(new THREE.BoxGeometry(bowDeckAftHalfWidth * 1.2, 0.03 * S, (bowVertexZ - bowDeckBackZ) * 0.5), hatchMat);
+                const hatchMat = new THREE.MeshPhongMaterial({ color: 0xa89f8c });
+                const anchorHatch = new THREE.Mesh(new BoatRBox(bowDeckAftHalfWidth * 1.2, 0.03 * S, (bowVertexZ - bowDeckBackZ) * 0.5), hatchMat);
                 anchorHatch.position.set(0, deckY + bowDeckRaise + 0.02 * S, bowDeckBackZ + (bowVertexZ - bowDeckBackZ) * 0.4);
                 group.add(anchorHatch);
                 // Bow deck left fully open for casting/fighting fish — passenger
                 // seating moved forward of the console instead.
                 // Cleats — small deck hardware at bow and stern.
                 function buildCleat() {
-                    const cleatMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
-                    const base = new THREE.Mesh(new THREE.BoxGeometry(0.16 * S, 0.03 * S, 0.05 * S), cleatMat);
-                    const hornGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.14 * S, 6);
+                    const cleatMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
+                    const base = new THREE.Mesh(new BoatRBox(0.16 * S, 0.03 * S, 0.05 * S), cleatMat);
+                    const hornGeo = new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.14 * S, 14);
                     const cleat = new THREE.Group();
                     cleat.add(base);
                     [-0.06, 0.06].forEach((dx) => {
@@ -11758,11 +11819,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const platformY = deckY * 0.35;
                 const sternZ = -(def.length / 2);
                 if (FIT.platform) {
-                    const platform = new THREE.Mesh(new THREE.BoxGeometry(platformHalfWidth * 2, 0.08 * S, platformDepth), platformMat);
+                    const platform = new THREE.Mesh(new BoatRBox(platformHalfWidth * 2, 0.08 * S, platformDepth), platformMat);
                     platform.position.set(0, platformY, sternZ - platformDepth / 2);
                     group.add(platform);
-                    const ladderMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
-                    const ladderRailGeo = new THREE.CylinderGeometry(0.02 * S, 0.02 * S, 0.5 * S, 6);
+                    const ladderMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
+                    const ladderRailGeo = new THREE.CylinderGeometry(0.02 * S, 0.02 * S, 0.5 * S, 14);
                     [-0.25, 0.25].forEach((dx) => {
                         const rail = new THREE.Mesh(ladderRailGeo, ladderMat);
                         rail.rotation.x = 0.5;
@@ -11770,7 +11831,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         group.add(rail);
                     });
                     [0.1, 0.28].forEach((ry) => {
-                        const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.45 * S, 6), ladderMat);
+                        const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.45 * S, 14), ladderMat);
                         rung.rotation.z = Math.PI / 2;
                         rung.position.set(0, platformY - 0.18 * S - ry * S, sternZ - platformDepth - 0.15 * S + ry * S * 0.8);
                         group.add(rung);
@@ -11794,7 +11855,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         motor.position.set(side * motorX, deckY, motorZ);
                         group.add(motor);
                     });
-                    const tieBarMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c, flatShading: true });
+                    const tieBarMat = new THREE.MeshPhongMaterial({ color: 0x1c1c1c });
                     const tieBar = limbBetween(new THREE.Vector3(-motorX, deckY + 0.05 * S, motorZ - 0.3 * S), new THREE.Vector3(motorX, deckY + 0.05 * S, motorZ - 0.3 * S), 0.025 * S, 0.025 * S, tieBarMat);
                     group.add(tieBar);
                 }
@@ -11864,9 +11925,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // helm position sits at z≈7.04, which falls inside the cabin's
                 // taper zone, so the first-person camera was starting completely
                 // embedded in solid material.
-                const cabinMat = new THREE.MeshPhongMaterial({ color: def.hullColor, flatShading: true });
+                const cabinMat = new THREE.MeshPhongMaterial({ color: def.hullColor });
                 const floorMat = makeWoodMaterial("sole"); // warm wood-plank sole, distinct from the hull-colored walls
-                const ceilingMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df, flatShading: true }); // lighter headliner
+                const ceilingMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df }); // lighter headliner
                 const floorThickness = 0.08 * S;
                 const floorGeo = new THREE.ExtrudeGeometry(cabinShapeOutline, { depth: floorThickness, bevelEnabled: false, steps: 1 });
                 floorGeo.rotateX(-Math.PI / 2);
@@ -11954,16 +12015,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Small header panel above the door opening, closing the gap above door height.
                 const doorTopY = wallBaseY + 0.75 * S;
                 if (doorTopY < wallBaseY + wallHeight) {
-                    const header = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, wallBaseY + wallHeight - doorTopY, 0.06 * S), cabinMat);
+                    const header = new THREE.Mesh(new BoatRBox(doorWidth, wallBaseY + wallHeight - doorTopY, 0.06 * S), cabinMat);
                     header.position.set(doorCenterX, (doorTopY + wallBaseY + wallHeight) / 2, backZ);
                     group.add(header);
                 }
                 // Windshield follows the rounded nose — same rake convention as the
                 // CC's (top leans aft), since "forward" is consistently +Z.
-                const windshieldMat = new THREE.MeshPhongMaterial({ color: 0x8fd0e0, flatShading: true, transparent: true, opacity: 0.35 });
+                const windshieldMat = new THREE.MeshPhongMaterial({ color: 0x8fd0e0, transparent: true, opacity: 0.35 });
                 const wsHeight = 0.65 * S;
                 const wsCenterY = cabinCenterY + 0.3 * S;
-                const cabinWindshield = new THREE.Mesh(new THREE.BoxGeometry(wShoulder * 1.7, wsHeight, 0.03 * S), windshieldMat);
+                const cabinWindshield = new THREE.Mesh(new BoatRBox(wShoulder * 1.7, wsHeight, 0.03 * S), windshieldMat);
                 cabinWindshield.position.set(0, wsCenterY, shoulderZ + 0.2 * S);
                 cabinWindshield.rotation.x = -0.4;
                 group.add(cabinWindshield);
@@ -11974,11 +12035,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // the "back" station, where the smooth curve has already narrowed
                 // slightly, so using the station's own wider value would have left
                 // it floating about 0.1 units outside the actual wall.
-                const windowMat = new THREE.MeshPhongMaterial({ color: 0x1a2a33, flatShading: true, transparent: true, opacity: 0.7 });
+                const windowMat = new THREE.MeshPhongMaterial({ color: 0x1a2a33, transparent: true, opacity: 0.7 });
                 [backZ + 0.5 * S, mid1Z, mid2Z].forEach((z) => {
                     const w = stage1WidthAt(z);
                     [-1, 1].forEach((side) => {
-                        const win = new THREE.Mesh(new THREE.BoxGeometry(0.02 * S, 0.32 * S, 0.55 * S), windowMat);
+                        const win = new THREE.Mesh(new BoatRBox(0.02 * S, 0.32 * S, 0.55 * S), windowMat);
                         win.position.set(side * w, cabinCenterY + 0.15 * S, z);
                         group.add(win);
                     });
@@ -11986,12 +12047,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Door — on the BACK wall (facing aft, toward the cockpit), matching
                 // the actual layout of a salon-to-cockpit door, not a side-wall door.
                 // Built as a hinged pivot (swings inward, into the cabin).
-                const doorMat = new THREE.MeshPhongMaterial({ color: 0x0d2438, flatShading: true });
+                const doorMat = new THREE.MeshPhongMaterial({ color: 0x0d2438 });
                 const doorHingeX = doorCenterX - doorWidth / 2; // inboard edge
                 const cabinDoorPivot = new THREE.Group();
                 cabinDoorPivot.position.set(doorHingeX, cabinCenterY - 0.28 * S, backZ);
                 group.add(cabinDoorPivot);
-                const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, 0.75 * S, 0.02 * S), doorMat);
+                const doorPanel = new THREE.Mesh(new BoatRBox(doorWidth, 0.75 * S, 0.02 * S), doorMat);
                 doorPanel.position.set(doorWidth / 2, 0, 0); // offset from the hinge by half its own width
                 cabinDoorPivot.add(doorPanel);
                 group.userData.cabinDoorPivot = cabinDoorPivot;
@@ -12012,15 +12073,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const interiorFloorY = cabinCenterY - cabinHeight / 2 + floorThickness;
                 // Settee (bench seat) along the port side wall, in the back section
                 // where the cabin is widest and most consistent.
-                const setteeMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0x2c4a5e : R.seat, flatShading: true }); // navy upholstery
+                const setteeMat = new THREE.MeshPhongMaterial({ color: R.seat === null ? 0x2c4a5e : R.seat }); // navy upholstery
                 const setteeDepth = 0.55 * S;
                 const setteeLen = (mid1Z - 0.3) - (backZ + 0.3);
                 const setteeCenterZ = backZ + 0.3 + setteeLen / 2;
                 const setteeX = -2.2; // verified against the backrest's outer edge (the part that reaches furthest toward the wall), not just the cushion — the cushion alone looked safe at -2.5 but the backrest overhung by 0.016 there
-                const setteeCushion = new THREE.Mesh(new THREE.BoxGeometry(setteeDepth, 0.18 * S, setteeLen), setteeMat);
+                const setteeCushion = new THREE.Mesh(new BoatRBox(setteeDepth, 0.18 * S, setteeLen), setteeMat);
                 setteeCushion.position.set(setteeX, interiorFloorY + 0.22 * S, setteeCenterZ);
                 group.add(setteeCushion);
-                const setteeBack = new THREE.Mesh(new THREE.BoxGeometry(0.12 * S, 0.4 * S, setteeLen), setteeMat);
+                const setteeBack = new THREE.Mesh(new BoatRBox(0.12 * S, 0.4 * S, setteeLen), setteeMat);
                 setteeBack.position.set(setteeX - setteeDepth / 2 + 0.06 * S, interiorFloorY + 0.5 * S, setteeCenterZ);
                 group.add(setteeBack);
                 // Seat marker for the sit interaction — cushion top height, centered
@@ -12034,24 +12095,24 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }];
                 // Small table in front of the settee.
                 const tableMat = makeWoodMaterial("table"); // dark varnished wood top
-                const tableLegMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, flatShading: true });
+                const tableLegMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a });
                 const tableX = setteeX + setteeDepth / 2 + 0.55 * S;
                 const tableTop = new THREE.Mesh(woodBox(0.7 * S, 0.04 * S, 1.0 * S, "table"), tableMat);
                 tableTop.position.set(tableX, interiorFloorY + 0.36 * S, setteeCenterZ);
                 group.add(tableTop);
-                const tableLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * S, 0.03 * S, 0.36 * S, 6), tableLegMat);
+                const tableLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * S, 0.03 * S, 0.36 * S, 14), tableLegMat);
                 tableLeg.position.set(tableX, interiorFloorY + 0.18 * S, setteeCenterZ);
                 group.add(tableLeg);
                 // Small galley-style cabinet on the starboard side, further forward
                 // (past mid1Z) to stay clear of the door's swing arc near the back.
-                const cabinetMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
-                const cabinetCounterMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a, flatShading: true });
+                const cabinetMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
+                const cabinetCounterMat = new THREE.MeshPhongMaterial({ color: 0x3a3a3a });
                 const cabinetZ = mid1Z + 0.5 * S;
                 const cabinetX = wMid1 - 0.7 * S; // verified against the cabinet's far Z-edge (z=3.31, where the hull has already narrowed to 2.436) — the cabinet's own depth extends past mid1Z, so checking width only at mid1Z (as originally done) missed this narrower point
-                const cabinetBody = new THREE.Mesh(new THREE.BoxGeometry(0.5 * S, 0.55 * S, 0.9 * S), cabinetMat);
+                const cabinetBody = new THREE.Mesh(new BoatRBox(0.5 * S, 0.55 * S, 0.9 * S), cabinetMat);
                 cabinetBody.position.set(cabinetX, interiorFloorY + 0.275 * S, cabinetZ);
                 group.add(cabinetBody);
-                const cabinetCounter = new THREE.Mesh(new THREE.BoxGeometry(0.55 * S, 0.04 * S, 0.95 * S), cabinetCounterMat);
+                const cabinetCounter = new THREE.Mesh(new BoatRBox(0.55 * S, 0.04 * S, 0.95 * S), cabinetCounterMat);
                 cabinetCounter.position.set(cabinetX, interiorFloorY + 0.57 * S, cabinetZ);
                 group.add(cabinetCounter);
                 // Flybridge coaming — extends the SAME smooth, hull-blended taper up
@@ -12106,14 +12167,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const flyFrontZ = shoulderZ - 0.3 * S;
                 const flyBackZ = cabinBackZ + 0.5;
                 const flyHalfWidth = Math.min(s2wMid1, s2wMid2) * 0.95;
-                const flyFloorMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df, flatShading: true });
-                const flyFloor = new THREE.Mesh(new THREE.BoxGeometry(flyHalfWidth * 2, 0.1 * S, flyFrontZ - flyBackZ), flyFloorMat);
+                const flyFloorMat = new THREE.MeshPhongMaterial({ color: 0xe8e6df });
+                const flyFloor = new THREE.Mesh(new BoatRBox(flyHalfWidth * 2, 0.1 * S, flyFrontZ - flyBackZ), flyFloorMat);
                 const flyFloorCenterZ = (flyFrontZ + flyBackZ) / 2;
                 flyFloor.position.set(0, stage2TopY + 0.05 * S, flyFloorCenterZ);
                 group.add(flyFloor);
                 const flyFloorTopY = stage2TopY + 0.1 * S;
                 // Flybridge perimeter rail.
-                const flyRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
+                const flyRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const flyRailY = flyFloorTopY + 0.4 * S;
                 const frFL = new THREE.Vector3(-flyHalfWidth * 0.9, flyRailY, flyFrontZ);
                 const frFR = new THREE.Vector3(flyHalfWidth * 0.9, flyRailY, flyFrontZ);
@@ -12128,12 +12189,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Tower — now properly seated on the flybridge floor (was floating
                 // 0.36 units above it before), with real cross-bracing and a ladder
                 // instead of four bare legs and a box.
-                const towerMat = new THREE.MeshPhongMaterial({ color: 0xdedede, flatShading: true });
+                const towerMat = new THREE.MeshPhongMaterial({ color: 0xdedede });
                 const towerLegX = 0.7 * S;
                 const towerFrontZ = flyFrontZ - 0.3 * S;
                 const towerBackZ = flyBackZ + 0.5 * S;
                 const towerLegHeight = 2.6 * S;
-                const towerLegGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, towerLegHeight, 6);
+                const towerLegGeo = new THREE.CylinderGeometry(0.06 * S, 0.06 * S, towerLegHeight, 14);
                 const towerLegBaseY = flyFloorTopY;
                 const towerLegTopY = towerLegBaseY + towerLegHeight;
                 [[-towerLegX, towerFrontZ], [towerLegX, towerFrontZ], [-towerLegX, towerBackZ], [towerLegX, towerBackZ]].forEach(([dx, tz]) => {
@@ -12143,7 +12204,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 });
                 // Cross-bracing — diagonal struts between adjacent legs, the detail
                 // that makes a tuna tower read as a real structural frame.
-                const braceMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4, flatShading: true });
+                const braceMat = new THREE.MeshPhongMaterial({ color: 0xc4c4c4 });
                 const braceMidY = towerLegBaseY + towerLegHeight * 0.45;
                 const towerCorners = {
                     fl: new THREE.Vector3(-towerLegX, 0, towerFrontZ), fr: new THREE.Vector3(towerLegX, 0, towerFrontZ),
@@ -12155,27 +12216,27 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     group.add(limbBetween(new THREE.Vector3(pb.x, braceMidY, pb.z), new THREE.Vector3(pa.x, towerLegBaseY + 0.15 * S, pa.z), 0.025 * S, 0.025 * S, braceMat));
                 });
                 // Ladder up the aft face.
-                const ladderMat = new THREE.MeshPhongMaterial({ color: 0xb0b0b0, flatShading: true });
+                const ladderMat = new THREE.MeshPhongMaterial({ color: 0xb0b0b0 });
                 [-0.25, 0.25].forEach((dx) => {
-                    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * S, 0.02 * S, towerLegHeight * 0.9, 6), ladderMat);
+                    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02 * S, 0.02 * S, towerLegHeight * 0.9, 14), ladderMat);
                     rail.position.set(dx * S, towerLegBaseY + towerLegHeight * 0.45, towerBackZ - 0.05 * S);
                     group.add(rail);
                 });
                 for (let i = 0; i < 6; i++) {
-                    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 6), ladderMat);
+                    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.015 * S, 0.015 * S, 0.55 * S, 14), ladderMat);
                     rung.rotation.z = Math.PI / 2;
                     rung.position.set(0, towerLegBaseY + 0.15 * S + i * (towerLegHeight * 0.75 / 6), towerBackZ - 0.05 * S);
                     group.add(rung);
                 }
                 // Upper platform + electronics.
-                const towerTop = new THREE.Mesh(new THREE.BoxGeometry(1.6 * S, 0.08 * S, 1.2 * S), towerMat);
+                const towerTop = new THREE.Mesh(new BoatRBox(1.6 * S, 0.08 * S, 1.2 * S), towerMat);
                 towerTop.position.set(0, towerLegTopY, (towerFrontZ + towerBackZ) / 2);
                 group.add(towerTop);
-                const radarMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5, flatShading: true });
-                const radarPost = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * S, 0.03 * S, 0.4 * S, 8), radarMat);
+                const radarMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5 });
+                const radarPost = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * S, 0.03 * S, 0.4 * S, 14), radarMat);
                 radarPost.position.set(0, towerLegTopY + 0.24 * S, (towerFrontZ + towerBackZ) / 2);
                 group.add(radarPost);
-                const radarDome = new THREE.Mesh(new THREE.SphereGeometry(0.16 * S, 8, 6), radarMat);
+                const radarDome = new THREE.Mesh(new THREE.SphereGeometry(0.16 * S, 14, 10), radarMat);
                 radarDome.position.set(0, towerLegTopY + 0.44 * S, (towerFrontZ + towerBackZ) / 2);
                 group.add(radarDome);
                 group.userData.anchors = { hasTop: true, roofY: towerLegTopY + 0.04 * S, roofZ: (towerFrontZ + towerBackZ) / 2, roofD: 1.2 * S, roofHalfW: 0.8 * S, rigX: 0.8 * S, rigY: towerLegTopY, rigZ: (towerFrontZ + towerBackZ) / 2, holderZ0: -0.88 * L, holderZ1: cabinBackZ - 0.3, cock: null };
@@ -12184,7 +12245,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const flyConsoleHalfWidth = 0.55 * S, flyConsoleHeight = 0.5 * S, flyConsoleDepth = 0.35 * S;
                 const flyConsoleFrontZ = flyFrontZ - 0.5 * S;
                 const flyConsoleCenterZ = flyConsoleFrontZ - flyConsoleDepth / 2;
-                const flyConsole = new THREE.Mesh(new THREE.BoxGeometry(flyConsoleHalfWidth * 2, flyConsoleHeight, flyConsoleDepth), consoleMat);
+                const flyConsole = new THREE.Mesh(new BoatRBox(flyConsoleHalfWidth * 2, flyConsoleHeight, flyConsoleDepth), consoleMat);
                 flyConsole.position.set(0, flyFloorTopY + flyConsoleHeight / 2, flyConsoleCenterZ);
                 group.add(flyConsole);
                 const flyWheelRadius = 0.2 * S, flyWheelStub = 0.15 * S;
@@ -12192,7 +12253,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 flyWheel.position.set(0, flyFloorTopY + 1.19, flyConsoleFrontZ);
                 group.add(flyWheel);
                 // Gauge cluster on the bridge dash.
-                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b, flatShading: true });
+                const gaugeMat = new THREE.MeshPhongMaterial({ color: 0x14171b });
                 [-0.3, 0.3].forEach((gx) => {
                     const gauge = buildGaugeDisc(0.06 * S, gaugeMat);
                     gauge.position.set(gx * S, flyFloorTopY + flyConsoleHeight * 0.75, flyConsoleFrontZ - 0.01 * S);
@@ -12212,37 +12273,37 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // Cockpit fighting chair — the single most iconic sportfisher
                 // feature, and it was completely missing. Pedestal-mounted, centered
                 // in the cockpit, with a footrest and rod holder in the base.
-                const chairMat = new THREE.MeshPhongMaterial({ color: 0x7a1c1c, flatShading: true });
-                const chairMetalMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, flatShading: true });
+                const chairMat = new THREE.MeshPhongMaterial({ color: 0x7a1c1c });
+                const chairMetalMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a });
                 const fightingChairZ = cabinBackZ - 3.5 * S;
-                const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.16 * S, 0.55 * S, 10), chairMetalMat);
+                const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.16 * S, 0.55 * S, 14), chairMetalMat);
                 pedestal.position.set(0, deckY + 0.275 * S, fightingChairZ);
                 group.add(pedestal);
-                const seatBase = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * S, 0.32 * S, 0.12 * S, 10), chairMat);
+                const seatBase = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * S, 0.32 * S, 0.12 * S, 14), chairMat);
                 seatBase.position.set(0, deckY + 0.6 * S, fightingChairZ);
                 group.add(seatBase);
-                const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.5 * S, 0.4 * S, 0.1 * S), chairMat);
+                const chairBack = new THREE.Mesh(new BoatRBox(0.5 * S, 0.4 * S, 0.1 * S), chairMat);
                 chairBack.position.set(0, deckY + 0.85 * S, fightingChairZ + 0.28 * S);
                 group.add(chairBack);
-                const footrest = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * S, 0.22 * S, 0.04 * S, 10), chairMetalMat);
+                const footrest = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * S, 0.22 * S, 0.04 * S, 14), chairMetalMat);
                 footrest.position.set(0, deckY + 0.14 * S, fightingChairZ);
                 group.add(footrest);
                 [-1, 1].forEach((side) => {
-                    const gimbalArm = new THREE.Mesh(new THREE.BoxGeometry(0.06 * S, 0.06 * S, 0.06 * S), chairMetalMat);
+                    const gimbalArm = new THREE.Mesh(new BoatRBox(0.06 * S, 0.06 * S, 0.06 * S), chairMetalMat);
                     gimbalArm.position.set(side * 0.28 * S, deckY + 0.62 * S, fightingChairZ);
                     group.add(gimbalArm);
                 });
                 // Tackle center — sink, cutting board, and rigging station along the
                 // gunwale, standard equipment on any real sportfisher cockpit.
-                const tackleMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8, flatShading: true });
+                const tackleMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const tackleCenterZ = cabinBackZ - 1.5 * S;
                 const tackleHalfW = 0.2 * S;
                 const tackleX = hullHalfWidthAt(tackleCenterZ, L, B) - tackleHalfW - 0.4; // derived directly from the hull's own width here, not from cabinHalfWidth — immune to future cabin margin changes
-                const tackleUnit = new THREE.Mesh(new THREE.BoxGeometry(0.4 * S, 0.5 * S, 0.9 * S), tackleMat);
+                const tackleUnit = new THREE.Mesh(new BoatRBox(0.4 * S, 0.5 * S, 0.9 * S), tackleMat);
                 tackleUnit.position.set(tackleX, deckY + 0.25 * S, tackleCenterZ);
                 group.add(tackleUnit);
-                const sinkMat = new THREE.MeshPhongMaterial({ color: 0xa8a8a8, flatShading: true });
-                const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.1 * S, 0.08 * S, 10), sinkMat);
+                const sinkMat = new THREE.MeshPhongMaterial({ color: 0xa8a8a8 });
+                const sink = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.1 * S, 0.08 * S, 14), sinkMat);
                 sink.position.set(tackleX, deckY + 0.51 * S, tackleCenterZ);
                 group.add(sink);
                 // Cooler — mirrored on the port side opposite the tackle center,
@@ -12256,7 +12317,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 group.userData.coolerMesh = cooler;
                 // Cockpit rod holders along the transom, where a sportfisher actually
                 // fights fish from.
-                const rodHolderMat = new THREE.MeshPhongMaterial({ color: 0x2b2f33, flatShading: true });
+                const rodHolderMat = new THREE.MeshPhongMaterial({ color: 0x2b2f33 });
                 [-0.35, -0.12, 0.12, 0.35].forEach((frac) => {
                     const holder = buildRodHolder(S, rodHolderMat);
                     holder.position.set(frac * def.beam, deckY + 0.35 * S, -def.length * 0.42);
@@ -12269,14 +12330,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const hw = group.userData.helmWheel; // the captain's chair: far enough behind the wheel that a seated driver can just reach the rim
                 if (hw) {
                     const hub = hw.position.clone().add(hw.userData.hubOff), seatPos = new THREE.Vector3(hub.x, deckY, hub.z - 0.58);
-                    const frameMat = new THREE.MeshPhongMaterial({ color: 0x22262b, flatShading: true }), padMat = new THREE.MeshPhongMaterial({ color: 0x2f3a46, flatShading: true });
+                    const frameMat = new THREE.MeshPhongMaterial({ color: 0x22262b }), padMat = new THREE.MeshPhongMaterial({ color: 0x2f3a46 });
                     const chair = new THREE.Group();
                     chair.position.copy(seatPos);
                     const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); chair.add(m); return m; };
-                    add(new THREE.CylinderGeometry(0.07, 0.1, 0.32, 8), frameMat, 0, 0.16, 0);
-                    add(new THREE.CylinderGeometry(0.25, 0.25, 0.09, 12), padMat, 0, 0.375, 0);
-                    add(new THREE.BoxGeometry(0.46, 0.36, 0.07), padMat, 0, 0.64, -0.29);
-                    [-1, 1].forEach((sx) => add(new THREE.BoxGeometry(0.06, 0.05, 0.3), frameMat, sx * 0.28, 0.55, -0.05));
+                    add(new THREE.CylinderGeometry(0.07, 0.1, 0.32, 14), frameMat, 0, 0.16, 0);
+                    add(new THREE.CylinderGeometry(0.25, 0.25, 0.09, 14), padMat, 0, 0.375, 0);
+                    add(new BoatRBox(0.46, 0.36, 0.07), padMat, 0, 0.64, -0.29);
+                    [-1, 1].forEach((sx) => add(new BoatRBox(0.06, 0.05, 0.3), frameMat, sx * 0.28, 0.55, -0.05));
                     group.add(chair);
                     group.userData.helmSeat = { pos: seatPos, top: deckY + 0.42, hub, rim: hw.userData.rim, wheel: hw };
                 }
