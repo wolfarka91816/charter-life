@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.33", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.34", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "25 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -70,12 +70,12 @@ catch (e) {
 const BUILD_LABEL = "v" + BUILD.version + (BUILD.build ? " \u00b7 " + BUILD.build : ""); // e.g. "v0.13 \u00b7 22 Oct 2026"
 const STAGE_HEIGHT = BUILD.fullscreen ? "100dvh" : "640px"; // the game and the title screen share one stage size
 const BOATS = [
-    { name: "Tideline 16", tier: "Skiff", length: 17, beam: 5.3, freeboardRatio: 0.088, gunwaleHeight: 0.45, hullColor: 0xf2f0e6, accent: 0x1c5d7a, maxSpeed: 9, turnRate: 0.85, rockFactor: 1.6, yawInertia: 0.3, rodStiffness: 1.4, tensionMult: 1.25, rodButtWidth: 3.4, tackleLabel: "12 LB CLASS SPIN", family: "skiff", kind: "Flats skiff", stripe: "boot", bottom: "red", hs: { keel: 0.32, chineW: 0.8, chineY: 0.3, bowRise: 0.3, flat: 0.5, rake: 0.06 }, fit: { ttop: false, twin: false, platform: false } },
-    { name: "Horizon 32 CC", tier: "Center Console", length: 17, beam: 5.4, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xffffff, accent: 0x0a3d62, maxSpeed: 14, turnRate: 0.55, rockFactor: 1.0, yawInertia: 0.6, rodStiffness: 1.0, tensionMult: 1.0, rodButtWidth: 4.4, tackleLabel: "20 LB CLASS", family: "cc", kind: "Center console", stripe: "boot", bottom: "red", hs: { keel: 0.62, chineW: 0.6, bowRise: 0.4 }, fit: { ttop: true, twin: true, platform: true } },
-    { name: "Canyon Chaser 40", tier: "Sportfisher", length: 22, beam: 6.5, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xf5f5f0, accent: 0x7a1c1c, maxSpeed: 12, turnRate: 0.35, rockFactor: 0.65, yawInertia: 1.1, rodStiffness: 0.6, tensionMult: 0.78, rodButtWidth: 6.2, tackleLabel: "50 LB CLASS STAND-UP", family: "sport", kind: "Sportfisher", stripe: "double", bottom: "red", hs: { keel: 0.85, chineW: 0.56, bowRise: 0.5, rake: 0.09 }, fit: {}, ad: ["outrig"] },
-    { name: "Backwater 19", tier: "Skiff", family: "cc", kind: "Bay boat", length: 16, beam: 5.7, freeboardRatio: 0.125, gunwaleHeight: 0.6, hullColor: 0xe9e4d2, accent: 0x2f6b4f, maxSpeed: 10.5, turnRate: 0.7, rockFactor: 1.3, yawInertia: 0.42, rodStiffness: 1.25, tensionMult: 1.15, rodButtWidth: 3.8, tackleLabel: "15 LB CLASS SPIN", stripe: "cove", bottom: "teal", hs: { keel: 0.4, chineW: 0.72, chineY: 0.32, bowRise: 0.36, flat: 0.25, rake: 0.07 }, fit: { ttop: false, twin: false, platform: false, motor: "standard" } },
-    { name: "Reef Runner 24", tier: "Center Console", family: "cc", kind: "Open console", length: 18.5, beam: 6, freeboardRatio: 0.135, gunwaleHeight: 0.7, hullColor: 0xf1f3f4, accent: 0x1b4965, maxSpeed: 12.5, turnRate: 0.62, rockFactor: 1.12, yawInertia: 0.5, rodStiffness: 1.1, tensionMult: 1.07, rodButtWidth: 4.2, tackleLabel: "20 LB CLASS", stripe: "double", bottom: "navy", hs: { keel: 0.55, chineW: 0.64, bowRise: 0.42 }, fit: { ttop: true, twin: false, platform: true, motor: "premium" } },
-    { name: "Stormbreaker 36 Cat", tier: "Center Console", family: "cc", kind: "Power catamaran", length: 20.5, beam: 6.8, freeboardRatio: 0.12, gunwaleHeight: 0.7, hullColor: 0xdde4e8, accent: 0x20404b, maxSpeed: 15, turnRate: 0.48, rockFactor: 0.52, yawInertia: 0.85, rodStiffness: 0.8, tensionMult: 0.86, rodButtWidth: 5.2, tackleLabel: "30 LB CLASS", stripe: "band", bottom: "grey", hs: { keel: 0.7, chineW: 0.92, chineY: 0.95, bowRise: 0.45, cat: 1, rake: 0.08 }, fit: { ttop: true, twin: true, platform: true } },
+    { name: "Tideline 16", kit: "flats", tier: "Skiff", length: 17, beam: 5.3, freeboardRatio: 0.088, gunwaleHeight: 0.45, hullColor: 0xf2f0e6, accent: 0x1c5d7a, maxSpeed: 9, turnRate: 0.85, rockFactor: 1.6, yawInertia: 0.3, rodStiffness: 1.4, tensionMult: 1.25, rodButtWidth: 3.4, tackleLabel: "12 LB CLASS SPIN", family: "skiff", kind: "Flats skiff", stripe: "boot", bottom: "red", hs: { keel: 0.32, chineW: 0.8, chineY: 0.3, bowRise: 0.3, flat: 0.5, rake: 0.06, bowFull: 1.45 }, fit: { ttop: false, twin: false, platform: false, rail: false } },
+    { name: "Horizon 32 CC", kit: "cc32", tier: "Center Console", length: 17, beam: 5.4, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xffffff, accent: 0x0a3d62, maxSpeed: 14, turnRate: 0.55, rockFactor: 1.0, yawInertia: 0.6, rodStiffness: 1.0, tensionMult: 1.0, rodButtWidth: 4.4, tackleLabel: "20 LB CLASS", family: "cc", kind: "Center console", stripe: "boot", bottom: "red", hs: { keel: 0.62, chineW: 0.6, bowRise: 0.5, flare: 0.1, bowFull: 2.0, rake: 0.085 }, fit: { ttop: true, twin: true, platform: false, consoleW: 1.45, consoleD: 1.25 } },
+    { name: "Canyon Chaser 40", kit: "sport", deck: "teak", tier: "Sportfisher", length: 22, beam: 6.5, freeboardRatio: 0.14, gunwaleHeight: 0.7, hullColor: 0xf5f5f0, accent: 0x7a1c1c, maxSpeed: 12, turnRate: 0.35, rockFactor: 0.65, yawInertia: 1.1, rodStiffness: 0.6, tensionMult: 0.78, rodButtWidth: 6.2, tackleLabel: "50 LB CLASS STAND-UP", family: "sport", kind: "Sportfisher", stripe: "double", bottom: "red", hs: { keel: 0.85, chineW: 0.56, bowRise: 0.95, rake: 0.11, flare: 0.17, bowFull: 2.0, deckTex: "planks" }, fit: {}, ad: ["outrig"] },
+    { name: "Backwater 19", kit: "bay", tier: "Skiff", family: "cc", kind: "Bay boat", length: 16, beam: 5.7, freeboardRatio: 0.125, gunwaleHeight: 0.6, hullColor: 0xe9e4d2, accent: 0x2f6b4f, maxSpeed: 10.5, turnRate: 0.7, rockFactor: 1.3, yawInertia: 0.42, rodStiffness: 1.25, tensionMult: 1.15, rodButtWidth: 3.8, tackleLabel: "15 LB CLASS SPIN", stripe: "cove", bottom: "teal", hs: { keel: 0.4, chineW: 0.72, chineY: 0.32, bowRise: 0.36, flat: 0.25, rake: 0.07, flare: 0.06, bowFull: 2.2 }, fit: { ttop: false, twin: false, platform: false, motor: "standard" } },
+    { name: "Reef Runner 24", kit: "cc24", tier: "Center Console", family: "cc", kind: "Open console", length: 18.5, beam: 6, freeboardRatio: 0.135, gunwaleHeight: 0.7, hullColor: 0xf1f3f4, accent: 0x1b4965, maxSpeed: 12.5, turnRate: 0.62, rockFactor: 1.12, yawInertia: 0.5, rodStiffness: 1.1, tensionMult: 1.07, rodButtWidth: 4.2, tackleLabel: "20 LB CLASS", stripe: "double", bottom: "navy", hs: { keel: 0.55, chineW: 0.64, bowRise: 0.4, flare: 0.07, bowFull: 1.9, rake: 0.075 }, fit: { ttop: true, twin: false, platform: true, motor: "premium" } },
+    { name: "Stormbreaker 36 Cat", kit: "cat", tier: "Center Console", family: "cc", kind: "Power catamaran", length: 20.5, beam: 6.8, freeboardRatio: 0.12, gunwaleHeight: 0.7, hullColor: 0xdde4e8, accent: 0x20404b, maxSpeed: 15, turnRate: 0.48, rockFactor: 0.52, yawInertia: 0.85, rodStiffness: 0.8, tensionMult: 0.86, rodButtWidth: 5.2, tackleLabel: "30 LB CLASS", stripe: "band", bottom: "grey", hs: { keel: 0.7, chineW: 0.92, chineY: 0.95, bowRise: 0.4, cat: 1, rake: 0.05, flare: 0.04, bowFull: 2.8 }, fit: { ttop: true, twin: false, platform: false, motor: "none", consoleW: 1.7, consoleD: 1.3 } },
 ];
 // <<BOATLOOK-BEGIN>>
 // ======================= BOATS: looks and lofted hulls (v19) =======================
@@ -139,7 +139,7 @@ function boatHexStr(n) { return "#" + ("000000" + (n >>> 0).toString(16)).slice(
 function boatOptId(list, id, def) { return list.some((o) => o.id === id) ? id : def; }
 function boatText(s, n) { return String(s === undefined || s === null ? "" : s).replace(/[^A-Za-z0-9 '&.\-]/g, "").replace(/\s+/g, " ").trim().slice(0, n); }
 function boatLookDefault(def) {
-    return { v: 1, h: boatHexStr(def.hullColor), a: boatHexStr(def.accent), st: def.stripe || "boot", sc: "", bt: def.bottom || "red", dk: "cream", cp: "hull", cv: "", sk: "", nm: "", pt: "", nf: "block", fl: "none", fc: "", dc: "none", dcc: "", ad: (def.ad || []).slice() };
+    return { v: 1, h: boatHexStr(def.hullColor), a: boatHexStr(def.accent), st: def.stripe || "boot", sc: "", bt: def.bottom || "red", dk: def.deck || "cream", cp: "hull", cv: "", sk: "", nm: "", pt: "", nf: "block", fl: "none", fc: "", dc: "none", dcc: "", ad: (def.ad || []).slice() };
 }
 function boatAddonOk(def, id) {
     const a = BOAT_ADDONS.find((x) => x.id === id);
@@ -192,6 +192,77 @@ function boatLookDecode(str) {
 }
 function boatFamily(def) { return def.family || ({ Skiff: "skiff", "Center Console": "cc", Sportfisher: "sport" })[def.tier] || "cc"; } // which builder dresses the hull
 function boatFit(def) { const f = boatFamily(def); return Object.assign({ ttop: f === "cc", twin: f === "cc", platform: f === "cc", motor: "premium" }, def.fit || {}); } // the fittings this hull has
+// A moulded non-skid pattern for decks (small diamonds with a faint seam), drawn once and tiled; null where there is no canvas (the tests).
+const BOAT_DECKTEX = {};
+function boatNonSkid(kind) {
+    kind = kind || "diamond";
+    if (BOAT_DECKTEX[kind] !== undefined)
+        return BOAT_DECKTEX[kind];
+    BOAT_DECKTEX[kind] = null;
+    const c = boatCanvas(128, 128);
+    if (!c)
+        return null;
+    const x = c.getContext("2d");
+    x.fillStyle = "#ffffff";
+    x.fillRect(0, 0, 128, 128);
+    if (kind === "planks") { // teak-style planking running fore and aft: dark caulked seams, staggered butt joints, a little grain
+        const n = 6, w = 128 / n;
+        for (let i = 0; i < n; i++) {
+            x.fillStyle = i % 2 ? "rgba(90,60,30,0.07)" : "rgba(255,240,215,0.10)";
+            x.fillRect(i * w, 0, w, 128);
+            x.strokeStyle = "rgba(60,40,20,0.10)";
+            x.lineWidth = 1;
+            for (let k = 1; k < 4; k++) {
+                x.beginPath();
+                x.moveTo(i * w + (k * w) / 4, 0);
+                x.lineTo(i * w + (k * w) / 4 + 1, 128);
+                x.stroke();
+            }
+            x.strokeStyle = "rgba(25,18,10,0.55)";
+            x.lineWidth = 2.2;
+            x.beginPath();
+            x.moveTo(i * w, 0);
+            x.lineTo(i * w, 128);
+            x.stroke();
+            const jz = ((i * 53) % 90) + 18;
+            x.lineWidth = 1.8;
+            x.beginPath();
+            x.moveTo(i * w, jz);
+            x.lineTo((i + 1) * w, jz);
+            x.stroke();
+        }
+    }
+    else {
+        x.strokeStyle = "rgba(60,64,70,0.22)";
+        x.lineWidth = 1.6;
+        for (let i = -128; i <= 256; i += 16) {
+            x.beginPath();
+            x.moveTo(i, 0);
+            x.lineTo(i + 128, 128);
+            x.stroke();
+            x.beginPath();
+            x.moveTo(i, 128);
+            x.lineTo(i + 128, 0);
+            x.stroke();
+        }
+        x.strokeStyle = "rgba(40,44,50,0.28)";
+        x.lineWidth = 2.2;
+        x.beginPath();
+        x.moveTo(0, 0);
+        x.lineTo(128, 0);
+        x.moveTo(0, 0);
+        x.lineTo(0, 128);
+        x.stroke();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    if (THREE.sRGBEncoding !== undefined)
+        t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = 4;
+    t.needsUpdate = true;
+    BOAT_DECKTEX[kind] = t;
+    return t;
+}
 // ---------- the lofted hull ----------
 // Plan outline: the same five points the superstructure builders already fit to (hullHalfWidthAt), joined by a smooth monotone curve that is
 // never narrower than the old straight-edged outline, so everything that was fitted to the old outline still sits inside the new hull.
@@ -208,7 +279,7 @@ function boatPolyHalfWidth(z, L, B) {
     }
     return 0;
 }
-function boatPlanner(L, B) {
+function boatPlanner(L, B, bowFull) {
     const z0 = 0.05 * L, zs0 = -0.55 * L;
     return function (z) {
         let w;
@@ -216,7 +287,7 @@ function boatPlanner(L, B) {
             return 0;
         if (z >= z0) {
             const t = (z - z0) / (L - z0);
-            w = B * (1 - Math.pow(t, 1.7));
+            w = B * (1 - Math.pow(t, bowFull || 1.7));
         }
         else if (z >= zs0)
             w = B;
@@ -360,11 +431,13 @@ function boatSmoothNormals(meshes, maxDeg) {
 // Forward is +Z, y = 0 is the old hull bottom (the deck is still at length * freeboardRatio, so every builder keeps working), the keel now reaches below that.
 function buildHullShell(def, r) {
     const L = def.length / 2, B = def.beam / 2, depth = def.length * def.freeboardRatio, gw = def.gunwaleHeight;
-    const hs = Object.assign({ keel: 0.55, chineW: 0.62, chineY: 0.34, bowRise: 0.34, sternRise: 0.06, bowKeel: 0.6, flat: 0, cat: 0, rake: 0.075 }, def.hs || {});
-    const plan = boatPlanner(L, B), wallT = 0.1, N = 84, rm = hs.rake * L, topY = depth + gw + hs.bowRise;
+    const hs = Object.assign({ keel: 0.55, chineW: 0.62, chineY: 0.34, bowRise: 0.34, sternRise: 0.06, bowKeel: 0.6, flat: 0, cat: 0, rake: 0.075, flare: 0, bowFull: 1.7, deckTex: "diamond" }, def.hs || {});
+    const plan = boatPlanner(L, B, hs.bowFull), wallT = 0.1, N = 84, rm = hs.rake * L, topY = depth + gw + hs.bowRise;
     // the stem leans forward with height (a raked bow): the outline at height y is the plan outline pushed forward by rake(z, y)
     const rakeAt = (z, y) => rm * Math.pow(Math.max(0, Math.min(1, y / topY)), 1.25) * Math.max(0, Math.min(1, (z - 0.05 * L) / (0.55 * L)));
-    const pw = (z, y) => plan(z - rakeAt(z, y));
+    // flare: the topsides lean out toward the bow (a Carolina-flared bow throws spray down); it only ever widens the hull, so every fitted part stays inside
+    const flareAt = (z, y) => 1 + hs.flare * Math.pow(Math.max(0, Math.min(1, (z + 0.1 * L) / (1.1 * L))), 1.6) * Math.max(0, Math.min(1, y / topY));
+    const pw = (z, y) => plan(z - rakeAt(z, y)) * flareAt(z, y);
     const zs = [];
     for (let i = 0; i <= N; i++) {
         const u = i / N;
@@ -503,7 +576,18 @@ function buildHullShell(def, r) {
     mk(botGeo, new THREE.MeshPhongMaterial({ color: r.bottom, side: THREE.DoubleSide }), "bottom");
     if (hs.cat)
         mk(tunGeo, new THREE.MeshPhongMaterial({ color: boatShade(r.hull, 0.72), side: THREE.DoubleSide }), "tunnel");
-    mk(deckGeo, new THREE.MeshPhongMaterial({ color: r.deck, side: THREE.DoubleSide }), "deck");
+    {
+        const ns = boatNonSkid(hs.deckTex);
+        const dm = mk(deckGeo, new THREE.MeshPhongMaterial({ color: r.deck, side: THREE.DoubleSide, map: ns || null }), "deck");
+        if (ns) {
+            const P = dm.geometry.attributes.position, uv = new Float32Array(P.count * 2);
+            for (let i = 0; i < P.count; i++) {
+                uv[i * 2] = P.array[i * 3] * 0.42;
+                uv[i * 2 + 1] = P.array[i * 3 + 2] * 0.42;
+            }
+            dm.geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+        }
+    }
     mk(inGeo, new THREE.MeshPhongMaterial({ color: boatMix(r.hull, 0xffffff, 0.35), side: THREE.DoubleSide }), "inner");
     mk(capGeo, new THREE.MeshPhongMaterial({ color: r.cap, side: THREE.DoubleSide, ...gloss }), "cap");
     boatSmoothNormals(group.children.filter((m) => m.name === "topsides" || m.name === "bottom" || m.name === "tunnel"), 80);
@@ -10817,9 +10901,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
         // clearance against "the hull" is checking against the real geometry,
         // not a separate approximation that could drift out of sync with it.
         const hullPlanCache = {};
-        function hullHalfWidthAt(z, L, B) {
-            const k = L + "|" + B;
-            const f = hullPlanCache[k] || (hullPlanCache[k] = boatPlanner(L, B));
+        function hullHalfWidthAt(z, L, B, bowFull) {
+            const k = L + "|" + B + "|" + (bowFull || 0);
+            const f = hullPlanCache[k] || (hullPlanCache[k] = boatPlanner(L, B, bowFull));
             return f(z);
         }
         // Cabin collision check for the walk system — is local point (x,z)
@@ -11033,8 +11117,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const bowVertexZ = L * 0.55; // hull's real taper-start vertex — width there is exactly 0.55*B
             const bowApexZ = L * 0.96; // 96% of the way to the actual tip — verified safe
             const margin = 0.08;
-            const wBack = hullHalfWidthAt(bowDeckBackZ, L, B) - margin;
-            const wVertex = hullHalfWidthAt(bowVertexZ, L, B) - margin;
+            const wBack = hullHalfWidthAt(bowDeckBackZ, L, B, def.hs && def.hs.bowFull) - margin;
+            const wVertex = hullHalfWidthAt(bowVertexZ, L, B, def.hs && def.hs.bowFull) - margin;
             return {
                 deckY,
                 bowDeckRaise,
@@ -11260,6 +11344,204 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 group.add(clip);
             });
             return group;
+        }
+        // ---------- per-hull character (v34): the fittings that make each hull read as its own kind of boat ----------
+        // Everything here is positioned from the lofted hull itself (width and sheer at each station), so nothing hangs outside the gunwale
+        // and the rod-holder pods, seats and rails always sit on the cap or the deck.
+        function buildBoatKit(def, group, shell, ctx) {
+            const kit = def.kit;
+            if (!kit)
+                return;
+            const { S, deckY, FIT, R } = ctx;
+            const H = shell.userData.hull, L = H.L, B = H.B, wall = H.wallT;
+            const M = (c, o) => new THREE.MeshPhongMaterial(Object.assign({ color: c }, o || {}));
+            const steel = M(0xc4c4c4, { shininess: 80 }), dark = M(0x2b2f33), rubber = M(0x1c1c1c), seatCol = R.seat === null ? boatMix(def.accent, 0x14202c, 0.25) : R.seat, cushion = M(seatCol); // (a seat colour that shows against the white deck)
+            const glass = M(0x8fd0e0, { transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false });
+            const inner = (z, y) => Math.max(0.2, H.pw(z, y === undefined ? deckY : y) - wall - 0.04); // usable half width of the cockpit at a station
+            const put = (m, x, y, z) => { m.position.set(x, y, z); group.add(m); return m; };
+            const box = (w, h, d, m, x, y, z) => put(new THREE.Mesh(new BoatRBox(w, h, d), m), x, y, z);
+            const cyl = (r0, r1, h, m, x, y, z, rx, rz) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 12), m); if (rx)
+                c.rotation.x = rx; if (rz)
+                c.rotation.z = rz; return put(c, x, y, z); };
+            const bar = (a, b, r, m) => { const l = limbBetween(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(b[0], b[1], b[2]), r, r, m); group.add(l); return l; };
+            const tip = L + H.rm, sheerTip = H.sheerAt(L); // the stem at the gunwale
+            // a row of rod holders along each gunwale, each in a small pod bolted to the cap (never loose tubes)
+            const pods = (n, z0, z1, tilt) => [-1, 1].forEach((sd) => {
+                for (let i = 0; i < n; i++) {
+                    const z = n === 1 ? z0 : z0 + (z1 - z0) * i / (n - 1), y = H.sheerAt(z), xo = H.pw(z, y);
+                    box(0.3, 0.3, 0.38, dark, sd * (xo - 0.16), y - 0.07, z);
+                    const h = buildRodHolder(S * 0.62, dark, -sd * (tilt || 0.2));
+                    h.position.set(sd * (xo - 0.18), y + 0.08, z);
+                    group.add(h);
+                }
+            });
+            // an anchor roller on a small bow pulpit
+            const pulpit = () => {
+                box(0.5, 0.09, 0.75, steel, 0, sheerTip + 0.02, tip - 0.05);
+                [-1, 1].forEach((sd) => box(0.06, 0.3, 0.6, steel, sd * 0.2, sheerTip + 0.15, tip + 0.28));
+                cyl(0.09, 0.09, 0.34, rubber, 0, sheerTip + 0.12, tip + 0.5, 0, Math.PI / 2);
+                bar([0, sheerTip + 0.26, tip - 0.5], [0, sheerTip + 0.2, tip + 0.62], 0.035, steel); // the stowed anchor
+            };
+            // flush deck hatches (fish boxes and storage): a pale lid in a slightly proud rim with a recessed pull
+            const hatch = (x, z, w, d, y) => { const yy = y === undefined ? deckY : y; box(w + 0.1, 0.035, d + 0.1, M(0x9aa3a8), x, yy + 0.012, z); box(w, 0.05, d, M(0xeae7dd), x, yy + 0.02, z); box(Math.min(0.34, w * 0.4), 0.02, 0.07, M(0x3a4046), x, yy + 0.05, z + d * 0.3); };
+            // soft U-shaped bow seating on the raised bow deck: a bench down each side and a bench across the front
+            const bowSeats = () => {
+                const P = getCCBowDeckParams(def), y0 = deckY + P.bowDeckRaise, zA = P.bowDeckBackZ + 0.5, zF = P.bowVertexZ + 0.1;
+                [-1, 1].forEach((sd) => {
+                    const zc = (zA + zF - 0.5) / 2, len = zF - 0.5 - zA, w = P.wBack * 0.82 + (P.wVertex - P.wBack) * 0.4;
+                    box(0.52, 0.2, len, cushion, sd * (w - 0.3), y0 + 0.1, zc);
+                    box(0.12, 0.38, len, cushion, sd * (w - 0.02), y0 + 0.2, zc);
+                });
+                const wf = P.wVertex * 0.82 - 0.3;
+                box(wf * 2, 0.2, 0.5, cushion, 0, y0 + 0.1, zF);
+                box(wf * 2, 0.36, 0.12, cushion, 0, y0 + 0.19, zF + 0.3);
+                // the filler hatch between the benches
+                box(Math.max(0.3, wf * 2 - 1.2), 0.04, Math.max(0.3, zF - 0.5 - zA - 0.2), M(0xa89f8c), 0, y0 + 0.02, (zA + zF - 0.5) / 2);
+            };
+            const motorZ = -L - 0.15 * S;
+            if (kit === "flats") { // a poling skiff: no rail, a push pole along the gunwale, a trolling motor on the bow, flush hatch lids
+                const p = getSkiffCockpitParams(def), sx = -(p.cockpitHalfWidth + (p.bowDeckHalfWidth - p.cockpitHalfWidth) * 0.5), py = p.raisedY + 0.1;
+                const zb = p.sternDeckBackZ + 1.0, zf = p.bowDeckFrontZ - 0.8;
+                bar([sx, py, zb], [sx, py + 0.01, zf], 0.034, M(0x6d7377));
+                [[-0.045, 0], [0.045, 0]].forEach(([dx]) => bar([sx + dx, py, zf - 0.05], [sx + dx * 2.4, py + 0.01, zf + 0.38], 0.02, M(0x6d7377))); // the fork foot
+                [zb + 0.6, (zb + zf) / 2, zf - 0.7].forEach((z) => { box(0.12, 0.1, 0.14, dark, sx, py - 0.07, z); box(0.15, 0.03, 0.14, dark, sx, py + 0.03, z); });
+                const zt = p.bowDeckFrontZ - 0.45; // trolling motor, stowed over the bow
+                box(0.5, 0.06, 0.5, dark, 0.35, p.raisedY + 0.03, zt - 0.4);
+                bar([0.35, p.raisedY + 0.18, zt - 0.4], [0.35, p.raisedY + 0.3, zt + 0.55], 0.035, M(0x1c1c1c));
+                cyl(0.08, 0.1, 0.4, rubber, 0.35, p.raisedY + 0.3, zt + 0.7, Math.PI / 2, 0);
+                return;
+            }
+            if (kit === "bay") {
+                // aft jump seats: boxed seats over the livewells, a clear lane down the middle to the engine
+                const zc = -0.58 * L, wd = 1.15;
+                [-1, 1].forEach((sd) => {
+                    const x = sd * (inner(zc) - 0.5);
+                    box(0.95, 0.55, wd, M(0xe9e6dc), x, deckY + 0.27, zc);
+                    box(0.98, 0.14, wd + 0.04, cushion, x, deckY + 0.62, zc);
+                    box(0.98, 0.42, 0.12, cushion, x, deckY + 0.88, zc - wd / 2 + 0.04);
+                    box(0.5, 0.26, 0.04, M(0x3d86a6, { transparent: true, opacity: 0.8 }), x, deckY + 0.32, zc + wd / 2 + 0.005); // the livewell window
+                });
+                // Power-Poles: a pair of shallow-water anchors on the transom
+                [-1, 1].forEach((sd) => {
+                    const x = sd * H.pw(-L, H.sheerAt(-L)) * 0.72, top = H.sheerAt(-L) + 2.7;
+                    box(0.26, 0.9, 0.16, dark, x, H.sheerAt(-L) - 0.35, -L - 0.1);
+                    cyl(0.06, 0.06, top - (H.sheerAt(-L) - 0.8), steel, x, (top + H.sheerAt(-L) - 0.8) / 2, -L - 0.2);
+                    box(0.2, 0.34, 0.22, dark, x, H.sheerAt(-L) + 0.4, -L - 0.2);
+                });
+                // a jack plate lifts the engine on the transom
+                box(0.7, 0.55, 0.14, steel, 0, deckY + 0.55, -L - 0.07);
+                // a stowed bow trolling motor
+                const P = getCCBowDeckParams(def), y0 = deckY + P.bowDeckRaise, zt = P.bowVertexZ + (P.bowApexZ - P.bowVertexZ) * 0.15;
+                box(0.5, 0.06, 0.5, dark, 0, y0 + 0.03, zt);
+                bar([0, y0 + 0.2, zt], [0, y0 + 0.34, zt + 1.5], 0.04, M(0x1c1c1c));
+                cyl(0.09, 0.11, 0.42, rubber, 0, y0 + 0.34, zt + 1.7, Math.PI / 2, 0);
+                pods(2, -0.1 * L, 0.2 * L, 0.2);
+                return;
+            }
+            if (kit === "cc32" || kit === "cc24") {
+                const big = kit === "cc32";
+                pods(big ? 5 : 3, -0.62 * L, 0.15 * L, 0.2);
+                if (big)
+                    pulpit();
+                if (!big)
+                    bowSeats();
+                hatch(-1.6, -0.5 * L, 1.5, 1.0);
+                hatch(1.6, -0.5 * L, 1.5, 1.0);
+                if (big) {
+                    hatch(-1.6, -0.2 * L, 1.5, 1.0);
+                    hatch(1.6, -0.2 * L, 1.5, 1.0);
+                }
+                // the console's side: a grab rail, and on the Horizon a head door
+                const cd = 0.9 * S * 0.55 * (FIT.consoleD || 1), cw = 1.1 * S * 0.55 * (FIT.consoleW || 1), cz0 = 0.5 * S, cz1 = cz0 + cd, ch = 1.2 * S * 0.55;
+                [-1, 1].forEach((sd) => bar([sd * (cw / 2 + 0.02), deckY + ch + 0.02, cz0 + 0.1], [sd * (cw / 2 + 0.02), deckY + ch + 0.02, cz1 - 0.05], 0.03, steel));
+                if (big) { // hardtop with wraparound glass, and a third outboard
+                    const topY = deckY + 1.6 * S, zc = (cz0 - 0.1 * S + cz1 + 0.05 * S) / 2, legX = 0.72 * S;
+                    if (group.userData.ttopRoof)
+                        group.userData.ttopRoof.visible = false;
+                    const roofMat = group.userData.ttopRoof ? group.userData.ttopRoof.material : M(0xffffff);
+                    box(2 * legX + 0.5, 0.17, 2.52 + 0.55, roofMat, 0, topY - 0.01, zc + 0.27);
+                    box(2 * legX + 0.3, 0.05, 0.09, M(0x1c2a33), 0, topY - 0.11, zc + 1.5); // the visor edge
+                    [-1, 1].forEach((sd) => box(0.12, 0.05, 0.12, M(0xfff2c4, { emissive: 0x6a5a30 }), sd * 0.8, topY - 0.13, zc + 0.9));
+                    const gy0 = deckY + ch + 0.1, gy1 = topY - 0.09, gz = cz0 + 0.3;
+                    const pane = (xa, za, xb, zb, ya, yb) => {
+                        const dx = xb - xa, dz = zb - za, len = Math.hypot(dx, dz), g = new THREE.Mesh(new THREE.PlaneGeometry(len, yb - ya), glass);
+                        g.position.set((xa + xb) / 2, (ya + yb) / 2, (za + zb) / 2);
+                        g.rotation.y = Math.atan2(-dz, dx);
+                        group.add(g);
+                        bar([xa, ya, za], [xa, yb, za], 0.035, steel);
+                        bar([xb, ya, zb], [xb, yb, zb], 0.035, steel);
+                        bar([xa, yb, za], [xb, yb, zb], 0.03, steel);
+                        bar([xa, ya, za], [xb, ya, zb], 0.03, steel);
+                    };
+                    const wx = cw / 2 + 0.1;
+                    pane(-wx, gz, wx, gz, gy0, gy1);
+                    [-1, 1].forEach((sd) => pane(sd * wx, gz, sd * (legX - 0.02), gz + 0.55, deckY + ch + 0.7, gy1));
+                    const mp = buildOutboardMotorPremium(S);
+                    mp.position.set(0, deckY, motorZ);
+                    group.add(mp);
+                }
+                return;
+            }
+            if (kit === "sport") { // a sportfisher's cockpit: fighting chair, mezzanine bench, transom door and a bow pulpit
+                const wb = 0.0;
+                const cz = -0.36 * L;
+                // the fighting chair: a bolted base plate, pedestal, bucket seat with arms, footrest and a rod gimbal
+                cyl(0.5, 0.55, 0.08, steel, 0, deckY + 0.04, cz);
+                cyl(0.12, 0.16, 0.62, steel, 0, deckY + 0.38, cz);
+                box(0.85, 0.16, 0.8, cushion, 0, deckY + 0.78, cz);
+                box(0.85, 1.0, 0.16, cushion, 0, deckY + 1.3, cz - 0.4);
+                [-1, 1].forEach((sd) => { box(0.1, 0.1, 0.7, steel, sd * 0.5, deckY + 1.05, cz - 0.02); bar([sd * 0.5, deckY + 0.78, cz + 0.2], [sd * 0.5, deckY + 1.0, cz + 0.2], 0.04, steel); });
+                bar([-0.4, deckY + 0.5, cz + 1.0], [0.4, deckY + 0.5, cz + 1.0], 0.04, steel);
+                bar([-0.35, deckY + 0.5, cz + 1.0], [-0.12, deckY + 0.3, cz + 0.2], 0.035, steel);
+                bar([0.35, deckY + 0.5, cz + 1.0], [0.12, deckY + 0.3, cz + 0.2], 0.035, steel);
+                cyl(0.07, 0.07, 0.2, dark, 0, deckY + 0.88, cz + 0.5, Math.PI / 2, 0); // the rod socket
+                // transom: a transom door and a livewell lid, plus the gunwale rod holders aft of the house
+                const zT = -L + wall + 0.06;
+                box(1.5, 1.35, 0.06, M(0x39434b), -0.9, deckY + 0.75, zT);
+                box(1.58, 0.07, 0.08, steel, -0.9, deckY + 1.45, zT);
+                box(1.58, 0.07, 0.08, steel, -0.9, deckY + 0.05, zT);
+                [-1, 1].forEach((sd) => box(0.07, 1.4, 0.08, steel, -0.9 + sd * 0.79, deckY + 0.75, zT));
+                box(0.12, 0.08, 0.1, steel, -0.2, deckY + 0.8, zT + 0.03);
+                box(1.3, 0.14, 0.9, M(0x2f6f8f, { transparent: true, opacity: 0.9 }), 1.3, deckY + 0.07, -L + 1.0);
+                pods(5, -0.88 * L, -0.12 * L, 0.2);
+                // a mezzanine bench against the house, port side of the door
+                const hz = -0.82 - 0.6; // the house is built from -0.82 aft; the bench sits just clear of the back wall
+                const bw = Math.max(1.2, inner(hz) * 0.9);
+                box(bw, 0.66, 0.85, M(0xe9e6dc), -inner(hz) + bw / 2 + 0.2, deckY + 0.33, hz);
+                box(bw, 0.15, 0.85, cushion, -inner(hz) + bw / 2 + 0.2, deckY + 0.73, hz);
+                pulpit();
+                return;
+            }
+            if (kit === "cat") {
+                const xs = H.pw(-L, 1) * 0.92 * 0.75; // the centre line of each sponson at the stern
+                // a swim pod behind each hull, with a ladder on the outer side; the tunnel stays open between them
+                const platY = deckY * 0.35;
+                [-1, 1].forEach((sd) => {
+                    box(1.3, 0.09, 1.5, M(0xe8e6df), sd * xs, platY, -L - 0.75);
+                    const x = sd * (xs + 0.45);
+                    [-0.12, 0.12].forEach((dz) => bar([x + sd * 0.0, platY + 0.02, -L - 1.25 + dz], [x + sd * 0.0, platY - 0.55, -L - 1.55 + dz], 0.025, steel));
+                    box(0.2, 0.05, 0.4, steel, x, platY - 0.3, -L - 1.4);
+                });
+                const mm = buildOutboardMotorPremium(S);
+                [-1, 1].forEach((sd) => { const m = buildOutboardMotorPremium(S); m.position.set(sd * xs, deckY, motorZ); group.add(m); });
+                // transom jump seats: padded flip-down benches folded against the transom, either side of the rigging station
+                [-1, 1].forEach((sd) => { box(1.15, 0.85, 0.14, cushion, sd * (xs + 0.1), deckY + 0.75, -L + wall + 0.12); box(1.19, 0.06, 0.17, steel, sd * (xs + 0.1), deckY + 0.32, -L + wall + 0.12); });
+                // the rigging station: tackle drawers, a sink and a lit livewell lid in one moulded block behind the helm
+                const rz = -L + 2.6;
+                box(1.7, 0.95, 0.85, M(0xe9e6dc), 0, deckY + 0.47, rz);
+                box(1.76, 0.07, 0.9, M(0x2f3a46), 0, deckY + 0.97, rz);
+                box(0.55, 0.05, 0.5, M(0x3d86a6, { transparent: true, opacity: 0.85 }), 0.4, deckY + 1.02, rz);
+                cyl(0.17, 0.14, 0.05, M(0xc4c4c4, { shininess: 90 }), -0.5, deckY + 1.01, rz);
+                [0.15, 0.4, 0.65].forEach((dy) => box(1.1, 0.16, 0.03, M(0x4a4f55), -0.15, deckY + dy, rz - 0.44));
+                pods(6, -0.7 * L, 0.2 * L, 0.2);
+                hatch(-2.2, -0.2 * L, 1.7, 1.1);
+                hatch(2.2, -0.2 * L, 1.7, 1.1);
+                hatch(-2.2, 0.0, 1.7, 1.1);
+                hatch(2.2, 0.0, 1.7, 1.1);
+                bowSeats();
+                pulpit();
+                return;
+            }
         }
         function buildBoat(def0, lookIn) {
             const look = boatLookSanitize(lookIn || def0.look || boatLookDefault(def0), def0); // the saved look of this hull (colours, stripe, name, flag, fittings)
@@ -11520,30 +11802,32 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // that mismatch was why it looked wrong before.
                 const sideRailMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const sideRailY = p.raisedY + 0.55;
-                const railL = def.length / 2;
-                const bowApex = new THREE.Vector3(0, sideRailY, railL * 0.9); // short of the very tip, matching a real bow rail
-                const forwardPoints = [];
-                [-1, 1].forEach((side) => {
-                    const rPts = [
-                        new THREE.Vector3(side * 0.55 * (def.beam / 2), sideRailY, 0.55 * railL),
-                        new THREE.Vector3(side * (def.beam / 2), sideRailY, 0.05 * railL),
-                        new THREE.Vector3(side * (def.beam / 2), sideRailY, -0.55 * railL),
-                        new THREE.Vector3(side * 0.85 * (def.beam / 2), sideRailY, -railL),
-                    ];
-                    forwardPoints.push(rPts[0]);
-                    for (let i = 0; i < rPts.length - 1; i++) {
-                        group.add(limbBetween(rPts[i], rPts[i + 1], 0.022 * S, 0.022 * S, sideRailMat));
-                    }
-                    // Stanchions rise from the actual deck surface, not the shorter gunwale wall.
-                    rPts.forEach((pt) => {
-                        group.add(limbBetween(new THREE.Vector3(pt.x, p.raisedY, pt.z), pt, 0.018 * S, 0.018 * S, sideRailMat));
+                if (FIT.rail !== false) { // (a poling skiff has no rail: it would snag the line and the push pole)
+                    const railL = def.length / 2;
+                    const bowApex = new THREE.Vector3(0, sideRailY, railL * 0.9); // short of the very tip, matching a real bow rail
+                    const forwardPoints = [];
+                    [-1, 1].forEach((side) => {
+                        const rPts = [
+                            new THREE.Vector3(side * 0.55 * (def.beam / 2), sideRailY, 0.55 * railL),
+                            new THREE.Vector3(side * (def.beam / 2), sideRailY, 0.05 * railL),
+                            new THREE.Vector3(side * (def.beam / 2), sideRailY, -0.55 * railL),
+                            new THREE.Vector3(side * 0.85 * (def.beam / 2), sideRailY, -railL),
+                        ];
+                        forwardPoints.push(rPts[0]);
+                        for (let i = 0; i < rPts.length - 1; i++) {
+                            group.add(limbBetween(rPts[i], rPts[i + 1], 0.022 * S, 0.022 * S, sideRailMat));
+                        }
+                        // Stanchions rise from the actual deck surface, not the shorter gunwale wall.
+                        rPts.forEach((pt) => {
+                            group.add(limbBetween(new THREE.Vector3(pt.x, p.raisedY, pt.z), pt, 0.018 * S, 0.018 * S, sideRailMat));
+                        });
                     });
-                });
-                // Meet up at the front — both sides converge on a shared bow point
-                // instead of stopping short of each other.
-                forwardPoints.forEach((pt) => {
-                    group.add(limbBetween(pt, bowApex, 0.022 * S, 0.022 * S, sideRailMat));
-                });
+                    // Meet up at the front — both sides converge on a shared bow point
+                    // instead of stopping short of each other.
+                    forwardPoints.forEach((pt) => {
+                        group.add(limbBetween(pt, bowApex, 0.022 * S, 0.022 * S, sideRailMat));
+                    });
+                }
                 const polingPlatform = buildPolingPlatform(S, p.raisedY);
                 polingPlatform.position.set(0, 0, -def.length * 0.4);
                 group.add(polingPlatform);
@@ -11584,7 +11868,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // whole block extending forward from there — verified by computation
                 // to keep clear of the angler, companion seats, and T-top.
                 const consoleScale = 0.55;
-                const cw = 1.1 * S * consoleScale, ch = 1.2 * S * consoleScale, cd = 0.9 * S * consoleScale;
+                const cw = 1.1 * S * consoleScale * (FIT.consoleW || 1), ch = 1.2 * S * consoleScale, cd = 0.9 * S * consoleScale * (FIT.consoleD || 1);
                 const consoleFrontZ = 0.5 * S;
                 const consoleCenterZ = consoleFrontZ + cd / 2;
                 const consoleBackZ = consoleFrontZ + cd;
@@ -11618,6 +11902,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const top = new THREE.Mesh(new BoatRBox(1.6 * S, 0.08 * S, 1.4 * S), R.canvas === null ? toppMat : new THREE.MeshPhongMaterial({ color: R.canvas })); // the roof takes the canvas colour when one is chosen
                     top.position.set(0, topY, topCenterZ);
                     group.add(top);
+                    group.userData.ttopRoof = top;
                     // Electronics box on top of the T-top — houses radar/antenna mounts,
                     // standard on a boat this size, absent on the small skiff.
                     const boxMat = new THREE.MeshPhongMaterial({ color: 0xe5e5e5 });
@@ -11701,7 +11986,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const windshieldMat = new THREE.MeshPhongMaterial({ color: 0x8fd0e0, transparent: true, opacity: 0.35 });
                 const windshieldY = ch + 0.2 * S;
                 const windshieldZ = consoleFrontZ + 0.25 * S;
-                const windshield = new THREE.Mesh(new BoatRBox(0.9 * S, 0.4 * S, 0.03 * S), windshieldMat);
+                const windshield = new THREE.Mesh(new BoatRBox(Math.max(0.9 * S, cw * 0.96), 0.4 * S, 0.03 * S), windshieldMat);
                 windshield.position.set(0, deckY + windshieldY, windshieldZ);
                 windshield.rotation.x = -0.35;
                 group.add(windshield);
@@ -11857,7 +12142,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // tie-bar linking them — real on any twin-engine setup.
                 const motorX = platformHalfWidth * 1.3;
                 const motorZ = sternZ - 0.15 * S;
-                if (!FIT.twin) { // one big outboard on the centre line
+                if (!FIT.twin && FIT.motor !== "none") { // one big outboard on the centre line
                     const motor = FIT.motor === "standard" ? buildOutboardMotor(S) : buildOutboardMotorPremium(S);
                     motor.position.set(0, deckY, motorZ);
                     group.add(motor);
@@ -11898,14 +12183,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // the station points themselves.
                 const wallMargin = 0.08;
                 const backZ = cabinBackZ, mid1Z = cabinBackZ + cabinDepth * 0.32, mid2Z = cabinBackZ + cabinDepth * 0.6, shoulderZ = cabinBackZ + cabinDepth * 0.87;
-                const wBack = hullHalfWidthAt(backZ, L, B) - wallMargin;
-                const wMid1 = hullHalfWidthAt(mid1Z, L, B) - wallMargin;
-                const wMid2 = hullHalfWidthAt(mid2Z, L, B) - wallMargin;
-                const wShoulder = hullHalfWidthAt(shoulderZ, L, B) - wallMargin;
+                const wBack = hullHalfWidthAt(backZ, L, B, def.hs && def.hs.bowFull) - wallMargin;
+                const wMid1 = hullHalfWidthAt(mid1Z, L, B, def.hs && def.hs.bowFull) - wallMargin;
+                const wMid2 = hullHalfWidthAt(mid2Z, L, B, def.hs && def.hs.bowFull) - wallMargin;
+                const wShoulder = hullHalfWidthAt(shoulderZ, L, B, def.hs && def.hs.bowFull) - wallMargin;
                 const cabinHalfWidth = wBack;
                 const mid2D = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
                 const tipStationZs = [shoulderZ, 7.4, 8.6, 9.5, 10.2, 10.75, 10.95];
-                const stations = tipStationZs.map((z) => [Math.max(0, hullHalfWidthAt(z, L, B) - wallMargin), z]);
+                const stations = tipStationZs.map((z) => [Math.max(0, hullHalfWidthAt(z, L, B, def.hs && def.hs.bowFull) - wallMargin), z]);
                 stations[0] = [wShoulder, shoulderZ]; // reuse the already-verified shoulder value exactly
                 // Builds one side of the smooth taper (through-point quadratic
                 // technique: curves pass through midpoints, with each station
@@ -11948,8 +12233,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const cabinFloor = new THREE.Mesh(floorGeo, floorMat);
                 cabinFloor.position.set(0, cabinCenterY - cabinHeight / 2, 0);
                 group.add(cabinFloor);
+                // The forward part of the house slopes down toward the bow like a real sportfisher's coachroof (it used to be one flat-topped box running right out to the stem).
+                const slopeZ0 = cabinFrontZ + 1.2, slopeZ1 = tipStationZs[tipStationZs.length - 1], slopeDrop = 1.3;
+                const dropAt = (z) => { if (z <= slopeZ0)
+                    return 0; const t = Math.min(1, (z - slopeZ0) / (slopeZ1 - slopeZ0)); return slopeDrop * (t * t * (3 - 2 * t) * 0.55 + t * 0.45); };
+                const dropGeo = (geo) => { const P = geo.attributes.position; for (let i = 0; i < P.count; i++)
+                    P.setY(i, P.getY(i) - dropAt(P.getZ(i))); P.needsUpdate = true; if (geo.computeVertexNormals)
+                    geo.computeVertexNormals(); return geo; };
                 const roofGeo = new THREE.ExtrudeGeometry(cabinShapeOutline, { depth: floorThickness, bevelEnabled: true, bevelThickness: 0.05 * S, bevelSize: 0.05 * S, bevelSegments: 2, steps: 1 });
                 roofGeo.rotateX(-Math.PI / 2);
+                dropGeo(roofGeo);
                 const cabinRoof = new THREE.Mesh(roofGeo, cabinMat);
                 cabinRoof.position.set(0, cabinCenterY + cabinHeight / 2 - floorThickness, 0);
                 group.add(cabinRoof);
@@ -11958,6 +12251,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // than the hull-colored walls.
                 const ceilingLinerGeo = new THREE.ExtrudeGeometry(cabinShapeOutline, { depth: 0.02 * S, bevelEnabled: false, steps: 1 });
                 ceilingLinerGeo.rotateX(-Math.PI / 2);
+                dropGeo(ceilingLinerGeo);
                 const ceilingLiner = new THREE.Mesh(ceilingLinerGeo, ceilingMat);
                 ceilingLiner.position.set(0, cabinCenterY + cabinHeight / 2 - floorThickness - 0.02 * S, 0);
                 group.add(ceilingLiner);
@@ -12003,15 +12297,27 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 ];
                 const wallBaseY = cabinCenterY - cabinHeight / 2 + floorThickness;
                 const wallHeight = cabinHeight - floorThickness * 2;
-                for (let i = 0; i < perimeter.length - 1; i++) {
-                    const a = perimeter[i].clone();
-                    a.y = wallBaseY;
-                    const b = perimeter[i + 1].clone();
-                    b.y = wallBaseY;
-                    if (a.distanceTo(b) < 0.001)
-                        continue; // skip degenerate zero-length panels (e.g. right at the nose point)
-                    group.add(wallBetween(a, b, wallHeight, 0.06 * S, cabinMat));
-                }
+                // The side walls are one smooth skin (not a row of separate panels, which showed as vertical seams), and they follow the sloping roof.
+                const wallTopAt = (z) => wallBaseY + wallHeight - dropAt(z);
+                const skin = (pts, yLo, yHi, mat, off) => {
+                    const pos = [], idx = [];
+                    pts.forEach((q) => { const o = Math.sign(q.x) * (off || 0); pos.push(q.x + o, yLo(q.z), q.z, q.x + o, yHi(q.z), q.z); });
+                    for (let i = 0; i < pts.length - 1; i++) {
+                        const a = i * 2;
+                        if (Math.abs(pts[i].x - pts[i + 1].x) + Math.abs(pts[i].z - pts[i + 1].z) < 0.001)
+                            continue;
+                        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+                    }
+                    const g = new THREE.BufferGeometry();
+                    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+                    g.setIndex(idx);
+                    g.computeVertexNormals();
+                    const m = new THREE.Mesh(g, mat);
+                    group.add(m);
+                    return m;
+                };
+                const skinMat = new THREE.MeshPhongMaterial({ color: def.hullColor, side: THREE.DoubleSide, shininess: 50, specular: 0x444444 });
+                skin(perimeter, () => wallBaseY, wallTopAt, skinMat, 0);
                 // Close the loop back to the start — except at the door, where a gap
                 // is left instead of one continuous panel (which was completely
                 // covering the door, hiding it and blocking the opening).
@@ -12050,20 +12356,26 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // it floating about 0.1 units outside the actual wall.
                 const windowMat = new THREE.MeshPhongMaterial({ color: 0x1a2a33, transparent: true, opacity: 0.7 });
                 const windowFrameMat = new THREE.MeshPhongMaterial({ color: 0xb8c0c4 });
-                [backZ + 0.5 * S, mid1Z, mid2Z].forEach((z) => {
-                    const w = stage1WidthAt(z);
-                    [-1, 1].forEach((side) => {
-                        const win = new THREE.Mesh(new BoatRBox(0.02 * S, 0.32 * S, 0.55 * S), windowMat);
-                        win.position.set(side * w, cabinCenterY + 0.15 * S, z);
-                        group.add(win);
-                        // a slim aluminium frame, a little proud of the glass, so the window reads as set into the wall
-                        [[0.035, 0.04, 0.62, 0, 0.18, 0], [0.035, 0.04, 0.62, 0, -0.18, 0], [0.035, 0.36, 0.04, 0, 0, 0.29], [0.035, 0.36, 0.04, 0, 0, -0.29]].forEach(([fx, fy, fz, ox, oy, oz]) => {
-                            const fr = new THREE.Mesh(new BoatRBox(fx * S, fy * S, fz * S), windowFrameMat);
-                            fr.position.set(side * w, cabinCenterY + 0.15 * S + oy * S, z + oz * S);
-                            group.add(fr);
-                        });
+                { // one continuous band of dark glass down each side with aluminium mullions: the "convertible window line" of a real sportfisher
+                    const glassMat = new THREE.MeshPhongMaterial({ color: 0x14232c, transparent: true, opacity: 0.82, side: THREE.DoubleSide, shininess: 90, specular: 0x9fb4c0 });
+                    const y0 = wallBaseY + 0.95, y1 = wallBaseY + 1.85;
+                    const bandPts = perimeter.slice(0, leftSamples.length + 2).filter((q) => q.z >= backZ + 0.45 && q.z <= slopeZ0 + 0.35);
+                    const top = (z) => Math.min(y1, wallTopAt(z) - 0.22), bot = (z) => Math.min(y0, top(z) - 0.2);
+                    [1, -1].forEach((sd) => {
+                        const pts = bandPts.map((q) => new THREE.Vector3(sd * Math.abs(q.x), 0, q.z));
+                        if (sd > 0)
+                            pts.reverse(); // keep the winding the same on both sides
+                        skin(pts, bot, top, glassMat, 0.012);
+                        skin(pts, bot, (z) => bot(z) + 0.05, windowFrameMat, 0.02);
+                        skin(pts, (z) => top(z) - 0.05, top, windowFrameMat, 0.02);
+                        for (let z = backZ + 0.45; z <= slopeZ0 + 0.3; z += 1.7) {
+                            const w = stage1WidthAt(z);
+                            const post = new THREE.Mesh(new BoatRBox(0.07, top(z) - bot(z), 0.09), windowFrameMat);
+                            post.position.set(sd * (w + 0.015), (top(z) + bot(z)) / 2, z);
+                            group.add(post);
+                        }
                     });
-                });
+                }
                 // Door — on the BACK wall (facing aft, toward the cockpit), matching
                 // the actual layout of a salon-to-cockpit door, not a side-wall door.
                 // Built as a hinged pivot (swings inward, into the cabin).
@@ -12327,7 +12639,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const tackleMat = new THREE.MeshPhongMaterial({ color: 0xd8d8d8 });
                 const tackleCenterZ = cabinBackZ - 1.5 * S;
                 const tackleHalfW = 0.2 * S;
-                const tackleX = hullHalfWidthAt(tackleCenterZ, L, B) - tackleHalfW - 0.4; // derived directly from the hull's own width here, not from cabinHalfWidth — immune to future cabin margin changes
+                const tackleX = hullHalfWidthAt(tackleCenterZ, L, B, def.hs && def.hs.bowFull) - tackleHalfW - 0.4; // derived directly from the hull's own width here, not from cabinHalfWidth — immune to future cabin margin changes
                 const tackleUnit = new THREE.Mesh(new BoatRBox(0.4 * S, 0.5 * S, 0.9 * S), tackleMat);
                 tackleUnit.position.set(tackleX, deckY + 0.25 * S, tackleCenterZ);
                 group.add(tackleUnit);
@@ -12339,7 +12651,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 // used for storing bait and keeper fish while walking the cockpit.
                 const cooler = buildCooler(S);
                 const coolerZ = tackleCenterZ;
-                const coolerX = -(hullHalfWidthAt(coolerZ, L, B) - 0.3 * S - 0.4);
+                const coolerX = -(hullHalfWidthAt(coolerZ, L, B, def.hs && def.hs.bowFull) - 0.3 * S - 0.4);
                 cooler.position.set(coolerX, deckY, coolerZ);
                 group.add(cooler);
                 group.userData.cooler = { x: coolerX, y: deckY, z: coolerZ };
@@ -12373,6 +12685,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     group.userData.helmSeat = { pos: seatPos, top: deckY + 0.42, hub, rim: hw.userData.rim, wheel: hw };
                 }
             }
+            buildBoatKit(def, group, shell, { S, deckY, FIT, R }); // what makes this hull its own kind of boat
             const addons = buildBoatAddons(def, R, group.userData.anchors, shell);
             group.add(addons); // the fittings this look has switched on
             return group;
