@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.34", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.35", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "25 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
@@ -4300,7 +4300,7 @@ function storyHud(qs) {
 }
 // ---------- end of the story section ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1 };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sharkSold: 0 } };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -6143,6 +6143,49 @@ const PROG_SIGHT_XP = { common: 15, uncommon: 30, rare: 60, veryRare: 120 }; // 
 const PROG_SPOT_XP = 60; // first visit to a remote fishing ground
 // ---- selling ----
 const PROG_SELL_PRICE = { "Mangrove Snapper": 2.1, "Yellowtail Snapper": 2.2, "Red Grouper": 2.5, "Gag Grouper": 2.7, "Mutton Snapper": 2.4, Amberjack: 1.7, Cobia: 2.0, "King Mackerel": 1.5, "Mahi-Mahi": 2.1, Redfish: 1.8, Snook: 2.5, Tarpon: 0.8, "Jack Crevalle": 0.6, Flounder: 3.2, Whiting: 1.4, Pompano: 4.0, Sheepshead: 2.0, "Rock Bass": 1.2, "Black Sea Bass": 2.8, Tautog: 2.6 }; // $ per lb
+// ======================= THE GAME WARDEN (v35): fishing rules =======================
+// The shark rules follow Florida's state-water rules (one shark per person per day, 54 in fork length minimum on bull, nurse, spinner and blue;
+// lemon, tiger, hammerhead and mako may not be kept). Inches are turned into rough pounds for the game. The slot and release rules for the other
+// fish are the same kind of thing. A fish with no entry here has no rule.
+const SHARK_DAILY_BAG = 1; // sharks kept per day
+const FISH_REGS = {
+    "Bonnethead": { grp: "shark", note: "no minimum size" }, "Atlantic Sharpnose": { grp: "shark", note: "no minimum size" }, "Blacktip Shark": { grp: "shark", note: "no minimum size" },
+    "Spinner Shark": { grp: "shark", minLb: 38, minIn: 54 }, "Nurse Shark": { grp: "shark", minLb: 38, minIn: 54 }, "Bull Shark": { grp: "shark", minLb: 48, minIn: 54 }, "Blue Shark": { grp: "shark", minLb: 38, minIn: 54 },
+    "Lemon Shark": { rel: "Protected: it may not be kept" }, "Tiger Shark": { rel: "Protected: it may not be kept" }, "Great Hammerhead": { rel: "Protected: it may not be kept" }, "Shortfin Mako": { rel: "Protected: it may not be kept" },
+    "Tarpon": { rel: "Catch and release only (no tag)" }, "Bonefish": { rel: "Catch and release only" }, "Sailfish": { rel: "A billfish: release it" }, "Blue Marlin": { rel: "A billfish: release it" },
+    "Snook": { minLb: 6, maxLb: 11, slot: "28 to 33 in" }, "Redfish": { minLb: 2, maxLb: 7.5, slot: "18 to 27 in" },
+};
+const WARDEN_FINE = { small: 75, big: 75, bag: 90, protected: 200 };
+function fishRegCheck(name, lb, ctx) {
+    const r = FISH_REGS[name];
+    if (!r)
+        return null;
+    if (r.rel)
+        return { level: "protected", msg: r.rel };
+    if (r.minLb && lb < r.minLb)
+        return { level: "small", msg: "Undersized: " + (r.minIn ? r.minIn + " in" : r.slot) + " minimum (about " + r.minLb + " lb)" };
+    if (r.maxLb && lb > r.maxLb)
+        return { level: "big", msg: "Over the slot: " + r.slot + " only (about " + r.minLb + " to " + r.maxLb + " lb)" };
+    if (r.grp === "shark" && ctx && ctx.sharkHave >= SHARK_DAILY_BAG)
+        return { level: "bag", msg: "Over the limit: " + SHARK_DAILY_BAG + " shark a day" };
+    return { level: "ok", msg: r.grp === "shark" ? "Legal to keep" + (r.minIn ? " (" + r.minIn + " in or more)" : "") + " · " + SHARK_DAILY_BAG + " shark a day" : "Legal to keep (" + r.slot + ")" };
+}
+function fishRegViolations(fish, sharkSold) {
+    const out = [];
+    let sharks = sharkSold || 0;
+    fish.slice().sort((a, b) => b.weight - a.weight).forEach((f) => {
+        const r = fishRegCheck(f.speciesName, f.weight, { sharkHave: sharks });
+        if (!r)
+            return;
+        if (r.level === "ok") {
+            if (FISH_REGS[f.speciesName].grp === "shark")
+                sharks++;
+            return;
+        }
+        out.push({ item: f, level: r.level, msg: r.msg });
+    });
+    return out;
+}
 function progSellValue(qs, name, weight) { return Math.max(3, Math.round(weight * (PROG_SELL_PRICE[name] || 1.5) * playStats(qs).sellMult)); }
 // What reaching each level opens up, for the "coming up" list.
 function progUnlocksAt(level) {
@@ -6512,6 +6555,7 @@ function fishProfile(look, t) {
     return out;
 }
 const FISH_SHAPES = {
+    sharkfin: [[0, 0.03], [0.62, 1], [0.76, 0.62], [0.88, 0.26], [1, 0.04]], // a shark's dorsal: a long straight leading edge to a tip well back, then a hollow trailing edge
     spiny: [[0, 0.5], [0.25, 1], [0.7, 0.85], [1, 0.12]], soft: [[0, 0.1], [0.22, 0.95], [0.6, 1], [1, 0.25]],
     sail: [[0, 0.8], [0.12, 1], [0.7, 0.85], [1, 0.25]], falcate: [[0, 1], [0.16, 0.8], [0.5, 0.4], [1, 0.14]], peak: [[0, 0.4], [0.17, 1], [0.5, 0.6], [1, 0.16]],
     sailfish: [[0, 0.45], [0.14, 1], [0.6, 0.92], [0.88, 0.5], [1, 0.1]], mahi: [[0, 1], [0.12, 0.85], [0.45, 0.5], [0.8, 0.36], [1, 0.18]], hogspines: [[0, 0.7], [0.1, 1], [0.26, 0.9], [0.38, 0.38], [1, 0.3]], low: [[0, 0.35], [0.5, 0.6], [1, 0.2]], lobe: [[0, 0.3], [0.2, 1], [0.55, 0.55], [1, 0.1]],
@@ -6672,7 +6716,7 @@ function fishBuildData(look, hexToRgb) {
             addPoly("filament", fin.color, undefined, [[0, e - 0.01 * L, b.z, 0], [0, e - 0.01 * L, b.z + 0.02 * L, 0], [0, e + 0.03 * L - fin.len * L * 0.3, b.z + fin.len * L, 1]], [[0, 2, 1]]);
         }
         else if (fin.kind === "tail") {
-            const lobe = fin.lobe * L, span = fin.span * L, ped = at(1), pedH = Math.max(0.02 * L, (ped.top + ped.bot) / 2), nf = fin.notch !== undefined ? fin.notch : 0.55, up = fin.upper || 1;
+            const lobe = fin.lobe * L, span = fin.span * L, lowK = fin.low !== undefined ? fin.low : 1, ped = at(1), pedH = Math.max(0.02 * L, (ped.top + ped.bot) / 2), nf = fin.notch !== undefined ? fin.notch : 0.55, up = fin.upper || 1;
             const trail = (u) => {
                 const a = Math.abs(u);
                 switch (fin.style) {
@@ -6686,7 +6730,7 @@ function fishBuildData(look, hexToRgb) {
             const verts = [[0, ped.yo, 0, 0], [0, ped.yo + pedH, 0, 0]], tris = [], K = 10;
             for (let k = 0; k <= K; k++) {
                 const u = 1 - (2 * k) / K;
-                verts.push([0, ped.yo + u * span, lobe * trail(u) * (u > 0 ? up : 1), 1]);
+                verts.push([0, ped.yo + u * span * (u < 0 ? lowK : 1), lobe * trail(u) * (u > 0 ? up : (lowK < 1 ? 0.45 + 0.55 * lowK : 1)), 1]);
             }
             verts.push([0, ped.yo - pedH, 0, 0]);
             for (let k = 1; k < verts.length - 1; k++)
@@ -7084,6 +7128,13 @@ const SEA_SPECIES = (() => {
         slender: [[0, 0, 0, 0], [0.05, 0.03, 0.028, 0.02], [0.14, 0.075, 0.07, 0.045], [0.3, 0.095, 0.09, 0.055], [0.55, 0.1, 0.095, 0.058], [0.78, 0.075, 0.07, 0.04], [0.92, 0.04, 0.04, 0.022], [1, 0.03, 0.03, 0.016]],
         mack: [[0, 0, 0, 0], [0.04, 0.06, 0.055, 0.035], [0.12, 0.11, 0.1, 0.06], [0.3, 0.14, 0.13, 0.075], [0.5, 0.15, 0.14, 0.078], [0.72, 0.11, 0.1, 0.055], [0.9, 0.042, 0.042, 0.025], [1, 0.03, 0.03, 0.02]],
         tuna: [[0, 0, 0, 0], [0.04, 0.07, 0.065, 0.045], [0.12, 0.15, 0.14, 0.095], [0.3, 0.2, 0.19, 0.12], [0.5, 0.21, 0.2, 0.125], [0.72, 0.15, 0.14, 0.08], [0.88, 0.06, 0.055, 0.03], [1, 0.03, 0.03, 0.018]],
+        shark: [[0, 0, 0, 0], [0.02, 0.03, 0.025, 0.02], [0.08, 0.08, 0.07, 0.06], [0.2, 0.15, 0.13, 0.1], [0.36, 0.18, 0.15, 0.115], [0.55, 0.14, 0.115, 0.09], [0.75, 0.08, 0.065, 0.05], [0.9, 0.045, 0.04, 0.03], [1, 0.04, 0.036, 0.025]],
+        sharkslim: [[0, 0, 0, 0], [0.025, 0.03, 0.025, 0.02], [0.1, 0.07, 0.06, 0.05], [0.24, 0.115, 0.1, 0.075], [0.4, 0.13, 0.11, 0.085], [0.6, 0.1, 0.085, 0.065], [0.78, 0.06, 0.05, 0.04], [0.9, 0.04, 0.035, 0.025], [1, 0.035, 0.032, 0.02]],
+        sharkstout: [[0, 0, 0, 0], [0.02, 0.04, 0.035, 0.03], [0.07, 0.1, 0.09, 0.08], [0.18, 0.19, 0.16, 0.125], [0.35, 0.23, 0.18, 0.15], [0.55, 0.18, 0.14, 0.115], [0.75, 0.1, 0.08, 0.06], [0.9, 0.055, 0.045, 0.035], [1, 0.045, 0.04, 0.03]],
+        sharknurse: [[0, 0, 0, 0], [0.02, 0.03, 0.025, 0.03], [0.08, 0.09, 0.07, 0.085], [0.2, 0.15, 0.1, 0.12], [0.38, 0.17, 0.12, 0.125], [0.58, 0.13, 0.1, 0.095], [0.76, 0.08, 0.065, 0.055], [0.9, 0.05, 0.045, 0.035], [1, 0.045, 0.04, 0.03]],
+        sharkmako: [[0, 0, 0, 0], [0.03, 0.04, 0.035, 0.03], [0.1, 0.09, 0.08, 0.07], [0.25, 0.17, 0.15, 0.115], [0.42, 0.19, 0.165, 0.13], [0.62, 0.14, 0.12, 0.095], [0.8, 0.07, 0.06, 0.05], [0.92, 0.04, 0.035, 0.03], [1, 0.035, 0.032, 0.03]],
+        sharkbonnet: [[0, 0, 0, 0], [0.015, 0.02, 0.02, 0.05], [0.06, 0.05, 0.045, 0.1], [0.12, 0.085, 0.075, 0.09], [0.26, 0.15, 0.13, 0.1], [0.42, 0.16, 0.135, 0.105], [0.6, 0.12, 0.1, 0.08], [0.78, 0.07, 0.06, 0.045], [0.9, 0.045, 0.04, 0.03], [1, 0.04, 0.036, 0.025]],
+        sharkhammer: [[0, 0, 0, 0], [0.012, 0.014, 0.014, 0.13], [0.04, 0.028, 0.026, 0.19], [0.08, 0.036, 0.032, 0.19], [0.115, 0.07, 0.06, 0.095], [0.2, 0.14, 0.12, 0.095], [0.36, 0.18, 0.15, 0.11], [0.55, 0.14, 0.115, 0.09], [0.75, 0.08, 0.065, 0.05], [0.9, 0.045, 0.04, 0.03], [1, 0.04, 0.036, 0.025]],
         bill: [[0, 0, 0, 0], [0.1, 0.004, 0.004, 0.004], [0.2, 0.014, 0.012, 0.01], [0.24, 0.04, 0.035, 0.025], [0.32, 0.105, 0.09, 0.06], [0.5, 0.13, 0.115, 0.07], [0.72, 0.1, 0.09, 0.055], [0.9, 0.045, 0.04, 0.025], [1, 0.03, 0.03, 0.018]],
     };
     const fn = {
@@ -7091,7 +7142,7 @@ const SEA_SPECIES = (() => {
         ana: (t0, t1, h, shape, color, edge) => Object.assign({ kind: "anal", t0, t1, h, shape, color }, edge !== undefined ? { edge } : {}),
         pec: (t, len, out, drop, color, base) => Object.assign({ kind: "pec", t, len, out, drop, color }, base ? { base } : {}),
         pel: (t, len, out, drop, color) => ({ kind: "pelvic", t, len, out, drop, color }),
-        tail: (style, lobe, span, notch, color, edge, upper) => Object.assign({ kind: "tail", style, lobe, span, color, edge }, notch !== undefined ? { notch } : {}, upper ? { upper } : {}),
+        tail: (style, lobe, span, notch, color, edge, upper, low) => Object.assign({ kind: "tail", style, lobe, span, color, edge }, notch !== undefined ? { notch } : {}, upper ? { upper } : {}, low !== undefined ? { low } : {}), // low: how tall the lower lobe is next to the upper one (a shark's tail is lopsided)
         lets: (where, t0, t1, n, h, color) => ({ kind: "finlets", where, t0, t1, n, h, color }),
         fil: (t, len, color) => ({ kind: "filament", t, len, color }),
         bars: (at, w, tilt, color, a, cmin) => ({ type: "bars", at, w, tilt, color, a, cmin }),
@@ -7386,6 +7437,107 @@ const SEA_SPECIES = (() => {
                 pat: [fn.bars([0.33, 0.4, 0.47, 0.54, 0.61, 0.68], 0.012, 0.0, 0x6aa0d8, 0.5, -0.2), fn.scl(0.03)],
                 fins: [fn.dor(0.28, 0.6, 0.12, "peak", 0x1c3a60, 0x0e1c30), fn.dor(0.7, 0.76, 0.04, "soft", 0x1c3a60), fn.ana(0.66, 0.72, 0.06, "soft", 0x8aa0b4), fn.pec(0.28, 0.1, 0.03, 0.04, 0x2a4a74), fn.pel(0.33, 0.1, 0.02, 0.06, 0x2a4a74), fn.tail("lunate", 0.14, 0.22, 0.3, 0x1c3a60, 0x0e1c30)],
                 eye: { t: 0.26, c: 0.08, r: 0.011, iris: 0x1a2a3a }, mouth: { end: 0.26, c: -0.05 } } },
+        // ---- sharks (v35): eleven Gulf and south-east Atlantic sharks. Rules for keeping them are in SHARK_REGS / FISH_REGS (the game warden checks them). ----
+        { n: "Bonnethead", hex: 0x8a9484, L: 3.4, w: [3, 15], zone: "inshore", pull: [8, 13], bw: 1.0, dr: 1.1, ri: 1.0, d0: 0.8, cd: [2.0, 3.4], mk: [{ type: "blotches", color: 0x5a6458 }],
+            fight: ["Runner", 0.8, 1.0, 0, 0.5, 0.1, false, "a steady, surprising run for a small shark"], px: 0.5,
+            hab: "Warm, shallow seagrass flats, sand bars and estuaries, often in small groups feeding on blue crabs.",
+            how: "A piece of crab or shrimp on the bottom over grass flats, fished with a short wire or heavy fluorocarbon leader.",
+            desc: "A small, grey-brown shark with a smooth, rounded shovel of a head instead of a hammer. It is the smallest of the hammerhead family and feeds mostly on crabs.",
+            look: { len: 2.8, seed: 201, prof: FP.sharkbonnet, pal: { back: 0x78826f, flank: 0xa0a898, belly: 0xeeeeea },
+                pat: [fn.dots(14, 0.012, 0.3, 0.8, -0.1, 0.6, 0x4a5448, 0.4), fn.bars([0.2, 0.215, 0.23, 0.245], 0.003, -0.05, 0x20262a, 0.4, -0.15)],
+                fins: [fn.dor(0.34, 0.46, 0.15, "sharkfin", 0x748070, 0x4a5448), fn.dor(0.68, 0.74, 0.04, "soft", 0x748070), fn.ana(0.7, 0.76, 0.045, "soft", 0x8a9486), fn.pec(0.22, 0.13, 0.08, 0.07, 0x7e8a78, 0.07), fn.pel(0.52, 0.06, 0.03, 0.04, 0x8a9486), fn.tail("fork", 0.2, 0.13, 0.4, 0x6e7a68, 0x3a443a, 1.15, 0.55)],
+                eye: { t: 0.075, c: 0.05, r: 0.013, iris: 0x2a2a1a }, mouth: { end: 0.06, c: -0.35 } } },
+        { n: "Atlantic Sharpnose", hex: 0x929ca2, L: 3.2, w: [2, 9.5], zone: "inshore", pull: [8, 13], bw: 1.0, dr: 1.1, ri: 1.2, d0: 0.6, cd: [1.8, 3.0], mk: [{ type: "blotches", color: 0xd8dcdc }],
+            fight: ["Runner", 0.9, 1.1, 0, 0.7, 0.1, false, "quick, twisting runs"], px: 0.5,
+            hab: "Sandy and muddy bottom from the surf zone out to the shelf, in schools in shallow water in the warm months.",
+            how: "Cut fish or squid on a bottom rig with a wire leader, from piers, surf and boats; it takes bait eagerly.",
+            desc: "A small, slim, grey-olive shark with a long pointed snout, a scatter of pale spots on the sides and a black edge on the second dorsal fin.",
+            look: { len: 2.6, seed: 202, prof: FP.sharkslim, pal: { back: 0x8a9496, flank: 0xb2b8b8, belly: 0xf4f4f0 },
+                pat: [fn.dots(16, 0.011, 0.3, 0.85, -0.1, 0.6, 0xf2f2ee, 0.65), fn.bars([0.2, 0.215, 0.23, 0.245], 0.003, -0.05, 0x20262a, 0.4, -0.15)],
+                fins: [fn.dor(0.3, 0.42, 0.14, "sharkfin", 0x8a9496, 0x4a5256), fn.dor(0.68, 0.74, 0.04, "soft", 0x8a9496, 0x1c2024), fn.ana(0.7, 0.76, 0.04, "soft", 0xa0a8a8), fn.pec(0.21, 0.13, 0.08, 0.07, 0x8a9496, 0.07), fn.pel(0.5, 0.06, 0.03, 0.04, 0xa0a8a8), fn.tail("fork", 0.2, 0.13, 0.4, 0x7e888a, 0x2a3236, 1.15, 0.55)],
+                eye: { t: 0.07, c: 0.06, r: 0.013, iris: 0x1a1a14 }, mouth: { end: 0.07, c: -0.35 } } },
+        { n: "Blacktip Shark", hex: 0x8c8e88, L: 5.4, w: [10, 120], zone: "reef", pull: [20, 28], bw: 0.9, dr: 0.9, ri: 1.5, d0: 0.4, cd: [1.6, 2.8], mk: [{ type: "stripe", color: 0xe8eae6, thickness: 0.06, opacity: 0.6, y: -0.2 }],
+            fight: ["Jumper", 1.2, 1.3, 1.0, 0.8, 0.3, false, "fast, hard runs and spinning jumps"], px: 0.9,
+            hab: "Coastal waters from the surf and passes to nearshore reefs, in big schools that follow bait up and down the coast.",
+            how: "Cut mullet or bonito on a wire or heavy mono leader, or a large lure thrown into a school; it hits hard and jumps.",
+            desc: "A sleek, bronze-grey shark with black tips on its fins (most clearly on the pectoral and second dorsal), a white belly and a pale band along the flank toward the tail.",
+            look: { len: 4.4, seed: 203, prof: FP.shark, pal: { back: 0x767874, flank: 0xb0b0a8, belly: 0xf4f4f0 },
+                pat: [fn.band(-0.12, 0.08, 0.5, 0.9, 0xeceeea, 0.7), fn.bars([0.18, 0.195, 0.21, 0.225, 0.24], 0.003, -0.05, 0x20262a, 0.45, -0.15)],
+                fins: [fn.dor(0.3, 0.43, 0.15, "sharkfin", 0x7a7c78, 0x111414), fn.dor(0.68, 0.73, 0.035, "soft", 0x7a7c78, 0x111414), fn.ana(0.69, 0.74, 0.04, "soft", 0x9a9a94, 0x111414), fn.pec(0.21, 0.15, 0.09, 0.08, 0x8a8c86, 0.07), fn.pel(0.5, 0.06, 0.03, 0.04, 0xa0a09a), fn.tail("fork", 0.22, 0.14, 0.4, 0x707470, 0x111414, 1.2, 0.55)],
+                eye: { t: 0.07, c: 0.05, r: 0.012, iris: 0x1a1a14 }, mouth: { end: 0.07, c: -0.35 } } },
+        { n: "Spinner Shark", hex: 0x9a8268, L: 6.4, w: [20, 150], zone: "reef", pull: [24, 32], bw: 0.9, dr: 0.8, ri: 1.6, d0: 0.3, cd: [1.4, 2.6], mk: [{ type: "stripe", color: 0xeceae2, thickness: 0.05, opacity: 0.5, y: -0.25 }],
+            fight: ["Jumper", 1.3, 1.4, 2.0, 0.9, 0.3, false, "rockets out of the water and spins"], px: 0.9,
+            hab: "Coastal and shelf waters, following schools of bait; it leaps and spins out of the water when it feeds, and the big fish gather in warm months along the coast.",
+            how: "Cut or live bait (mullet, bonito, ladyfish) on wire, near schools of baitfish. Fight it on a fairly firm drag: it jumps a lot.",
+            desc: "A slim bronze-grey shark with a long snout, white belly, and black tips on the fins. It earns its name leaping and spinning in the air as it feeds through a bait school.",
+            look: { len: 5.2, seed: 204, prof: FP.sharkslim, pal: { back: 0x7a6a58, flank: 0xb89c7c, belly: 0xf2eee6 },
+                pat: [fn.bars([0.18, 0.195, 0.21, 0.225, 0.24], 0.003, -0.05, 0x20262a, 0.45, -0.15), fn.band(-0.1, 0.09, 0.45, 0.9, 0xe6dccc, 0.45)],
+                fins: [fn.dor(0.3, 0.42, 0.13, "sharkfin", 0x8a7a68, 0x141616), fn.dor(0.68, 0.73, 0.035, "soft", 0x8a7a68, 0x141616), fn.ana(0.69, 0.74, 0.04, "soft", 0xa89a88, 0x141616), fn.pec(0.21, 0.16, 0.09, 0.08, 0x9a8a76, 0.07), fn.pel(0.5, 0.06, 0.03, 0.04, 0xb0a290), fn.tail("fork", 0.23, 0.14, 0.4, 0x7a6a58, 0x141616, 1.2, 0.55)],
+                eye: { t: 0.07, c: 0.05, r: 0.012, iris: 0x1a1a14 }, mouth: { end: 0.075, c: -0.35 } } },
+        { n: "Nurse Shark", hex: 0x8a7458, L: 8.0, w: [20, 150], zone: "reef", pull: [18, 28], bw: 1.2, dr: 0.8, ri: 0.9, d0: 0.8, cd: [2.6, 4.4], mk: [{ type: "blotches", color: 0x6a5a40 }],
+            fight: ["Grinder", 0.7, 0.9, 0, 0.6, 0.1, false, "a heavy, sulking weight that digs in on the bottom"], px: 0.7,
+            hab: "Shallow reefs, ledges, rocky bottom and mangrove edges, resting in caves and under ledges by day and hunting at night.",
+            how: "Cut fish or squid on the bottom near ledges and reef edges on heavy gear. It is slow to take the bait and slow to give up.",
+            desc: "A heavy, tan to dark-brown shark with a broad flat head, tiny eyes, a pair of whisker-like barbels at the nose and two nearly equal dorsal fins, far back on the body.",
+            look: { len: 6.6, seed: 205, prof: FP.sharknurse, pal: { back: 0x6a5a42, flank: 0x8a7658, belly: 0xc8b890 },
+                pat: [fn.dots(10, 0.012, 0.3, 0.8, 0.0, 0.7, 0x4a3c2a, 0.25), fn.bars([0.2, 0.215, 0.23, 0.245], 0.003, -0.05, 0x20262a, 0.3, -0.15)],
+                fins: [fn.dor(0.42, 0.52, 0.1, "sharkfin", 0x7a6a50, 0x3e3426), fn.dor(0.6, 0.68, 0.085, "sharkfin", 0x7a6a50, 0x3e3426), fn.ana(0.72, 0.78, 0.045, "soft", 0x8a7a60), fn.pec(0.2, 0.13, 0.1, 0.06, 0x7e6c52, 0.08), fn.pel(0.46, 0.07, 0.04, 0.04, 0x8a7a60), fn.tail("fork", 0.22, 0.1, 0.45, 0x6e5e46, 0x3a3022, 1.0, 0.8),
+                    { kind: "barbel", t: 0.025, x: 0.3, c: 0.5, wd: 0.008, out: 0.012, drop: 0.035, len: 0.03, color: 0xa89878 }],
+                eye: { t: 0.06, c: 0.2, r: 0.008, iris: 0x2a2a1a }, mouth: { end: 0.05, c: -0.3 } } },
+        { n: "Bull Shark", hex: 0x747c7e, L: 8.8, w: [30, 350], zone: "inshore", pull: [30, 42], bw: 1.1, dr: 0.6, ri: 1.6, d0: 0.3, cd: [1.6, 2.8], mk: [{ type: "stripe", color: 0xe8ecec, thickness: 0.08, opacity: 0.4, y: -0.3 }],
+            fight: ["Grinder", 1.5, 1.5, 0.3, 1.0, 0.7, false, "a bulldog: powerful, relentless runs and head shakes"], px: 1.0,
+            hab: "Warm shallow coasts, passes, river mouths and bays; it is one of the few sharks that moves into fresh water.",
+            how: "A big chunk of fresh cut fish (mullet, ladyfish, jack) on heavy gear with a thick wire leader, near passes and channels.",
+            desc: "A thick, blunt-nosed grey shark with a pale belly and small eyes. It is among the strongest and most powerful fighters of the inshore sharks.",
+            look: { len: 7.2, seed: 206, prof: FP.sharkstout, pal: { back: 0x646e70, flank: 0x949c9c, belly: 0xf0f0ec },
+                pat: [fn.bars([0.17, 0.185, 0.2, 0.215, 0.23], 0.0035, -0.05, 0x20262a, 0.45, -0.15)],
+                fins: [fn.dor(0.3, 0.43, 0.15, "sharkfin", 0x6a7476, 0x3a4244), fn.dor(0.66, 0.72, 0.045, "soft", 0x6a7476), fn.ana(0.68, 0.74, 0.045, "soft", 0x8a9292), fn.pec(0.2, 0.16, 0.1, 0.08, 0x747e80, 0.08), fn.pel(0.5, 0.07, 0.03, 0.04, 0x8a9292), fn.tail("fork", 0.23, 0.14, 0.4, 0x646e70, 0x2a3234, 1.15, 0.55)],
+                eye: { t: 0.06, c: 0.05, r: 0.011, iris: 0x1a1a14 }, mouth: { end: 0.06, c: -0.35 } } },
+        { n: "Blue Shark", hex: 0x2a5ea8, L: 8.6, w: [25, 250], zone: "openWater", pull: [24, 34], bw: 1.2, dr: 0.7, ri: 1.4, d0: 0.4, cd: [1.8, 3.2], mk: [{ type: "stripe", color: 0x8ab8e8, thickness: 0.07, opacity: 0.5, y: -0.1 }],
+            fight: ["Runner", 1.4, 1.2, 0.3, 0.9, 0.2, false, "long, steady runs and a lot of weight"], px: 0.6,
+            hab: "Open ocean worldwide in temperate and tropical water, often near the surface, along current edges and weed lines far from shore.",
+            how: "Chum a slick, then drift cut fish or squid back on a wire or heavy leader. It is common offshore and easy to attract with a slick.",
+            desc: "A very slender, long-snouted shark with a deep indigo back, brilliant blue sides, a white belly and very long, narrow pectoral fins.",
+            look: { len: 7.0, seed: 207, prof: FP.sharkslim, pal: { back: 0x1a3a78, flank: 0x4a7ec4, belly: 0xf6f8fa },
+                pat: [fn.bars([0.17, 0.185, 0.2, 0.215, 0.23], 0.0035, -0.05, 0x12202e, 0.4, -0.15)],
+                fins: [fn.dor(0.33, 0.45, 0.11, "sharkfin", 0x24468a, 0x0e1e3a), fn.dor(0.7, 0.75, 0.03, "soft", 0x24468a), fn.ana(0.7, 0.76, 0.035, "soft", 0x3a62a8), fn.pec(0.2, 0.26, 0.1, 0.1, 0x2a4e94, 0.07), fn.pel(0.5, 0.05, 0.03, 0.04, 0x3a62a8), fn.tail("fork", 0.25, 0.14, 0.4, 0x20408a, 0x0e1e3a, 1.25, 0.6)],
+                eye: { t: 0.08, c: 0.05, r: 0.015, iris: 0x14141a }, mouth: { end: 0.08, c: -0.35 } } },
+        { n: "Lemon Shark", hex: 0x98884e, L: 8.0, w: [40, 250], zone: "inshore", pull: [28, 38], bw: 1.1, dr: 0.7, ri: 1.2, d0: 0.5, cd: [2.0, 3.4], mk: [{ type: "blotches", color: 0x7a6a38 }],
+            fight: ["Grinder", 1.1, 1.3, 0.2, 0.9, 0.4, false, "powerful runs, then it digs in and pulls hard"], px: 2.0,
+            hab: "Shallow, sheltered subtropical water: mangrove shorelines, sandy flats, channels and reefs.",
+            how: "A large cut fish on a wire leader near mangrove edges and flats. Protected in Florida, so the fight is the point: it goes back.",
+            desc: "A heavy, yellow-brown shark with a broad blunt head and two dorsal fins of nearly the same size. The yellowish tone helps it blend into sandy bottom.",
+            look: { len: 6.6, seed: 208, prof: FP.sharkstout, pal: { back: 0x8a7a44, flank: 0xa89860, belly: 0xece4c0 },
+                pat: [fn.bars([0.17, 0.185, 0.2, 0.215, 0.23], 0.0035, -0.05, 0x3a3018, 0.35, -0.15)],
+                fins: [fn.dor(0.4, 0.5, 0.11, "sharkfin", 0x9a8a52, 0x5a4c26), fn.dor(0.62, 0.7, 0.1, "sharkfin", 0x9a8a52, 0x5a4c26), fn.ana(0.7, 0.76, 0.05, "soft", 0xa89860), fn.pec(0.2, 0.15, 0.1, 0.07, 0x9a8a52, 0.08), fn.pel(0.48, 0.07, 0.04, 0.04, 0xa89860), fn.tail("fork", 0.22, 0.13, 0.42, 0x8a7a44, 0x4a3c1a, 1.1, 0.6)],
+                eye: { t: 0.06, c: 0.05, r: 0.011, iris: 0xd8c050 }, mouth: { end: 0.06, c: -0.35 } } },
+        { n: "Tiger Shark", hex: 0x687470, L: 11.5, w: [120, 900], zone: "deepSea", pull: [44, 58], bw: 1.3, dr: 0.5, ri: 1.7, d0: 0.3, cd: [1.8, 3.0], mk: [{ type: "verticalBars", color: 0x3a4442 }],
+            fight: ["Grinder", 1.7, 1.6, 0.2, 1.1, 0.8, false, "enormous, slow, brutal power"], px: 2.0,
+            hab: "Warm coastal and open water, from shallow reefs and passes to the edge of the shelf; it roams widely and will eat nearly anything.",
+            how: "Huge chunks of fish or a whole fish on very heavy tackle and a wire leader, after chumming. Protected in Florida: hook it, win the fight and let it go.",
+            desc: "A very large, blunt-snouted shark with dark vertical bars and spots on the sides of a blue-grey body that fade with age. The bars give it its name.",
+            look: { len: 9.5, seed: 209, prof: FP.sharkstout, pal: { back: 0x56625e, flank: 0x84908a, belly: 0xe6e8e0 },
+                pat: [fn.bars([0.22, 0.3, 0.38, 0.46, 0.54, 0.62, 0.7, 0.78], 0.022, 0.12, 0x2e3836, 0.5, -0.05), fn.bars([0.17, 0.185, 0.2, 0.215, 0.23], 0.0035, -0.05, 0x20262a, 0.4, -0.15)],
+                fins: [fn.dor(0.32, 0.44, 0.13, "sharkfin", 0x5e6a66, 0x2e3836), fn.dor(0.68, 0.73, 0.04, "soft", 0x5e6a66), fn.ana(0.69, 0.74, 0.045, "soft", 0x7a8680), fn.pec(0.2, 0.17, 0.11, 0.08, 0x66726e, 0.09), fn.pel(0.5, 0.07, 0.04, 0.04, 0x7a8680), fn.tail("fork", 0.26, 0.15, 0.4, 0x56625e, 0x1e2624, 1.3, 0.55)],
+                eye: { t: 0.06, c: 0.05, r: 0.012, iris: 0x1a1a14 }, mouth: { end: 0.06, c: -0.35 } } },
+        { n: "Great Hammerhead", hex: 0x7e8072, L: 12.0, w: [100, 800], zone: "deepSea", pull: [38, 50], bw: 1.2, dr: 0.6, ri: 1.5, d0: 0.4, cd: [2.0, 3.4], mk: [{ type: "stripe", color: 0xe0e0d8, thickness: 0.05, opacity: 0.4, y: -0.3 }],
+            fight: ["Diver", 1.6, 1.5, 0.2, 1.0, 0.6, false, "dives deep and hangs on, then runs hard"], px: 2.0,
+            hab: "Warm coastal waters and the edge of the shelf, from shallow flats and reefs to deeper water; it hunts stingrays along the bottom.",
+            how: "Heavy tackle with a big whole fish or chunk bait. Protected: it is an extremely fragile catch, so the fight must be short, and it goes back in the water.",
+            desc: "The largest hammerhead: a broad, flat 'hammer' head with the eyes at the tips, a very tall sickle-shaped first dorsal fin, and a brownish-grey back.",
+            look: { len: 10.0, seed: 210, prof: FP.sharkhammer, pal: { back: 0x6a6c60, flank: 0x92968a, belly: 0xe8e8e0 },
+                pat: [fn.bars([0.2, 0.215, 0.23, 0.245], 0.003, -0.05, 0x20262a, 0.35, -0.15)],
+                fins: [fn.dor(0.3, 0.42, 0.21, "sharkfin", 0x62645a, 0x2c2e28), fn.dor(0.68, 0.73, 0.04, "soft", 0x62645a), fn.ana(0.69, 0.74, 0.045, "soft", 0x7a7c70), fn.pec(0.22, 0.16, 0.1, 0.08, 0x6a6c60, 0.09), fn.pel(0.5, 0.07, 0.04, 0.04, 0x7a7c70), fn.tail("fork", 0.28, 0.16, 0.38, 0x5a5c52, 0x22241e, 1.3, 0.55)],
+                eye: { t: 0.045, c: 0.0, r: 0.011, iris: 0xe8d870 }, mouth: { end: 0.12, c: -0.35 } } },
+        { n: "Shortfin Mako", hex: 0x2e5ea2, L: 9.0, w: [60, 600], zone: "deepSea", pull: [40, 54], bw: 1.4, dr: 0.5, ri: 1.9, d0: 0.15, cd: [1.6, 2.8], mk: [{ type: "stripe", color: 0xf4f6f8, thickness: 0.07, opacity: 0.5, y: -0.3 }],
+            fight: ["Jumper", 1.8, 1.6, 2.5, 0.9, 0.5, true, "the fastest shark: blistering runs and towering leaps"], px: 2.0,
+            hab: "Open ocean in warm and temperate water, often well offshore along current edges, though it comes closer to the shelf edge when bait is there.",
+            how: "Chum a slick and drift live or cut bait (bonito, mackerel) on heavy tackle and wire. It leaps higher than any other shark; protected in Florida, so release it.",
+            desc: "A torpedo-shaped shark with a metallic cobalt-blue back, a brilliant white belly, a conical snout and a crescent tail. It is the fastest shark in the sea and a spectacular jumper.",
+            look: { len: 7.4, seed: 211, prof: FP.sharkmako, pal: { back: 0x1c4a8e, flank: 0x6a9ad0, belly: 0xfafcfe },
+                pat: [fn.bars([0.17, 0.185, 0.2, 0.215, 0.23], 0.0035, -0.05, 0x10243a, 0.4, -0.15)],
+                fins: [fn.dor(0.34, 0.44, 0.13, "sharkfin", 0x24508e, 0x0e2036), fn.dor(0.72, 0.76, 0.025, "soft", 0x24508e), fn.ana(0.72, 0.76, 0.03, "soft", 0x4a78b4), fn.pec(0.21, 0.15, 0.09, 0.08, 0x2a5896, 0.07), fn.pel(0.52, 0.045, 0.03, 0.03, 0x4a78b4), fn.tail("lunate", 0.24, 0.17, 0.3, 0x1e4a86, 0x0e2036, 1.05, 0.85)],
+                eye: { t: 0.065, c: 0.05, r: 0.016, iris: 0x14141a }, mouth: { end: 0.075, c: -0.35 } } },
     ];
     return SEA_LIST;
 })();
@@ -7400,6 +7552,32 @@ function seaSpeciesEntry(q) {
     return { name: q.n, color: q.hex, scale: q.L / q.look.len, weightRange: q.w, zone: q.zone, biteWindow: q.bw, basePullMin: q.pull[0], basePullMax: q.pull[1], staminaDrainMult: q.dr,
         runIntensityMult: q.ri, initialRunDelay: q.d0, runCooldownMin: q.cd[0], runCooldownMax: q.cd[1], markings: q.mk, habitat: q.hab, howToCatch: q.how, description: q.desc };
 }
+// ---- sharks (v35): which grounds hold them. [name, level it opens at, weight in the pool, ground kinds, nearest, farthest (ft from the dock)] ----
+const SHARK_SPAWN = [
+    ["Bonnethead", 1, 1.2, ["inshore"], 0, 1700], ["Atlantic Sharpnose", 1, 1.0, ["inshore", "reef", "openWater", "sand"], 0, 2300],
+    ["Blacktip Shark", 4, 1.0, ["inshore", "reef", "wreck", "openWater"], 300, 3300], ["Nurse Shark", 4, 0.8, ["reef", "wreck", "inshore", "rocks"], 400, 2700],
+    ["Spinner Shark", 6, 0.7, ["reef", "wreck", "openWater"], 900, 4300], ["Bull Shark", 8, 0.6, ["inshore", "reef"], 400, 2400], ["Lemon Shark", 8, 0.5, ["inshore", "reef"], 400, 2500],
+    ["Blue Shark", 12, 0.8, ["openWater"], 3600, 9000], ["Shortfin Mako", 18, 0.45, ["openWater", "reef", "wreck"], 3800, 9000],
+    ["Great Hammerhead", 20, 0.4, ["reef", "wreck", "openWater"], 2600, 9000], ["Tiger Shark", 24, 0.35, ["wreck", "reef", "openWater"], 2800, 9000],
+];
+function sharkPoolAdd(pool, type, dist, lv, sizeHi) {
+    let add = "";
+    SHARK_SPAWN.forEach((r) => {
+        if (lv < r[1] || r[3].indexOf(type) < 0 || dist < r[4] || dist > r[5] || pool.indexOf(r[0] + ":") >= 0)
+            return;
+        const w = SEA_SPECIES.find((q) => q.n === r[0]).w, top = w[0] + sizeHi * (w[1] - w[0]); // the heaviest one this ground could give: the near water keeps to the small end (the same limits as every other fish)
+        if (dist < 1500 ? top > 25 : dist < 3800 ? top > 90 : false)
+            return;
+        add += "," + r[0] + ":" + r[2];
+    });
+    return pool + add;
+}
+SEA_GROUNDS.forEach((g) => { g.pool = sharkPoolAdd(g.pool, g.type, g.d, g.lv || 0, g.size[1]); });
+REMOTE_SPOT_DATA.forEach((sp) => { const r = GROUND_RULES[sp.id]; if (r)
+    r.pool = sharkPoolAdd(r.pool, sp.type, Math.hypot(sp.x - SEA_ORIGIN.x, sp.z - SEA_ORIGIN.z), r.lv || 0, r.size[1]); });
+GROUND_RULES["home-inshore"].pool += ",Bonnethead:1";
+GROUND_RULES["home-open"].pool += ",Atlantic Sharpnose:0.6";
+REGION_POOLS.banks.pool += ",Blacktip Shark:1,Spinner Shark:0.6,Nurse Shark:0.6";
 const SEA_GROUND_BY_ID = {};
 SEA_GROUNDS.forEach((g) => {
     const p = seaPoint(g.b, g.d);
@@ -12880,6 +13058,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 boatPos.z = a.toZ;
                 boatHeading = a.toH;
                 if (a.kind === "dock") {
+                    if (wardenCool <= 0 && heldFish().length && Math.random() < 0.3)
+                        setTimeout(() => wardenInspect("dock"), 1200);
                     fishingState.docked = true;
                     marineShowToast(TOUCH_UI ? "⚓ Docked. Step out from the menu, or open Marina services" : "⚓ Docked. Press L to step out, or open Marina services", "#7fe6a8", 4);
                 }
@@ -13875,6 +14055,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 fxPlay("wind");
         }
         let lastCatchFlags = { first: false, best: false };
+        let catchPending = null; // a regulated fish just landed and the player has not yet chosen to keep or release it: { name, weight, level }
+        let wardenCool = 150 + Math.random() * 150, wardenSeaT = 0; // seconds before a warden may check you again / a timer for the sea patrol roll
         let catchDisplay = null; // the fish just landed, held up where the player can see it: { mesh, t, dur, k } (see the result block in the frame loop)
         const catchTmp = new THREE.Vector3(), catchBox = new THREE.Box3(), catchSize = new THREE.Vector3();
         const spotsFound = {};
@@ -14264,6 +14446,81 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 gearAfterChange();
             return res;
         }
+        // ---------- The game warden: keep or release, and inspections ----------
+        function wardenState() {
+            const W = quest.warden || (quest.warden = { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sharkSold: 0 }), key = questDayKey(quest.dayOffset);
+            if (W.day !== key) {
+                W.day = key;
+                W.sharkSold = 0;
+            }
+            return W;
+        }
+        function heldFish() { return stateRef.current.carriedItems.filter((i) => i.type === "fish").concat(stateRef.current.coolerStorage.fish); }
+        function wardenCtx() { return { sharkHave: wardenState().sharkSold + heldFish().filter((f) => FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp === "shark").length }; }
+        function catchResolve(keep) {
+            const c = catchPending;
+            if (!c)
+                return;
+            catchPending = null;
+            if (keep) {
+                stateRef.current.carriedItems.push({ type: "fish", speciesName: c.name, weight: c.weight, id: Math.random().toString(36).slice(2) });
+                marineShowToast(c.level === "ok" ? "🧊 Kept the " + c.name : "⚠️ Kept an illegal " + c.name + ": a game warden could fine you", c.level === "ok" ? "#7fe6a8" : "#ffb84d", c.level === "ok" ? 3 : 5);
+            }
+            else
+                marineShowToast("🌊 Released the " + c.name + " (" + c.weight.toFixed(c.weight < 10 ? 1 : 0) + " lb)", "#8fd9e6", 3);
+            setUiCatch((u) => (u && u.reg ? { ...u, reg: { ...u.reg, pending: false, kept: !!keep } } : u));
+            if (fishingState.mode === "result")
+                fishingState.resultTimer = Math.min(fishingState.resultTimer, 1.5);
+        }
+        function wardenInspect(where) {
+            const W = wardenState(), held = heldFish();
+            W.checks++;
+            wardenCool = 420 + Math.random() * 240;
+            const v = fishRegViolations(held, W.sharkSold), who = where === "dock" ? "👮 A game warden is waiting on the dock" : "👮 A game warden pulls alongside";
+            if (!v.length) {
+                W.clean++;
+                const gain = awardXp(10 + Math.min(40, held.length * 4));
+                marineShowToast(who + ": " + held.length + " fish checked, all legal. Tight lines! +" + gain.gained + " XP", "#7fe6a8", 7);
+                questSave(quest);
+                questPush();
+                return;
+            }
+            let fine = 0;
+            v.forEach((x) => { fine += WARDEN_FINE[x.level] || 75; });
+            fine = Math.round(fine * (1 + 0.5 * Math.min(4, W.strikes)) * (1 + questLevelForXp(quest.xp) * 0.04));
+            fine = Math.min(fine, Math.max(0, Math.floor(quest.money)));
+            const gone = new Set(v.map((x) => x.item));
+            stateRef.current.carriedItems = stateRef.current.carriedItems.filter((i) => !gone.has(i));
+            stateRef.current.coolerStorage.fish = stateRef.current.coolerStorage.fish.filter((i) => !gone.has(i));
+            quest.money -= fine;
+            W.strikes++;
+            W.fines += fine;
+            W.seized += v.length;
+            const names = {};
+            v.forEach((x) => { names[x.item.speciesName] = (names[x.item.speciesName] || 0) + 1; });
+            marineShowToast(who + ": " + v.length + " illegal fish seized (" + Object.keys(names).map((k) => names[k] + " " + k).join(", ") + "). Fine $" + fine + (W.strikes >= 3 ? ". Repeat offender: fines go up" : "") + " · " + v[0].msg, "#ff8a6a", 11);
+            fxPlay("lost");
+            questSave(quest);
+            questPush();
+        }
+        function wardenTick(dt) {
+            if (wardenCool > 0)
+                wardenCool -= dt;
+            if (wardenCool > 0 || ashoreMode || dockAnim || travelAnim || shopOpen || homeOpen || questDialogGiver || catchPending)
+                return;
+            if (fishingState.mode !== "idle" && fishingState.mode !== "waiting")
+                return;
+            wardenSeaT += dt;
+            if (wardenSeaT < 5)
+                return;
+            wardenSeaT = 0;
+            if (fishingState.docked || !heldFish().length)
+                return;
+            if (Math.hypot(boatPos.x - SEA_ORIGIN.x, boatPos.z - SEA_ORIGIN.z) > 4300)
+                return; // the patrol covers the coast and the shelf, not the blue water
+            if (Math.random() < 5 / 200)
+                wardenInspect("sea");
+        }
         function questRecordCatch(c) {
             const r = questOnCatch(quest, c);
             lastCatchFlags = r.flags;
@@ -14382,8 +14639,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 storyRadioTimer = 0;
         }
         // The fish buyer at the shop takes everything on hand: fish still being carried plus fish in the cooler.
+        function sellFishAll() { return stateRef.current.carriedItems.filter((i) => i.type === "fish").concat(stateRef.current.coolerStorage.fish); }
         function sellList() {
-            const fish = stateRef.current.carriedItems.filter((i) => i.type === "fish").concat(stateRef.current.coolerStorage.fish);
+            const fish = sellFishAll();
             const by = {};
             let total = 0;
             fish.forEach((f) => { const v = progSellValue(quest, f.speciesName, f.weight); total += v; by[f.speciesName] = by[f.speciesName] || { name: f.speciesName, n: 0, value: 0 }; by[f.speciesName].n++; by[f.speciesName].value += v; });
@@ -14460,6 +14718,16 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     marineShowToast("✅ " + r.title + " done · +" + r.reward.xp + " XP · +$" + r.reward.money + (r.levelText ? " · " + r.levelText : "") + (note ? " · " + note : ""), r.levelText ? "#ffd36b" : "#7fe6a8", r.levelText ? 8 : 7);
                 }
             }
+            else if (a.type === "catchkeep") {
+                catchResolve(true);
+            }
+            else if (a.type === "catchrelease") {
+                catchResolve(false);
+            }
+            else if (a.type === "testwarden") {
+                wardenCool = 0;
+                wardenInspect(a.where || "sea");
+            }
             else if (a.type === "sell") {
                 const sl = sellList();
                 if (!shopOpen && !(homeOpen && homePort && homeOwned(quest, homePort.id)))
@@ -14467,6 +14735,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 else if (!sl.n)
                     marineShowToast("No fish to sell", "#ffb84d", 3);
                 else {
+                    {
+                        const W = wardenState();
+                        sellFishAll().forEach((f) => { if (FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp === "shark")
+                            W.sharkSold++; });
+                    } // (a shark sold counts toward the day's limit)
                     stateRef.current.carriedItems = stateRef.current.carriedItems.filter((i) => i.type !== "fish");
                     stateRef.current.coolerStorage.fish = [];
                     quest.money += sl.total;
@@ -16146,7 +16419,14 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         journal[sp.name].lastWeight = fs.weight;
                         if (fs.weight > journal[sp.name].biggestWeight)
                             journal[sp.name].biggestWeight = fs.weight;
-                        stateRef.current.carriedItems.push({ type: "fish", speciesName: sp.name, weight: fs.weight, id: Math.random().toString(36).slice(2) });
+                        const reg = fishRegCheck(sp.name, fs.weight, wardenCtx());
+                        catchPending = null;
+                        if (!reg)
+                            stateRef.current.carriedItems.push({ type: "fish", speciesName: sp.name, weight: fs.weight, id: Math.random().toString(36).slice(2) });
+                        else if (reg.level !== "protected") {
+                            catchPending = { name: sp.name, weight: fs.weight, level: reg.level };
+                            fs.resultTimer = 18;
+                        } // the player decides: keep or release (a protected fish simply goes back)
                         const gotXp = questRecordCatch({ species: sp.name, weight: fs.weight, spotType: hf && hf.spot ? hf.spot.type : sp.zone, home: hf && hf.spot ? hf.spot.home : true });
                         fs.resultText += ` · +${gotXp} XP`;
                         const wr = fs.weightRoll;
@@ -16154,6 +16434,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             name: sp.name, weight: fs.weight, xp: gotXp, first: !!lastCatchFlags.first, best: !!lastCatchFlags.best,
                             size: wr < 0.2 ? "Small" : wr < 0.6 ? "Keeper" : wr < 0.9 ? "Big one" : "Trophy",
                             kind: st.kind, color: "#" + sp.color.toString(16).padStart(6, "0"),
+                            reg: reg ? { level: reg.level, msg: reg.msg, pending: !!catchPending, kept: false } : null,
                         });
                         spawnSplash(fs.hookDropPoint.x, fs.hookDropPoint.z, 0.9);
                         if (hf) {
@@ -16175,9 +16456,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 if (fs.mode === "result") {
                     fs.resultTimer -= dt;
                     if (fs.resultTimer <= 0) {
+                        if (catchPending)
+                            catchResolve(catchPending.level === "ok");
                         fs.mode = "idle";
                         fs.resultText = "";
-                    }
+                    } // (a decision left alone: a legal fish is kept, anything else goes back)
                 }
                 if (catchDisplay) {
                     const cd = catchDisplay, m = cd.mesh, an = ashoreMode ? ashoreAngler : (currentBoatGroup ? currentBoatGroup.userData.angler : null);
@@ -16198,6 +16481,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             scene.add(m);
                     }
                 }
+                wardenTick(dt);
                 updateFishingSpots(dt);
                 updateSeaLandmarks(dt);
                 updateSplashes(dt);
@@ -18078,7 +18362,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         uiCatch.kind,
                         " fight \u00B7 +",
                         uiCatch.xp,
-                        " XP")))) : (React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: uiResultSuccess ? "#8fd97a" : "#ff5c5c" } }, uiResultText))),
+                        " XP"),
+                    uiCatch.reg && (React.createElement("div", { style: { marginTop: 6 } },
+                        React.createElement("div", { style: { fontSize: 11, fontWeight: 700, lineHeight: 1.3, color: uiCatch.reg.level === "ok" ? "#8fd97a" : uiCatch.reg.level === "protected" ? "#ffd36b" : "#ff8a6a" } }, uiCatch.reg.level === "protected" ? "🛡️ " + uiCatch.reg.msg + " · released" : uiCatch.reg.msg),
+                        uiCatch.reg.pending ? (React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } },
+                            React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "catchkeep" }; }, style: { flex: 1, padding: "7px 10px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700, border: "1px solid " + (uiCatch.reg.level === "ok" ? "#7fe6a8" : "#ff8a6a"), background: "transparent", color: uiCatch.reg.level === "ok" ? "#7fe6a8" : "#ff8a6a" } }, uiCatch.reg.level === "ok" ? "Keep it" : "Keep anyway"),
+                            React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "catchrelease" }; }, style: { flex: 1, padding: "7px 10px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700, border: "1px solid #8fd9e6", background: "transparent", color: "#8fd9e6" } }, "Release"))) : uiCatch.reg.level !== "protected" && React.createElement("div", { style: { fontSize: 10, opacity: 0.7, marginTop: 2 } }, uiCatch.reg.kept ? "Kept" : "Released")))))) : (React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: uiResultSuccess ? "#8fd97a" : "#ff5c5c" } }, uiResultText))),
             !TOUCH_UI && React.createElement("div", { style: { marginTop: 8, textAlign: "right" } },
                 React.createElement("button", { onClick: () => { const v = !uiFx; fxUnlock(); fxSetOn(v); setUiFx(v); if (v)
                         fxPlay("click"); }, style: { fontSize: 10, padding: "2px 8px", borderRadius: 4, cursor: "pointer", border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(234,243,245,0.55)" } }, uiFx ? "Sound and buzz: on" : "Sound and buzz: off")))) : TOUCH_UI ? null : (React.createElement("div", { style: { position: "absolute", bottom: 90, left: "50%", transform: "translateX(-50%)", ...panelStyle, fontSize: 12, opacity: 0.8 } }, TOUCH_UI ? React.createElement(React.Fragment, null,
