@@ -49,8 +49,8 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.35", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "25 Oct 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    version: "0.36", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "1 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
 };
@@ -4300,7 +4300,7 @@ function storyHud(qs) {
 }
 // ---------- end of the story section ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sharkSold: 0 } };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }, traps: trapsFresh() };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -4326,7 +4326,7 @@ function questLoad(speciesInfo) {
         if (raw) {
             const p = JSON.parse(raw);
             if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught) {
-                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), boats: boatsSanitize(p.boats) };
+                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), traps: trapsSanitize(p.traps), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), boats: boatsSanitize(p.boats) };
                 if (!p.skiffRule && (p.xp > 0 || p.stats.totalCaught > 0 || (p.story && p.story.i > 0)))
                     qs.story.flags.skiff = true; // a save from before the dock start already has the skiff
                 qs.skiffRule = 1;
@@ -6147,13 +6147,17 @@ const PROG_SELL_PRICE = { "Mangrove Snapper": 2.1, "Yellowtail Snapper": 2.2, "R
 // The shark rules follow Florida's state-water rules (one shark per person per day, 54 in fork length minimum on bull, nurse, spinner and blue;
 // lemon, tiger, hammerhead and mako may not be kept). Inches are turned into rough pounds for the game. The slot and release rules for the other
 // fish are the same kind of thing. A fish with no entry here has no rule.
-const SHARK_DAILY_BAG = 1; // sharks kept per day
+const BAG_LIMITS = { shark: 1, lobster: 12, stone: 12 }; // kept per day, by group (lobster: Florida allows 6 a person; the game counts a crew of two. Stone crab: about a gallon of claws a person)
+const BAG_WORD = { shark: "shark", lobster: "lobster", stone: "stone crab claw" };
 const FISH_REGS = {
     "Bonnethead": { grp: "shark", note: "no minimum size" }, "Atlantic Sharpnose": { grp: "shark", note: "no minimum size" }, "Blacktip Shark": { grp: "shark", note: "no minimum size" },
-    "Spinner Shark": { grp: "shark", minLb: 38, minIn: 54 }, "Nurse Shark": { grp: "shark", minLb: 38, minIn: 54 }, "Bull Shark": { grp: "shark", minLb: 48, minIn: 54 }, "Blue Shark": { grp: "shark", minLb: 38, minIn: 54 },
+    "Spinner Shark": { grp: "shark", minLb: 38, unit: "54 in" }, "Nurse Shark": { grp: "shark", minLb: 38, unit: "54 in" }, "Bull Shark": { grp: "shark", minLb: 48, unit: "54 in" }, "Blue Shark": { grp: "shark", minLb: 38, unit: "54 in" },
     "Lemon Shark": { rel: "Protected: it may not be kept" }, "Tiger Shark": { rel: "Protected: it may not be kept" }, "Great Hammerhead": { rel: "Protected: it may not be kept" }, "Shortfin Mako": { rel: "Protected: it may not be kept" },
     "Tarpon": { rel: "Catch and release only (no tag)" }, "Bonefish": { rel: "Catch and release only" }, "Sailfish": { rel: "A billfish: release it" }, "Blue Marlin": { rel: "A billfish: release it" },
     "Snook": { minLb: 6, maxLb: 11, slot: "28 to 33 in" }, "Redfish": { minLb: 2, maxLb: 7.5, slot: "18 to 27 in" },
+    // from the traps (v36)
+    "Spiny Lobster": { grp: "lobster", minLb: 1.0, unit: "3 in carapace" }, "Spiny Lobster (berried)": { rel: "Egg-bearing: it must be released" },
+    "Stone Crab Claws": { grp: "stone", minLb: 0.45, unit: "2 7/8 in claw" }, "Blue Crab": { minLb: 0.35, unit: "5 in across" }, "Blue Crab (sponge)": { rel: "Egg-bearing: it must be released" },
 };
 const WARDEN_FINE = { small: 75, big: 75, bag: 90, protected: 200 };
 function fishRegCheck(name, lb, ctx) {
@@ -6163,29 +6167,171 @@ function fishRegCheck(name, lb, ctx) {
     if (r.rel)
         return { level: "protected", msg: r.rel };
     if (r.minLb && lb < r.minLb)
-        return { level: "small", msg: "Undersized: " + (r.minIn ? r.minIn + " in" : r.slot) + " minimum (about " + r.minLb + " lb)" };
+        return { level: "small", msg: "Undersized: " + (r.unit || r.slot) + " minimum (about " + r.minLb + " lb)" };
     if (r.maxLb && lb > r.maxLb)
         return { level: "big", msg: "Over the slot: " + r.slot + " only (about " + r.minLb + " to " + r.maxLb + " lb)" };
-    if (r.grp === "shark" && ctx && ctx.sharkHave >= SHARK_DAILY_BAG)
-        return { level: "bag", msg: "Over the limit: " + SHARK_DAILY_BAG + " shark a day" };
-    return { level: "ok", msg: r.grp === "shark" ? "Legal to keep" + (r.minIn ? " (" + r.minIn + " in or more)" : "") + " · " + SHARK_DAILY_BAG + " shark a day" : "Legal to keep (" + r.slot + ")" };
+    if (r.grp && BAG_LIMITS[r.grp] && ctx && ctx.have && (ctx.have[r.grp] || 0) >= BAG_LIMITS[r.grp])
+        return { level: "bag", msg: "Over the limit: " + BAG_LIMITS[r.grp] + " " + BAG_WORD[r.grp] + (BAG_LIMITS[r.grp] === 1 ? "" : "s") + " a day" };
+    const lim = r.grp && BAG_LIMITS[r.grp] ? " · " + BAG_LIMITS[r.grp] + " " + BAG_WORD[r.grp] + (BAG_LIMITS[r.grp] === 1 ? "" : "s") + " a day" : "";
+    return { level: "ok", msg: "Legal to keep" + (r.unit ? " (" + r.unit + " or more)" : r.slot ? " (" + r.slot + ")" : "") + lim };
 }
-function fishRegViolations(fish, sharkSold) {
-    const out = [];
-    let sharks = sharkSold || 0;
+function fishRegViolations(fish, sold) {
+    const out = [], have = Object.assign({}, sold || {});
     fish.slice().sort((a, b) => b.weight - a.weight).forEach((f) => {
-        const r = fishRegCheck(f.speciesName, f.weight, { sharkHave: sharks });
+        const r = fishRegCheck(f.speciesName, f.weight, { have });
         if (!r)
             return;
         if (r.level === "ok") {
-            if (FISH_REGS[f.speciesName].grp === "shark")
-                sharks++;
+            const g = FISH_REGS[f.speciesName].grp;
+            if (g)
+                have[g] = (have[g] || 0) + 1;
             return;
         }
         out.push({ item: f, level: r.level, msg: r.msg });
     });
     return out;
 }
+// ======================= TRAPS (v36): crab pots and lobster traps — set, soak, haul =======================
+// You buy traps and bait at the marina store, set them from the boat (each leaves a buoy), leave them to soak, and come back to haul them.
+// Soaking runs on the real clock (a trap keeps soaking while the game is closed). What is inside is worked out when you haul it, from the trap's
+// own seed, so it is always the same animals however many times you look. The rules (seasons, sizes, egg-bearing animals, daily limits) are the
+// warden's (FISH_REGS above). Seasons follow Florida: spiny lobster 6 Aug to 31 Mar (the July mini-season is left out), stone crab 15 Oct to 1 May.
+const TRAP_KINDS = {
+    crab: { id: "crab", name: "Crab pot", icon: "🦀", price: 55, level: 2, cap: 10, rate: 0.3, color: 0xff8a2a, blurb: "A wire pot. Blue crab on the flats, stone crab on hard bottom." },
+    lobster: { id: "lobster", name: "Lobster trap", icon: "🦞", price: 85, level: 5, cap: 5, rate: 0.12, color: 0xd8332a, blurb: "A slat trap for spiny lobster on reefs, ledges and wrecks." },
+};
+const TRAP_BAIT_PRICE = 8, TRAP_BAIT_PACK = 5; // a pack of bait; one bait goes in every time a trap is set
+const TRAP_BAIT_LASTS = 90, TRAP_DAY_LOSS = 2880; // minutes the bait lasts; minutes after which a trap line may go missing (a boat cuts it)
+const TRAP_MIN_DEPTH = { crab: 2, lobster: 8 }, TRAP_ZONE_RANGE = 150; // feet of water a trap needs; how near a ground it counts as on that ground
+function trapLimit(level) { return Math.min(20, 3 + Math.floor(level / 3)); } // traps you may have set at once
+// What each kind of bottom holds, by trap: [animal, weight in the draw]. rate: how busy the bottom is compared with a good reef.
+const TRAP_ZONES = {
+    inshore: { rate: 0.9, label: "grass flats and channels", crab: [["Blue Crab", 6], ["Octopus", 1], ["Pinfish", 2], ["Pigfish", 1], ["Gulf Toadfish", 1]], lobster: [["Octopus", 1], ["Gulf Toadfish", 1]] },
+    reef: { rate: 1.0, label: "reef and hard bottom", crab: [["Stone Crab Claws", 5], ["Blue Crab", 1], ["Octopus", 1], ["Pinfish", 1], ["Gulf Toadfish", 1]], lobster: [["Spiny Lobster", 6], ["Octopus", 1], ["Moray Eel", 1], ["Gulf Toadfish", 1]] },
+    wreck: { rate: 1.0, label: "wreck and rubble", crab: [["Stone Crab Claws", 3], ["Octopus", 1], ["Gulf Toadfish", 1]], lobster: [["Spiny Lobster", 6], ["Moray Eel", 1], ["Octopus", 1]] },
+    openWater: { rate: 0.35, label: "open water", crab: [["Blue Crab", 3], ["Pinfish", 1]], lobster: [["Octopus", 1]] },
+    sand: { rate: 0.3, label: "bare sand", crab: [["Blue Crab", 2], ["Pinfish", 1]], lobster: [] },
+};
+// the animals: w = weight range in lb, fate when it is not a keeper: "release" (always goes back) or "bait" (live bait for the rod) or "keep" (sold by the pound)
+const TRAP_SPECIES = {
+    "Blue Crab": { w: [0.2, 0.9], px: 7, sponge: 0.1, season: null },
+    "Stone Crab Claws": { w: [0.25, 1.0], px: 18, season: "stone" },
+    "Spiny Lobster": { w: [0.5, 6], px: 12, berried: 0.14, season: "lobster" },
+    "Octopus": { w: [0.8, 4], px: 4, fate: "keep" }, "Pinfish": { w: [0.1, 0.4], fate: "bait" }, "Pigfish": { w: [0.1, 0.5], fate: "bait" },
+    "Gulf Toadfish": { w: [0.2, 1], fate: "release" }, "Moray Eel": { w: [1, 8], fate: "release" },
+};
+Object.keys(TRAP_SPECIES).forEach((n) => { if (TRAP_SPECIES[n].px)
+    PROG_SELL_PRICE[n] = TRAP_SPECIES[n].px; });
+PROG_SELL_PRICE["Spiny Lobster (berried)"] = 12;
+PROG_SELL_PRICE["Blue Crab (sponge)"] = 7; // (only if kept against the rules)
+function trapSeasonOpen(season, key) {
+    if (!season)
+        return true;
+    const md = (+key.slice(5, 7)) * 100 + (+key.slice(8, 10));
+    return season === "lobster" ? (md >= 806 || md <= 331) : (md >= 1015 || md <= 501);
+}
+function trapSeasonText(season, key) {
+    if (!season)
+        return "open all year";
+    const open = trapSeasonOpen(season, key);
+    return season === "lobster" ? (open ? "open until 31 Mar" : "closed until 6 Aug") : (open ? "open until 1 May" : "closed until 15 Oct");
+}
+function trapZoneFor(type) { return type === "reef" || type === "rocks" ? "reef" : type === "wreck" ? "wreck" : type === "inshore" ? "inshore" : type === "openWater" ? "openWater" : "sand"; }
+function trapsFresh() { return { v: 1, own: { crab: 0, lobster: 0 }, bait: 0, set: [], nextId: 1, log: { hauls: 0, animals: 0, lobsters: 0, crabs: 0, lost: 0, best: 0, earned: 0 } }; }
+function trapsSanitize(t) {
+    const d = trapsFresh();
+    if (!t || typeof t !== "object")
+        return d;
+    const num = (v, lo, hi, dv) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : dv);
+    const out = { v: 1, own: { crab: num(t.own && t.own.crab, 0, 99, 0) | 0, lobster: num(t.own && t.own.lobster, 0, 99, 0) | 0 }, bait: num(t.bait, 0, 999, 0) | 0, set: [], nextId: num(t.nextId, 1, 1e9, 1) | 0, log: { ...d.log } };
+    Object.keys(d.log).forEach((k) => { out.log[k] = num(t.log && t.log[k], 0, 1e9, 0); });
+    (Array.isArray(t.set) ? t.set : []).slice(0, 20).forEach((e) => {
+        if (!e || !TRAP_KINDS[e.kind] || !Number.isFinite(e.x) || !Number.isFinite(e.z) || !Number.isFinite(e.t))
+            return;
+        out.set.push({ id: num(e.id, 1, 1e9, out.nextId) | 0, kind: e.kind, x: e.x, z: e.z, t: e.t, baited: !!e.baited, zone: TRAP_ZONES[e.zone] ? e.zone : "sand", ground: typeof e.ground === "string" ? e.ground.slice(0, 40) : "open water", seed: num(e.seed, 1, 4e9, 1) | 0, dist: num(e.dist, 0, 1e6, 0) });
+    });
+    return out;
+}
+function trapSoakMin(trap, now) { return Math.max(0, Math.min(4320, (now - trap.t) / 60000)); } // minutes in the water (the clock is trusted up to three days)
+function trapEffMin(trap, soak) { return Math.min(soak, TRAP_BAIT_LASTS) + 0.2 * Math.max(0, soak - TRAP_BAIT_LASTS); } // the bait is spent after about an hour and a half, then the trap only catches the odd animal
+function trapArrivals(trap, soak) {
+    const K = TRAP_KINDS[trap.kind], z = TRAP_ZONES[trap.zone] || TRAP_ZONES.sand, rate = K.rate * z.rate * (trap.baited ? 1 : 0.25), eff = trapEffMin(trap, soak);
+    if (rate <= 0)
+        return 0;
+    const r = makeRng(trap.seed);
+    let t = 0, n = 0;
+    while (n < K.cap) {
+        t += -Math.log(1 - Math.min(0.9999, r())) / rate;
+        if (t > eff)
+            break;
+        n++;
+    }
+    return n;
+}
+function trapLostChance(soak) { return soak <= TRAP_DAY_LOSS ? 0 : Math.min(0.85, 0.25 * (1 + Math.floor((soak - TRAP_DAY_LOSS) / 720))); }
+function trapHaulResult(trap, now, ctx) {
+    const soak = trapSoakMin(trap, now), res = { soak, lost: false, rows: [] };
+    const rl = makeRng((trap.seed ^ 0x9e3779b9) >>> 0)(); // (the line missing is decided once for this trap)
+    if (rl < trapLostChance(soak)) {
+        res.lost = true;
+        return res;
+    }
+    const n = trapArrivals(trap, soak), z = TRAP_ZONES[trap.zone] || TRAP_ZONES.sand, tbl = z[trap.kind] || [], r = makeRng((trap.seed * 2654435761) >>> 0);
+    const sizeCap = Math.max(0.3, Math.min(1, 0.3 + (trap.dist || 0) / 3000)), have = Object.assign({}, ctx && ctx.have);
+    const tot = tbl.reduce((a, e) => a + e[1], 0), rows = [];
+    for (let i = 0; i < n; i++) {
+        let q = r() * tot, name = tbl[0][0];
+        for (let j = 0; j < tbl.length; j++) {
+            q -= tbl[j][1];
+            if (q <= 0) {
+                name = tbl[j][0];
+                break;
+            }
+        }
+        const sp = TRAP_SPECIES[name], u = Math.pow(r(), 1.4), cap = sp.season || name === "Blue Crab" ? sizeCap : 1;
+        let weight = sp.w[0] + (sp.w[1] - sp.w[0]) * u * cap;
+        weight = Math.round(weight * 20) / 20;
+        const roll = r();
+        let label = name, fate = sp.fate || "keep", why = "";
+        if (sp.berried && roll < sp.berried)
+            label = name + " (berried)";
+        else if (sp.sponge && roll < sp.sponge)
+            label = name + " (sponge)";
+        if (!sp.fate) { // a crab or lobster: the rules decide
+            if (sp.season && !trapSeasonOpen(sp.season, ctx.key)) {
+                fate = "closed";
+                why = "Season closed";
+            }
+            else {
+                const c = fishRegCheck(label, weight, { have });
+                if (c.level === "protected") {
+                    fate = "egg";
+                    why = c.msg;
+                }
+                else if (c.level === "small") {
+                    fate = "short";
+                    why = c.msg;
+                }
+                else if (c.level === "bag") {
+                    fate = "bag";
+                    why = c.msg;
+                }
+                else {
+                    fate = "keep";
+                    const g = FISH_REGS[label] && FISH_REGS[label].grp;
+                    if (g)
+                        have[g] = (have[g] || 0) + 1;
+                }
+            }
+        }
+        else if (fate === "release")
+            why = name === "Moray Eel" ? "Not for the pot" : "Too small to bother";
+        rows.push({ name: label, weight, fate, why });
+    }
+    res.rows = rows;
+    return res;
+}
+function trapWaitText(soak) { const m = Math.round(soak); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0") + " min"; }
 function progSellValue(qs, name, weight) { return Math.max(3, Math.round(weight * (PROG_SELL_PRICE[name] || 1.5) * playStats(qs).sellMult)); }
 // What reaching each level opens up, for the "coming up" list.
 function progUnlocksAt(level) {
@@ -8085,6 +8231,26 @@ function seaChartDraw(ctx, W, H, cam, d, o) {
             ctx.fillText(sp.name, x + 8, y + 3);
         }
     });
+    // traps that are set: a buoy-coloured square (orange for crab, red for lobster)
+    (d.traps || []).forEach((t) => {
+        const x = sx(t.x), y = sy(t.z);
+        if (x < -20 || y < -20 || x > W + 20 || y > H + 20)
+            return;
+        const c = t.kind === "lobster" ? "#e8453a" : "#ff9a3a", r = big ? 4.5 : 3;
+        ctx.fillStyle = c;
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.rect(x - r, y - r, r * 2, r * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (big && s > 0.12) {
+            ctx.fillStyle = "rgba(240,246,248,0.95)";
+            ctx.font = "500 10px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText((t.kind === "lobster" ? "Lobster trap" : "Crab pot"), x + 8, y + 3);
+        }
+    });
     // the course
     if (d.wp && d.boat) {
         const bx = sx(d.boat.x), by = sy(d.boat.z), wx = sx(d.wp.x), wy = sy(d.wp.z);
@@ -8305,6 +8471,10 @@ function SeaChart({ getData, onClose, onWaypoint, fastSail, onFastSail, fastOk, 
             bd = dd;
             best = { x: m.x, z: m.z, name: m.name, sub: "Sea mark" };
         } });
+        (d.traps || []).forEach((t) => { const dd = Math.hypot(W / 2 + (t.x - c.x) * c.s - px, H / 2 - (t.z - c.z) * c.s - py); if (dd < bd) {
+            bd = dd;
+            best = { x: t.x, z: t.z, name: t.kind === "lobster" ? "Lobster trap" : "Crab pot", sub: t.ground };
+        } });
         (d.regions || []).forEach((r) => { if (!r.open)
             return; const dd = Math.hypot(W / 2 + (r.cx - c.x) * c.s - px, H / 2 - (r.cz - c.z) * c.s - py); if (dd < bd + 8) {
             bd = dd;
@@ -8488,6 +8658,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             spots: (st.fishSpots || []).map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, found: !!(u.spotsFound && u.spotsFound[sp.id]), lv: sp.lv })),
             marks: SEA_LANDMARKS.map((l) => ({ id: l.id, name: l.name, kind: l.kind, x: l.x, z: l.z, seen: !!(u.marksSeen && u.marksSeen[l.id]), spot: l.spot })),
             regions: REGIONS.filter((r) => !r.home).map((r) => ({ id: r.id, name: r.name, cx: r.cx, cz: r.cz, open: !!(u.quest && travelOpen(u.quest, r.id)) })),
+            traps: ((u.quest && u.quest.traps && u.quest.traps.set) || []).map((t) => ({ id: t.id, kind: t.kind, x: t.x, z: t.z, ground: t.ground })),
             boat: st.nav || null, wp: st.wp || null, home: { x: 46, z: -23 },
         };
     });
@@ -8576,6 +8747,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiResultText, setUiResultText] = useState("");
     const [uiResultSuccess, setUiResultSuccess] = useState(false);
     const [uiFight, setUiFight] = useState(null); // live bite/fight readout (updated about 11 times a second while hooked)
+    const [uiTrapNear, setUiTrapNear] = useState(null); // the trap buoy the boat is alongside (shows the Haul button)
+    const [uiTrapHaul, setUiTrapHaul] = useState(null); // the haul card: what came up in the trap
+    const [uiTrapsOpen, setUiTrapsOpen] = useState(false); // the Trap Line panel
     const [uiCatch, setUiCatch] = useState(null); // the catch card shown after landing a fish
     const [uiFx, setUiFx] = useState(fx.on); // sound and vibration on/off
     const [uiTravelOpen, setUiTravelOpen] = useState(false); // the travel screen
@@ -14448,15 +14622,22 @@ function DeepWaterPrototype({ onExit, newLook }) {
         }
         // ---------- The game warden: keep or release, and inspections ----------
         function wardenState() {
-            const W = quest.warden || (quest.warden = { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sharkSold: 0 }), key = questDayKey(quest.dayOffset);
+            const W = quest.warden || (quest.warden = { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }), key = questDayKey(quest.dayOffset);
+            if (!W.sold)
+                W.sold = { shark: W.sharkSold || 0 };
             if (W.day !== key) {
                 W.day = key;
-                W.sharkSold = 0;
+                W.sold = {};
             }
             return W;
         }
         function heldFish() { return stateRef.current.carriedItems.filter((i) => i.type === "fish").concat(stateRef.current.coolerStorage.fish); }
-        function wardenCtx() { return { sharkHave: wardenState().sharkSold + heldFish().filter((f) => FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp === "shark").length }; }
+        function wardenCtx() {
+            const have = Object.assign({}, wardenState().sold);
+            heldFish().forEach((f) => { const g = FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp; if (g)
+                have[g] = (have[g] || 0) + 1; });
+            return { have };
+        }
         function catchResolve(keep) {
             const c = catchPending;
             if (!c)
@@ -14476,7 +14657,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const W = wardenState(), held = heldFish();
             W.checks++;
             wardenCool = 420 + Math.random() * 240;
-            const v = fishRegViolations(held, W.sharkSold), who = where === "dock" ? "👮 A game warden is waiting on the dock" : "👮 A game warden pulls alongside";
+            const v = fishRegViolations(held, W.sold), who = where === "dock" ? "👮 A game warden is waiting on the dock" : "👮 A game warden pulls alongside";
             if (!v.length) {
                 W.clean++;
                 const gain = awardXp(10 + Math.min(40, held.length * 4));
@@ -14728,6 +14909,66 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 wardenCool = 0;
                 wardenInspect(a.where || "sea");
             }
+            else if (a.type === "trapbuy") { // traps and bait are sold at the marina store
+                const T = quest.traps, K = TRAP_KINDS[a.kind];
+                if (!shopOpen)
+                    marineShowToast("Traps are sold at a marina store", "#ffb84d", 3);
+                else if (a.kind === "bait") {
+                    if (quest.money < TRAP_BAIT_PRICE)
+                        marineShowToast("Not enough money", "#ffb84d", 3);
+                    else {
+                        quest.money -= TRAP_BAIT_PRICE;
+                        T.bait += TRAP_BAIT_PACK;
+                        questSave(quest);
+                        questPush();
+                        marineShowToast("🐟 Bought " + TRAP_BAIT_PACK + " trap bait", "#7fe6a8", 3);
+                    }
+                }
+                else if (!K) { /* unknown */ }
+                else if (questLevelForXp(quest.xp) < K.level)
+                    marineShowToast(K.name + "s open at level " + K.level, "#ffb84d", 3);
+                else if (quest.money < K.price)
+                    marineShowToast("Not enough money", "#ffb84d", 3);
+                else if (T.own[a.kind] + T.set.filter((o) => o.kind === a.kind).length >= 12)
+                    marineShowToast("That is plenty of " + K.name.toLowerCase() + "s", "#ffb84d", 3);
+                else {
+                    quest.money -= K.price;
+                    T.own[a.kind]++;
+                    questSave(quest);
+                    questPush();
+                    marineShowToast(K.icon + " Bought a " + K.name.toLowerCase(), "#7fe6a8", 3);
+                }
+            }
+            else if (a.type === "trapset") {
+                trapSet(a.kind);
+            }
+            else if (a.type === "traphaul") {
+                trapHaulStart();
+            }
+            else if (a.type === "trapcard") {
+                trapHaulAction(a.act);
+            }
+            else if (a.type === "trapwp") {
+                const tr = quest.traps.set.find((o) => o.id === a.id);
+                if (tr) {
+                    seaSetWaypoint({ x: tr.x, z: tr.z, name: TRAP_KINDS[tr.kind].name, sub: tr.ground });
+                    marineShowToast("📍 Course set to your " + TRAP_KINDS[tr.kind].name.toLowerCase(), "#8fd9e6", 3);
+                }
+            }
+            else if (a.type === "testtrapgive") {
+                quest.traps.own.crab += 3;
+                quest.traps.own.lobster += 3;
+                quest.traps.bait += 10;
+                quest.money += 500;
+                questSave(quest);
+                questPush();
+            }
+            else if (a.type === "testtrapage") {
+                const mins = a.min || 60;
+                quest.traps.set.forEach((o) => { o.t -= mins * 60000; });
+                questSave(quest);
+                questPush();
+            }
             else if (a.type === "sell") {
                 const sl = sellList();
                 if (!shopOpen && !(homeOpen && homePort && homeOwned(quest, homePort.id)))
@@ -14737,9 +14978,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 else {
                     {
                         const W = wardenState();
-                        sellFishAll().forEach((f) => { if (FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp === "shark")
-                            W.sharkSold++; });
-                    } // (a shark sold counts toward the day's limit)
+                        sellFishAll().forEach((f) => { const g = FISH_REGS[f.speciesName] && FISH_REGS[f.speciesName].grp; if (g)
+                            W.sold[g] = (W.sold[g] || 0) + 1; });
+                    } // (an animal sold counts toward the day's limit)
                     stateRef.current.carriedItems = stateRef.current.carriedItems.filter((i) => i.type !== "fish");
                     stateRef.current.coolerStorage.fish = [];
                     quest.money += sl.total;
@@ -15756,15 +15997,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 }
             }
         }
-        // ---------- A new game starts on foot at the head of the dock. The skiff is still up at the yard (built, tied up at its berth, but hidden)
-        // until the first story step is done: then it appears alongside the dock, tied up. ----------
+        // ---------- Every game starts on foot at the head of the dock, with the boat tied up alongside it. A new game's skiff is still up at the yard
+        // (built, tied up at its berth, but hidden) until the first story step is done; then it appears alongside the dock. A saved game starts the same
+        // way with the boat it last sailed: the player walks down the dock, steps aboard and undocks. ----------
         function skiffOwnedNow() { return !!(quest.story && quest.story.flags && quest.story.flags.skiff); }
         function startOnFoot() {
-            skiffGate = false;
-            spawnBoat(0);
-            lastBoatIndex = 0;
-            stateRef.current.boatIndex = 0;
-            setUiBoatIndex(0); // the starter skiff (this also leaves it untied: tie it up below)
+            const owned = skiffOwnedNow();
+            skiffGate = owned; // a saved game already has its boat; a new one does not yet
+            const idx = owned && BOATS[stateRef.current.boatIndex] ? stateRef.current.boatIndex : 0; // the boat last sailed, else the starter skiff
+            spawnBoat(idx);
+            lastBoatIndex = idx;
+            stateRef.current.boatIndex = idx;
+            setUiBoatIndex(idx); // (this also leaves it untied: tie it up below)
             const hc = hullCapsule(boatDef.length, boatDef.beam);
             let berth = planBerth(DOCK_DIMS, hc, { x: dockX + 14, z: dockStartZ + 30, heading: 0 }, (x, z, h) => hullHitsRects(x, z, h, hc, DOCK_RECTS), (x, z, h) => !hullBlockedAt(x, z, h));
             if (!berth)
@@ -15797,8 +16041,386 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 fxPlay("plop");
             }
         }
-        if (!skiffOwnedNow())
-            startOnFoot();
+        // ---------- Traps (v36): buoys on the water, setting a trap, hauling it ----------
+        // The data, the rules and the "what is inside" maths are the module-level trap* functions. Here: the meshes and the actions.
+        const trapBuoys = {}; // trap id -> its buoy
+        const trapFx = []; // short animations: a trap dropping over the stern, a trap sinking back, a trap coming aboard
+        let trapHaul = null; // the haul in progress: { id, kind, t, res, cage, line, phase, rows }
+        let trapNearId = null, trapNearT = 0, trapBobT = 0;
+        const TRAP_WIRE = new THREE.LineBasicMaterial({ color: 0x33403b }), TRAP_GLASS = new THREE.MeshBasicMaterial({ color: 0x7a8a82, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
+        function trapBuildBuoy(kind) {
+            const K = TRAP_KINDS[kind], g = new THREE.Group(), col = new THREE.MeshPhongMaterial({ color: K.color, shininess: 40 }), white = new THREE.MeshPhongMaterial({ color: 0xf2efe6 });
+            const fl = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), col);
+            fl.scale.y = 0.85;
+            fl.position.y = 0.12;
+            g.add(fl);
+            const band = new THREE.Mesh(new THREE.CylinderGeometry(0.405, 0.405, 0.12, 14), white);
+            band.position.y = 0.12;
+            g.add(band);
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 6), white);
+            pole.position.y = 1.05;
+            g.add(pole);
+            const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.4), new THREE.MeshPhongMaterial({ color: K.color, side: THREE.DoubleSide }));
+            flag.position.set(0.31, 1.7, 0);
+            g.add(flag);
+            g.userData = { flag };
+            return g;
+        }
+        function trapWireBox(w, h, d, nv, nh) {
+            const P = [], seg = (a, b) => P.push(a[0], a[1], a[2], b[0], b[1], b[2]), x = w / 2, z = d / 2;
+            const C = [[-x, 0, -z], [x, 0, -z], [x, 0, z], [-x, 0, z]], T = C.map((c) => [c[0], h, c[2]]);
+            for (let i = 0; i < 4; i++) {
+                seg(C[i], C[(i + 1) % 4]);
+                seg(T[i], T[(i + 1) % 4]);
+                seg(C[i], T[i]);
+            }
+            for (let k = 1; k < nv; k++) {
+                const f = k / nv;
+                for (let i = 0; i < 4; i++) {
+                    const a = C[i], b = C[(i + 1) % 4];
+                    const p = [a[0] + (b[0] - a[0]) * f, 0, a[2] + (b[2] - a[2]) * f];
+                    seg(p, [p[0], h, p[2]]);
+                }
+            }
+            for (let k = 1; k < nh; k++) {
+                const y = h * k / nh;
+                for (let i = 0; i < 4; i++) {
+                    const a = C[i], b = C[(i + 1) % 4];
+                    seg([a[0], y, a[2]], [b[0], y, b[2]]);
+                }
+            }
+            for (let k = 1; k < nv; k++) {
+                const f = k / nv;
+                seg([-x + w * f, h, -z], [-x + w * f, h, z]);
+                seg([-x, h, -z + d * f], [x, h, -z + d * f]);
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
+            return new THREE.LineSegments(geo, TRAP_WIRE);
+        }
+        function trapBuildCage(kind, rows) {
+            const g = new THREE.Group();
+            if (kind === "crab") {
+                g.add(trapWireBox(1.0, 0.8, 1.0, 4, 3));
+                const glass = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 1.0), TRAP_GLASS);
+                glass.position.y = 0.4;
+                g.add(glass);
+                const fun = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.4, 10, 1, true), TRAP_GLASS);
+                fun.rotation.z = Math.PI / 2;
+                fun.position.set(0.4, 0.2, 0);
+                g.add(fun);
+                const bait = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshPhongMaterial({ color: 0x3a2a24 }));
+                bait.position.set(0, 0.55, 0);
+                g.add(bait);
+            }
+            else {
+                const wood = new THREE.MeshPhongMaterial({ color: 0x9a7a52 }), dark = new THREE.MeshPhongMaterial({ color: 0x5e4630 }), brick = new THREE.MeshPhongMaterial({ color: 0x8c8c86 });
+                const add = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+                add(1.5, 0.1, 1.0, brick, 0, 0.05, 0); // the cement base
+                [[-0.72, -0.47], [0.72, -0.47], [0.72, 0.47], [-0.72, 0.47]].forEach((c) => add(0.07, 0.72, 0.07, dark, c[0], 0.46, c[1]));
+                for (let i = 0; i < 6; i++)
+                    add(1.5, 0.035, 0.12, wood, 0, 0.82, -0.42 + i * 0.168); // top slats
+                for (let k = 0; k < 3; k++) {
+                    const y = 0.2 + k * 0.28;
+                    add(1.5, 0.08, 0.05, wood, 0, y, 0.5);
+                    add(1.5, 0.08, 0.05, wood, 0, y, -0.5);
+                    add(0.05, 0.08, 1.0, wood, 0.75, y, 0);
+                    add(0.05, 0.08, 1.0, wood, -0.75, y, 0);
+                }
+                add(0.02, 0.4, 0.5, new THREE.MeshPhongMaterial({ color: 0x14100c }), 0.76, 0.42, 0); // the entrance
+            }
+            (rows || []).slice(0, 8).forEach((r, i) => {
+                const lob = r.name.indexOf("Lobster") >= 0, crab = !lob && (r.name.indexOf("Crab") >= 0 || r.name.indexOf("Claws") >= 0);
+                const m = new THREE.Mesh(lob ? new THREE.CylinderGeometry(0.07, 0.05, 0.5, 6) : new THREE.SphereGeometry(0.13, 8, 6), new THREE.MeshPhongMaterial({ color: lob ? 0xb8452e : crab ? 0x4a78a8 : 0x6a6a5a }));
+                if (lob)
+                    m.rotation.z = Math.PI / 2;
+                else
+                    m.scale.y = 0.55;
+                m.position.set(-0.3 + ((i * 0.37) % 0.6), 0.14 + (i % 2) * 0.08, -0.3 + ((i * 0.23) % 0.6));
+                g.add(m);
+            });
+            return g;
+        }
+        function trapDispose(o) { o.traverse((c) => { if (c.geometry && c.geometry !== undefined && !c.userData.shared)
+            c.geometry.dispose(); }); }
+        function trapSync() {
+            const want = {};
+            quest.traps.set.forEach((tr) => { want[tr.id] = tr; });
+            Object.keys(trapBuoys).forEach((id) => { if (!want[id]) {
+                scene.remove(trapBuoys[id]);
+                trapDispose(trapBuoys[id]);
+                delete trapBuoys[id];
+            } });
+            quest.traps.set.forEach((tr) => { if (!trapBuoys[tr.id]) {
+                const b = trapBuildBuoy(tr.kind);
+                b.position.set(tr.x, splashWaveAt(tr.x, tr.z) + 0.05, tr.z);
+                scene.add(b);
+                trapBuoys[tr.id] = b;
+            } });
+        }
+        function trapNote(text, color, secs) { marineShowToast(text, color || "#ffb84d", secs || 4); }
+        function trapSternPoint() { const f = new THREE.Vector3(Math.sin(boatHeading), 0, Math.cos(boatHeading)), back = boatDef.length / 2 + 3.2; return { x: boatPos.x - f.x * back, z: boatPos.z - f.z * back }; }
+        function trapZoneAt(x, z) {
+            let best = null, bd = TRAP_ZONE_RANGE;
+            FISH_SPOTS.forEach((sp) => { const d = Math.hypot(sp.x - x, sp.z - z); if (d < bd) {
+                bd = d;
+                best = sp;
+            } });
+            if (best)
+                return { zone: trapZoneFor(best.type), ground: best.name };
+            return -marineBottomAt(x, z) <= 12 ? { zone: "inshore", ground: "the flats" } : { zone: "sand", ground: "open sand" };
+        }
+        function trapSet(kind) {
+            const T = quest.traps, K = TRAP_KINDS[kind], lvl = questLevelForXp(quest.xp), fs = fishingState;
+            if (!K)
+                return;
+            if (ashoreMode)
+                return trapNote("Traps are set from the boat");
+            if (fs.docked || dockAnim)
+                return trapNote("Cast off first: traps go out in open water");
+            if (lvl < K.level)
+                return trapNote(K.icon + " " + K.name + "s open at level " + K.level);
+            if (!(T.own[kind] > 0))
+                return trapNote("You have no " + K.name.toLowerCase() + ". Buy one at the marina store");
+            if (T.set.length >= trapLimit(lvl))
+                return trapNote("You already have " + T.set.length + " traps out (the limit is " + trapLimit(lvl) + " at your level)");
+            if (!(T.bait > 0))
+                return trapNote("No trap bait. Buy a pack at the marina store");
+            if (kind === "lobster" && !trapSeasonOpen("lobster", questDayKey(quest.dayOffset)))
+                return trapNote("🦞 Lobster season is closed until 6 August");
+            if (Math.abs(boatSpeed) > 2.5)
+                return trapNote("Slow down to set a trap");
+            if (fs.mode !== "idle" && fs.mode !== "waiting")
+                return trapNote("Reel in first");
+            const p = trapSternPoint(), depth = -marineBottomAt(p.x, p.z);
+            if (isLandOrObstacleAt(p.x, p.z) || depth < 1)
+                return trapNote("No water for a trap here");
+            if (depth < TRAP_MIN_DEPTH[kind])
+                return trapNote("Too shallow for a " + K.name.toLowerCase() + " (it needs " + TRAP_MIN_DEPTH[kind] + " ft)");
+            if (Math.hypot(p.x - dockX, p.z - (dockStartZ + dockLength / 2)) < 90)
+                return trapNote("Keep the marina fairway clear: set traps out in the sound");
+            if (T.set.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < 18))
+                return trapNote("Too close to another trap");
+            const z = trapZoneAt(p.x, p.z), tr = { id: T.nextId++, kind, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10, t: Date.now(), baited: true, zone: z.zone, ground: z.ground, seed: 1 + Math.floor(Math.random() * 4e9), dist: Math.round(Math.hypot(p.x - SEA_ORIGIN.x, p.z - SEA_ORIGIN.z)) };
+            T.set.push(tr);
+            T.own[kind]--;
+            T.bait--;
+            trapSync();
+            questSave(quest);
+            questPush();
+            const cage = trapBuildCage(kind, null);
+            cage.position.set(p.x, 1.6, p.z);
+            scene.add(cage);
+            trapFx.push({ type: "sink", mesh: cage, t: 0, dur: 1.1, y0: 1.6, x: p.x, z: p.z });
+            spawnSplash(p.x, p.z, 1.3);
+            fxPlay("plop");
+            trapNote(K.icon + " " + K.name + " set on " + z.ground + ". It soaks while you are away; haul it in " + (kind === "lobster" ? "20" : "10") + " minutes or more", "#7fe6a8", 6);
+        }
+        function trapNearest() {
+            if (!quest.traps.set.length || ashoreMode)
+                return null;
+            let best = null, bd = 1e9;
+            quest.traps.set.forEach((tr) => { const d = Math.hypot(tr.x - boatPos.x, tr.z - boatPos.z); if (d < bd) {
+                bd = d;
+                best = tr;
+            } });
+            return best && bd <= 24 ? { trap: best, dist: bd } : null;
+        }
+        function trapHaulStart() {
+            if (trapHaul)
+                return;
+            const near = trapNearest(), fs = fishingState;
+            if (!near)
+                return trapNote("Pull up beside a trap buoy first");
+            if (Math.abs(boatSpeed) > 3)
+                return trapNote("Slow down to haul the trap");
+            if (fs.mode !== "idle" && fs.mode !== "waiting")
+                return trapNote("Reel in first");
+            fs.mode = "idle";
+            const tr = near.trap, now = Date.now();
+            const res = trapHaulResult(tr, now, { key: questDayKey(quest.dayOffset), have: wardenCtx().have });
+            if (res.lost) { // the line is gone: cut by a passing boat
+                quest.traps.set = quest.traps.set.filter((o) => o.id !== tr.id);
+                quest.traps.log.lost++;
+                trapSync();
+                questSave(quest);
+                questPush();
+                return trapNote("⚠️ The " + TRAP_KINDS[tr.kind].name.toLowerCase() + " line has been cut: a passing boat must have taken the trap. Haul your traps sooner", "#ff8a6a", 7);
+            }
+            const cage = trapBuildCage(tr.kind, res.rows);
+            scene.add(cage);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 0], 3));
+            const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xe8e2d2 }));
+            line.frustumCulled = false;
+            scene.add(line);
+            trapHaul = { id: tr.id, kind: tr.kind, t: 0, res, cage, line, phase: "up", rows: res.rows, kept: false };
+            setUiTrapNear(null);
+            trapNearId = null;
+            fxPlay("click");
+        }
+        function trapHaulPoint(extra) {
+            const h = boatHeading, fx = Math.sin(h), fz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h), off = boatDef.beam / 2 + 1.5;
+            return { x: boatPos.x + rx * off - fx * (extra || 0), z: boatPos.z + rz * off - fz * (extra || 0) };
+        }
+        function trapHaulFinish() {
+            const H = trapHaul, tr = quest.traps.set.find((o) => o.id === H.id);
+            if (!tr) {
+                trapHaulClear();
+                return;
+            }
+            const keep = {}, rel = {}, ill = [];
+            let value = 0, nKeep = 0;
+            H.rows.forEach((r) => {
+                if (r.fate === "keep") {
+                    stateRef.current.carriedItems.push({ type: "fish", speciesName: r.name, weight: r.weight, id: Math.random().toString(36).slice(2) });
+                    const e = keep[r.name] || (keep[r.name] = { name: r.name, n: 0, lb: 0 });
+                    e.n++;
+                    e.lb += r.weight;
+                    value += progSellValue(quest, r.name, r.weight);
+                    nKeep++;
+                }
+                else if (r.fate === "bait") {
+                    stateRef.current.carriedItems.push({ type: "bait", speciesName: r.name, id: Math.random().toString(36).slice(2) });
+                    const e = keep[r.name + " (bait)"] || (keep[r.name + " (bait)"] = { name: r.name + " (live bait)", n: 0, lb: 0 });
+                    e.n++;
+                    nKeep++;
+                }
+                else {
+                    const e = rel[r.name] || (rel[r.name] = { name: r.name, n: 0, why: r.why });
+                    e.n++;
+                    if (r.fate !== "release")
+                        ill.push(r);
+                }
+            });
+            const L = quest.traps.log;
+            L.hauls++;
+            L.animals += nKeep;
+            H.rows.forEach((r) => { if (r.fate === "keep") {
+                if (r.name.indexOf("Lobster") >= 0)
+                    L.lobsters++;
+                else if (r.name.indexOf("Crab") >= 0 || r.name.indexOf("Claws") >= 0)
+                    L.crabs++;
+            } });
+            L.best = Math.max(L.best, Math.round(value));
+            const xp = awardXp(6 + nKeep * 3);
+            questSave(quest);
+            questPush();
+            H.illegal = ill;
+            H.phase = "card";
+            setUiTrapHaul({ id: tr.id, kind: tr.kind, name: TRAP_KINDS[tr.kind].name, ground: tr.ground, soak: trapWaitText(H.res.soak), keep: Object.keys(keep).map((k) => keep[k]), release: Object.keys(rel).map((k) => rel[k]), illegalN: ill.length, value: Math.round(value), xp: xp.gained, bait: quest.traps.bait, kept: false, empty: H.rows.length === 0 });
+            fxPlay("landed");
+        }
+        function trapHaulClear() { if (!trapHaul)
+            return; scene.remove(trapHaul.line); scene.remove(trapHaul.cage); trapDispose(trapHaul.cage); trapHaul.line.geometry.dispose(); trapHaul = null; setUiTrapHaul(null); }
+        function trapHaulAction(a) {
+            const H = trapHaul;
+            if (!H || H.phase !== "card")
+                return;
+            const T = quest.traps, tr = T.set.find((o) => o.id === H.id), K = TRAP_KINDS[H.kind];
+            if (a === "keepillegal") {
+                if (H.kept)
+                    return;
+                H.kept = true;
+                H.illegal.forEach((r) => { stateRef.current.carriedItems.push({ type: "fish", speciesName: r.name, weight: r.weight, id: Math.random().toString(36).slice(2) }); });
+                setUiTrapHaul((u) => (u ? { ...u, kept: true } : u));
+                trapNote("⚠️ You kept " + H.illegal.length + " illegal animal" + (H.illegal.length === 1 ? "" : "s") + ". A warden could fine you", "#ffb84d", 5);
+                wardenCool = Math.min(wardenCool, 25);
+                return;
+            }
+            const p = trapHaulPoint(0);
+            if (a === "redrop") {
+                if (!tr)
+                    return trapHaulClear();
+                if (!(T.bait > 0))
+                    return trapNote("No trap bait left");
+                T.bait--;
+                tr.t = Date.now();
+                tr.baited = true;
+                tr.seed = 1 + Math.floor(Math.random() * 4e9);
+                questSave(quest);
+                questPush();
+                trapFx.push({ type: "sink", mesh: H.cage, t: 0, dur: 1.2, y0: H.cage.position.y, x: H.cage.position.x, z: H.cage.position.z });
+                H.cage = new THREE.Group(); // (the fx owns the real cage now)
+                spawnSplash(p.x, p.z, 1.1);
+                fxPlay("plop");
+                trapNote(K.icon + " Re-baited and dropped back in", "#7fe6a8", 3);
+            }
+            else if (a === "aboard") {
+                if (tr) {
+                    T.set = T.set.filter((o) => o.id !== tr.id);
+                    T.own[H.kind]++;
+                    trapSync();
+                    questSave(quest);
+                    questPush();
+                }
+                trapFx.push({ type: "stow", mesh: H.cage, t: 0, dur: 0.9, y0: H.cage.position.y, x: H.cage.position.x, z: H.cage.position.z });
+                H.cage = new THREE.Group();
+                trapNote(K.icon + " " + K.name + " brought aboard", "#7fe6a8", 3);
+            }
+            trapHaulClear();
+        }
+        function trapTick(dt, t) {
+            trapBobT += dt;
+            quest.traps.set.forEach((tr) => { const b = trapBuoys[tr.id]; if (!b)
+                return; b.position.y = splashWaveAt(tr.x, tr.z) + 0.05; b.rotation.z = Math.sin(trapBobT * 1.3 + tr.id) * 0.07; b.rotation.x = Math.cos(trapBobT * 1.1 + tr.id * 2) * 0.05; b.userData.flag.rotation.y = Math.sin(trapBobT * 3 + tr.id) * 0.25; });
+            for (let i = trapFx.length - 1; i >= 0; i--) {
+                const f = trapFx[i];
+                f.t += dt;
+                const u = Math.min(1, f.t / f.dur);
+                if (f.type === "sink")
+                    f.mesh.position.set(f.x, f.y0 - (f.y0 + 3.5) * u * u, f.z);
+                else {
+                    f.mesh.position.set(f.x + (boatPos.x - f.x) * u, f.y0 + u * 1.5, f.z + (boatPos.z - f.z) * u);
+                    f.mesh.scale.setScalar(Math.max(0.01, 1 - u * 0.9));
+                }
+                if (!f.mesh.parent)
+                    scene.add(f.mesh);
+                if (u >= 1) {
+                    scene.remove(f.mesh);
+                    trapDispose(f.mesh);
+                    trapFx.splice(i, 1);
+                }
+            }
+            if (trapHaul) {
+                const H = trapHaul, p = trapHaulPoint(0), deckY = boatDef.length * boatDef.freeboardRatio;
+                if (H.phase === "up") {
+                    H.t += dt;
+                    const u = Math.min(1, H.t / 2.4), e = u * u * (3 - 2 * u);
+                    H.cage.position.set(p.x, -3.5 + e * 3.9, p.z);
+                    if (u >= 1) {
+                        H.phase = "wait";
+                    }
+                }
+                else if (H.phase === "wait") {
+                    H.t += dt;
+                    if (H.t > 2.9)
+                        trapHaulFinish();
+                }
+                else if (H.phase === "card")
+                    H.cage.position.set(p.x, 0.4 + Math.sin(trapBobT * 1.6) * 0.06, p.z);
+                H.cage.rotation.y = boatHeading;
+                H.cage.rotation.z = Math.sin(trapBobT * 2.1) * 0.05;
+                const pos = H.line.geometry.attributes.position, rx = Math.cos(boatHeading), rz = -Math.sin(boatHeading), ax = boatPos.x + rx * (boatDef.beam / 2 - 0.1), az = boatPos.z + rz * (boatDef.beam / 2 - 0.1);
+                pos.setXYZ(0, H.cage.position.x, H.cage.position.y + 0.85, H.cage.position.z);
+                pos.setXYZ(1, ax, deckY + 0.7, az);
+                pos.needsUpdate = true;
+                if (Math.hypot(boatPos.x - H.cage.position.x, boatPos.z - H.cage.position.z) > 12) {
+                    H.cage.position.set(p.x, H.cage.position.y, p.z);
+                }
+            }
+            trapNearT -= dt;
+            if (trapNearT <= 0) {
+                trapNearT = 0.25;
+                const n = !trapHaul && !ashoreMode && !dockAnim && !travelAnim && Math.abs(boatSpeed) < 3 && (fishingState.mode === "idle" || fishingState.mode === "waiting") ? trapNearest() : null, id = n ? n.trap.id : null;
+                if (id !== trapNearId) {
+                    trapNearId = id;
+                    setUiTrapNear(n ? { id, kind: n.trap.kind, ground: n.trap.ground, soak: trapWaitText(trapSoakMin(n.trap, Date.now())) } : null);
+                }
+            }
+        }
+        trapSync();
+        startOnFoot();
         function animate() {
             try {
                 const dt = Math.min(clock.getDelta(), 0.1);
@@ -16482,6 +17104,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     }
                 }
                 wardenTick(dt);
+                trapTick(dt, t);
                 updateFishingSpots(dt);
                 updateSeaLandmarks(dt);
                 updateSplashes(dt);
@@ -17945,6 +18568,63 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("button", { style: btn("rgba(255,255,255,0.4)"), onClick: () => { stateRef.current.questCloseRequested = true; } }, m.status === "offered" ? "Not now" : "Close")),
                 m.status === "offered" && React.createElement("div", { style: { fontSize: 10, opacity: 0.55, marginTop: 10 } }, "Only fish landed after you accept count toward a mission.")));
         })(),
+        uiTrapsOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
+            React.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
+                    React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83E\uDD9E Trap Line"),
+                    React.createElement("button", { onClick: () => setUiTrapsOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
+                React.createElement(TrapPanel, { qs: uiQuest, canBuy: false, send: (a) => { stateRef.current.questAction = a; }, showTesting: BUILD.dev })))),
+        uiTrapNear && !uiTrapHaul && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiTrapsOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiHomeOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
+            React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } },
+                TRAP_KINDS[uiTrapNear.kind].icon,
+                " ",
+                uiTrapNear.ground,
+                " \u00B7 soaked ",
+                uiTrapNear.soak),
+            React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "traphaul" }; }, style: { fontSize: 14, padding: "10px 20px", borderRadius: 8, cursor: "pointer", border: "1px solid #ffb84d", background: "rgba(120,80,20,0.92)", color: "#fff3dc", fontWeight: 700 } }, "\uD83E\uDE9D Haul trap"))),
+        uiTrapHaul && (React.createElement("div", { style: { position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: 150, width: "min(420px, calc(100% - 24px))", zIndex: 300, background: "rgba(10,24,32,0.95)", border: "1px solid rgba(255,184,77,0.45)", borderRadius: 10, padding: "12px 14px", color: "#eaf3f5", boxShadow: "0 6px 24px rgba(0,0,0,0.5)" } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 } },
+                React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#ffb84d" } },
+                    TRAP_KINDS[uiTrapHaul.kind].icon,
+                    " ",
+                    uiTrapHaul.name,
+                    " \u00B7 ",
+                    uiTrapHaul.ground),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.65 } },
+                    "soaked ",
+                    uiTrapHaul.soak)),
+            uiTrapHaul.empty && React.createElement("div", { style: { fontSize: 13, margin: "8px 0", opacity: 0.8 } }, "Nothing in it. It needs more time, or fresh bait."),
+            uiTrapHaul.keep.length > 0 && (React.createElement("div", { style: { margin: "8px 0 4px" } },
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 2 } },
+                    "KEPT (worth about $",
+                    uiTrapHaul.value,
+                    " \u00B7 +",
+                    uiTrapHaul.xp,
+                    " XP)"),
+                uiTrapHaul.keep.map((k) => React.createElement("div", { key: k.name, style: { fontSize: 13 } },
+                    "\u2705 ",
+                    k.n,
+                    " \u00D7 ",
+                    k.name,
+                    k.lb ? " · " + k.lb.toFixed(1) + " lb" : "")))),
+            uiTrapHaul.release.length > 0 && (React.createElement("div", { style: { margin: "6px 0 4px" } },
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.6, marginBottom: 2 } }, "RELEASED"),
+                uiTrapHaul.release.map((k) => React.createElement("div", { key: k.name, style: { fontSize: 12, opacity: 0.85 } },
+                    "\u21A9 ",
+                    k.n,
+                    " \u00D7 ",
+                    k.name,
+                    k.why ? " · " + k.why : "")))),
+            React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+                React.createElement("button", { disabled: uiTrapHaul.bait < 1, onClick: () => { stateRef.current.questAction = { type: "trapcard", act: "redrop" }; }, style: { fontSize: 13, padding: "8px 14px", borderRadius: 7, cursor: uiTrapHaul.bait < 1 ? "default" : "pointer", opacity: uiTrapHaul.bait < 1 ? 0.4 : 1, border: "1px solid #7fe6a8", background: "rgba(40,110,70,0.9)", color: "#eafff2", fontWeight: 700 } },
+                    "\uD83E\uDEB1 Re-bait & drop (",
+                    uiTrapHaul.bait,
+                    ")"),
+                React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "trapcard", act: "aboard" }; }, style: { fontSize: 13, padding: "8px 14px", borderRadius: 7, cursor: "pointer", border: "1px solid rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)", color: "#eaf3f5", fontWeight: 600 } }, "Bring aboard"),
+                uiTrapHaul.illegalN > 0 && !uiTrapHaul.kept && React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "trapcard", act: "keepillegal" }; }, style: { fontSize: 12, padding: "8px 12px", borderRadius: 7, cursor: "pointer", border: "1px solid #ff8a6a", background: "rgba(120,40,30,0.85)", color: "#ffd9d0", fontWeight: 600 } },
+                    "Keep the ",
+                    uiTrapHaul.illegalN,
+                    " illegal anyway")))),
         uiGearOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83E\uDDF0 Tackle"),
@@ -18129,6 +18809,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "🏝️", label: uiAshoreMode ? "To Boat" : "Go Ashore", active: uiAshoreMode, enabled: uiCanGoAshore || (uiAshoreMode && uiSkiff), why: uiAshoreMode ? "Your skiff arrives once you have caught three fish off the dock" : "Dock the boat or pull up next to land first", run: rq("ashoreToggleRequested") },
                         { icon: "🧭", label: "Travel", enabled: true, run: () => setUiTravelOpen(true) },
                         { icon: "🎣", label: "Tackle", sub: "tackle" },
+                        { icon: "🦞", label: "Traps", sub: "traps" },
                         { icon: "🚤", label: "Boat", sub: "hull" },
                         { icon: "🌤️", label: "World", sub: "world" },
                         { icon: "👁", label: "View", sub: "view" },
@@ -18140,6 +18821,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "👔", label: "Wardrobe", enabled: true, run: () => setUiWardrobeOpen(true) },
                         { icon: "📖", label: "Journal", enabled: true, run: () => setUiJournalOpen(true) },
                         { icon: "🧊", label: "Cooler", enabled: uiNearCooler, why: "Get near the cooler on deck", run: () => setUiCoolerOpen(true) },
+                    ] },
+                traps: { title: "TRAPS", items: [
+                        { icon: "🦞", label: "Trap Line" + (uiQuest ? " (" + uiQuest.traps.set.length + ")" : ""), enabled: !!uiQuest, run: () => setUiTrapsOpen(true) },
+                        { icon: "🦀", label: "Set Crab Pot" + (uiQuest ? " (" + uiQuest.traps.own.crab + ")" : ""), enabled: !uiAshoreMode && uiDock !== "docked" && !!uiQuest && uiQuest.traps.own.crab > 0, why: uiAshoreMode ? "Traps are set from the boat" : uiDock === "docked" ? "Cast off and slow down in open water" : "Buy a crab pot at the marina store", run: () => { stateRef.current.questAction = { type: "trapset", kind: "crab" }; } },
+                        { icon: "🦞", label: "Set Lobster Trap" + (uiQuest ? " (" + uiQuest.traps.own.lobster + ")" : ""), enabled: !uiAshoreMode && uiDock !== "docked" && !!uiQuest && uiQuest.traps.own.lobster > 0, why: uiAshoreMode ? "Traps are set from the boat" : uiDock === "docked" ? "Cast off and slow down in open water" : "Buy a lobster trap at the marina store", run: () => { stateRef.current.questAction = { type: "trapset", kind: "lobster" }; } },
+                        { icon: "🪝", label: "Haul Trap", enabled: !!uiTrapNear && !uiTrapHaul, why: "Pull up beside a trap buoy first", run: () => { stateRef.current.questAction = { type: "traphaul" }; } },
                     ] },
                 hull: { title: "BOAT", items: [{ icon: "🎨", label: "Boat Yard", enabled: true, run: () => setUiBoatYardOpen(true) }].concat(GEAR_ITEMS.filter((g) => g.slot === "hull").map((h) => {
                         const owned = !!(uiQuest && uiQuest.gear.owned[h.id]), canSwap = owned && uiDock === "docked" && !uiAshoreMode && !boatLocked;
@@ -18467,6 +19154,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     "\uD83D\uDCB0 $",
                     uiQuest.money),
                 React.createElement(WardrobePanel, { qs: uiQuest, canBuy: true, compact: true, send: (a) => { stateRef.current.questAction = a; } }))),
+            uiQuest && (React.createElement("div", { style: { marginBottom: 18 } },
+                React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ffb84d", marginBottom: 4 } }, "\uD83E\uDD9E Crab pots & lobster traps"),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.55, marginBottom: 10 } }, "Set a trap from the boat, leave it to soak, come back and haul it. Everything you set shows on the chart."),
+                React.createElement(TrapPanel, { qs: uiQuest, canBuy: true, send: (a) => { stateRef.current.questAction = a; }, showTesting: false }))),
             React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ffb84d", marginBottom: 8 } }, "\uD83E\uDEB1 Bait"),
             SHOP_BAIT_OPTIONS.map((name) => (React.createElement("div", { key: name, style: { ...panelStyle, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" } },
                 React.createElement("div", { style: { fontSize: 13, fontWeight: 600 } }, name),
@@ -18878,6 +19569,93 @@ function BoatCard({ look, def, height }) {
             React.createElement("line", { x1: "38", y1: "58", x2: "38", y2: "30", stroke: "#d8d8d8", strokeWidth: "1.6" }),
             React.createElement("path", { d: "M38 31 L58 36 L38 42 Z", fill: css(R.flagCol), stroke: "#0003", strokeWidth: "0.5" })),
         motor));
+}
+// ---------- Trap Line panel (v36): what you own, what is soaking, and the store counter ----------
+function TrapPanel({ qs, send, canBuy, showTesting }) {
+    const [, setTick] = useState(0);
+    useEffect(() => { const id = setInterval(() => setTick((n) => n + 1), 5000); return () => clearInterval(id); }, []);
+    const T = qs.traps || trapsFresh(), lvl = questLevelForXp(qs.xp), key = questDayKey(qs.dayOffset), now = Date.now();
+    const card = { background: "#0e1f28", border: "1px solid rgba(255,184,77,0.22)", borderRadius: 6, padding: "10px 12px", marginBottom: 8, color: "#eaf3f5" };
+    const btn = (color, on) => ({ fontSize: 12, padding: "5px 12px", borderRadius: 5, cursor: on ? "pointer" : "default", border: "1px solid " + color, background: "rgba(255,255,255,0.05)", color, opacity: on ? 1 : 0.4, fontWeight: 600 });
+    const L = T.log;
+    return (React.createElement("div", null,
+        React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, marginBottom: 10 } },
+            React.createElement("span", { style: { color: "#8fd97a" } },
+                "\uD83D\uDCB0 $",
+                qs.money),
+            React.createElement("span", null,
+                "Traps out ",
+                React.createElement("b", null, T.set.length),
+                " / ",
+                trapLimit(lvl)),
+            React.createElement("span", null,
+                "\uD83E\uDEB1 Trap bait ",
+                React.createElement("b", null, T.bait))),
+        Object.keys(TRAP_KINDS).map((k) => {
+            const K = TRAP_KINDS[k], ok = lvl >= K.level, sea = k === "lobster" ? trapSeasonText("lobster", key) : null;
+            return (React.createElement("div", { key: k, style: card },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 } },
+                    React.createElement("div", { style: { fontSize: 14, fontWeight: 700 } },
+                        K.icon,
+                        " ",
+                        K.name,
+                        " ",
+                        React.createElement("span", { style: { fontWeight: 400, opacity: 0.7, fontSize: 12 } },
+                            "\u00B7 in the locker: ",
+                            T.own[k])),
+                    canBuy && React.createElement("button", { disabled: !ok || qs.money < K.price, onClick: () => send({ type: "trapbuy", kind: k }), style: btn("#7fe6a8", ok && qs.money >= K.price) }, ok ? "Buy $" + K.price : "Level " + K.level)),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginTop: 4 } },
+                    K.blurb,
+                    sea ? " Season: " + sea + "." : "",
+                    !ok ? " Opens at level " + K.level + "." : "")));
+        }),
+        canBuy && (React.createElement("div", { style: { ...card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 } },
+            React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 13, fontWeight: 700 } },
+                    "\uD83E\uDEB1 Trap bait \u00B7 pack of ",
+                    TRAP_BAIT_PACK),
+                React.createElement("div", { style: { fontSize: 11, opacity: 0.65 } }, "One goes in each time you set or re-bait a trap. It lasts about an hour and a half.")),
+            React.createElement("button", { disabled: qs.money < TRAP_BAIT_PRICE, onClick: () => send({ type: "trapbuy", kind: "bait" }), style: btn("#6fd6e8", qs.money >= TRAP_BAIT_PRICE) },
+                "Buy $",
+                TRAP_BAIT_PRICE))),
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#ffb84d", margin: "12px 0 6px" } }, "On the bottom"),
+        !T.set.length && React.createElement("div", { style: { fontSize: 12, opacity: 0.6, marginBottom: 8 } }, "Nothing set. From the boat, slow down in open water and use the wheel (Traps > Set). Reefs, wrecks and ledges hold lobster; the flats hold blue crab."),
+        T.set.map((tr) => {
+            const K = TRAP_KINDS[tr.kind], soak = trapSoakMin(tr, now), full = soak >= 40, lost = trapLostChance(soak);
+            return (React.createElement("div", { key: tr.id, style: card },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 } },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: 13, fontWeight: 700 } },
+                            K.icon,
+                            " ",
+                            K.name,
+                            " \u00B7 ",
+                            tr.ground),
+                        React.createElement("div", { style: { fontSize: 11, opacity: 0.7 } },
+                            "Soaking ",
+                            trapWaitText(soak),
+                            soak < 10 ? " · give it time" : full ? " · well soaked" : "",
+                            lost > 0 ? " · ⚠️ the line may be cut soon" : "")),
+                    React.createElement("button", { onClick: () => send({ type: "trapwp", id: tr.id }), style: btn("#8fd9e6", true) }, "\uD83D\uDCCD Course"))));
+        }),
+        React.createElement("div", { style: { fontSize: 11, opacity: 0.6, marginTop: 10 } },
+            "Hauled ",
+            L.hauls,
+            " \u00B7 kept ",
+            L.animals,
+            " \u00B7 lobsters ",
+            L.lobsters,
+            " \u00B7 crabs ",
+            L.crabs,
+            " \u00B7 lost ",
+            L.lost,
+            " \u00B7 best haul $",
+            L.best),
+        React.createElement("div", { style: { fontSize: 11, opacity: 0.5, marginTop: 4 } }, "The sea only counts the minutes the trap sits in the water, even while you are not playing. Undersize, egg-bearing and out-of-season animals go back; the warden counts what you keep."),
+        showTesting && React.createElement("div", { style: { marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" } },
+            React.createElement("button", { onClick: () => send({ type: "testtrapgive" }), style: btn("#ff8a6a", true) }, "TEST: give kit"),
+            React.createElement("button", { onClick: () => send({ type: "testtrapage", min: 60 }), style: btn("#ff8a6a", true) }, "TEST: +1 h soak"),
+            React.createElement("button", { onClick: () => send({ type: "testtrapage", min: 1500 }), style: btn("#ff8a6a", true) }, "TEST: +25 h"))));
 }
 function BoatYardPanel({ qs, send, canBuy, boatIndex }) {
     const level = questLevelForXp(qs.xp);
