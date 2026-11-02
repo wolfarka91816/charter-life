@@ -49,10 +49,10 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.36", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "1 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    version: "0.37", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "2 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
-    demoRegions: ["marina", "shoals"], // regions the demo can reach (the rest show "Full game")
+    demoRegions: ["marina", "cypress", "tarpon", "shoals", "flats", "jetty", "lighthouse", "fort"], // regions the demo can reach (Blue Water Banks and The Canyon, the far endgame, show "Full game")
 };
 // Phones and tablets (a coarse primary pointer) get a calmer HUD: collapsible panels, notifications in a drop-down, no keyboard hints.
 // ?touch=1 or ?touch=0 in the address forces it either way (for testing on a desktop).
@@ -3301,12 +3301,18 @@ const SPOT_TYPE_ICON = { reef: "🪸", wreck: "⚓", inshore: "🌿", openWater:
 const REGIONS = [
     { id: "marina", name: "Marina Waters", icon: "⚓", home: true, x: 0, z: 0, heading: 0, cx: 0, cz: 0, types: ["reef", "wreck", "inshore", "openWater"],
         blurb: "Home. The reefs, wrecks, mangrove flats and open water around the marina, and the rich grounds further out." },
+    { id: "cypress", name: "Cypress Backcountry", icon: "🌿", level: 3, price: 600, x: -1372, z: -1592, heading: -2.21, cx: -1450, cz: -1650, types: ["inshore"], rad: 520, blurb: "Tannin-dark creeks winding between mangrove islands, with a stilt fish camp. Snook, redfish and trout hide under the roots." },
+    { id: "tarpon", name: "Tarpon Bay", icon: "🐟", level: 5, price: 1200, x: 1392, z: 1622, heading: 0.64, cx: 1450, cz: 1700, types: ["inshore", "openWater"], rad: 520, blurb: "A wide grass bay behind a pass, with an old bridge, a rip at the mouth and silver kings rolling at dawn." },
     { id: "shoals", name: "Sandy Shoals", icon: "🏖️", level: 6, price: 1500, x: 2605, z: -517, heading: 2.5, cx: 2500, cz: -700, types: ["sand"],
         blurb: "Pale sand flats far to the east, with sandbars and drop-offs. Flatfish and surf fish feed over the clean bottom." },
+    { id: "flats", name: "Turquoise Flats", icon: "🏝️", level: 8, price: 2600, x: 3422, z: 1258, heading: 2.21, cx: 3500, cz: 1200, types: ["sand", "inshore"], rad: 520, blurb: "Clear, pale water over sand and turtle grass, palm cays and sandbars. Bonefish and permit tail in the shallows." },
     { id: "jetty", name: "Jetty Rocks", icon: "🪨", level: 10, price: 3500, x: -2325, z: 1403, heading: 2.55, cx: -2400, cz: 1300, types: ["rocks"],
         blurb: "A long stone jetty and boulder fields far to the west. Rock-loving fish hold tight to the structure." },
+    { id: "lighthouse", name: "Lighthouse Reef", icon: "🗼", level: 11, price: 4200, x: 949, z: -3016, heading: -2.62, cx: 900, cz: -3100, types: ["reef"], rad: 520, blurb: "A tall light on a rock islet, with elkhorn gardens, drop-off walls and a long run of snapper, grouper and barracuda." },
+    { id: "fort", name: "Fort Bastion", icon: "🏰", level: 12, price: 5500, x: -3316, z: -1049, heading: -1.05, cx: -3400, cz: -1000, types: ["wreck", "reef"], rad: 520, blurb: "A ruined stone fort on a sandy islet, ringed by old wrecks and a powder reef. Grouper, amberjack and cobia hold on the iron." },
     { id: "banks", name: "Blue Water Banks", icon: "🌊", level: 20, price: 9000, x: -75, z: 2780, heading: 2.18, cx: -200, cz: 2900, types: ["reef", "wreck", "openWater"],
         blurb: "Deep blue water far to the north: pinnacles, wrecks and the big fish. There is no marina out here, but there is a house for sale." },
+    { id: "canyon", name: "The Canyon", icon: "🔱", level: 30, price: 18000, x: 2950, z: 3560, heading: 0.35, cx: 3000, cz: 3700, types: ["openWater", "wreck"], rad: 520, blurb: "The deep edge of the shelf, far out, where the bottom falls away. Marlin, sailfish, tuna and wahoo run the rip. No harbor out here." },
 ];
 const REGION_SPOTS = [
     { id: "sh1", region: "shoals", name: "Whiting Run", type: "sand", x: 2635, z: -557, fish: 7 },
@@ -3334,6 +3340,11 @@ const PORTS = [
     { id: "shoalsLanding", region: "shoals", name: "Shoals Landing", shop: "Shoals Landing Trading Post", kind: "harbor", style: "sand", x: 2690, z: -470, ux: -0.875, uz: -0.484, serviceR: 65 },
     { id: "jettyCove", region: "jetty", name: "Jetty Cove", shop: "Jetty Cove Trading Post", kind: "harbor", style: "rock", x: -2400, z: 1470, ux: 0.745, uz: -0.666, serviceR: 65 },
     { id: "banksPoint", region: "banks", name: "Banks Point", shop: "Banks Point House", kind: "home", style: "lush", price: 25000, level: 22, x: -150, z: 2860, ux: 0.68, uz: -0.73, serviceR: 70 },
+    { id: "cypressPort", region: "cypress", name: "Cypress Landing", shop: "Cypress Landing Bait & Tackle", kind: "harbor", style: "lush", x: -1450, z: -1650, ux: 0.8, uz: 0.6, serviceR: 65 },
+    { id: "tarponPort", region: "tarpon", name: "Bay Point", shop: "Bay Point Bait House", kind: "harbor", style: "sand", x: 1450, z: 1700, ux: -0.6, uz: -0.8, serviceR: 65 },
+    { id: "flatsPort", region: "flats", name: "Palm Cay Landing", shop: "Palm Cay Trading Post", kind: "harbor", style: "sand", x: 3500, z: 1200, ux: -0.8, uz: 0.6, serviceR: 65 },
+    { id: "lighthousePort", region: "lighthouse", name: "Keeper's Dock", shop: "Keeper's Dock Supply", kind: "harbor", style: "rock", x: 900, z: -3100, ux: 0.5, uz: 0.866, serviceR: 65 },
+    { id: "fortPort", region: "fort", name: "Sally Port", shop: "Sally Port Trading Post", kind: "harbor", style: "rock", x: -3400, z: -1000, ux: 0.866, uz: -0.5, serviceR: 65 },
 ];
 const HOME_STYLES = [
     { w: 7, d: 5.5, floors: 1, porch: true, chimney: true },
@@ -3478,7 +3489,7 @@ const HOME_SPOT_TYPES = ["reef", "wreck", "inshore", "openWater"];
 function regionIdAt(x, z) {
     for (let i = 0; i < REGIONS.length; i++) {
         const r = REGIONS[i];
-        if (!r.home && Math.hypot(x - r.cx, z - r.cz) < 900)
+        if (!r.home && Math.hypot(x - r.cx, z - r.cz) < (r.rad || 900))
             return r.id;
     }
     return "marina";
@@ -7724,6 +7735,76 @@ REMOTE_SPOT_DATA.forEach((sp) => { const r = GROUND_RULES[sp.id]; if (r)
 GROUND_RULES["home-inshore"].pool += ",Bonnethead:1";
 GROUND_RULES["home-open"].pool += ",Atlantic Sharpnose:0.6";
 REGION_POOLS.banks.pool += ",Blacktip Shark:1,Spinner Shark:0.6,Nurse Shark:0.6";
+// ---------- v37: six more areas (grounds, fish and landmarks for the new regions in REGIONS) ----------
+// Every ground gets its own pool and, where it has one, a landmark (see seaLmBuild). The sharks that belong are added by the same rule as everywhere else,
+// and each region's own fish list is the sum of its grounds. A ground opens at its region's level (the permit already asks for it).
+const NEW_AREAS = {
+    cypress: { size: [0.05, 0.5], fish: 7, spots: [
+            ["cy1", "Black Water Creek", "inshore", -1530, -1780, "mangrove", "Snook:4,Redfish:3,Spotted Seatrout:2,Black Drum:2,Gafftopsail Catfish:2,Jack Crevalle:1"],
+            ["cy2", "Oyster Point", "inshore", -1330, -1770, "daybeacon", "Sheepshead:4,Black Drum:3,Redfish:3,Mangrove Snapper:3,Gafftopsail Catfish:1"],
+            ["cy3", "Pelican Bayou", "inshore", -1650, -1600, "stakes", "Spotted Seatrout:4,Redfish:3,Ladyfish:2,Snook:2,Jack Crevalle:2,Pinfish:2"],
+            ["cy4", "Cypress Knees", "inshore", -1380, -1530, "mangrove", "Snook:4,Tarpon:1,Redfish:3,Mangrove Snapper:3,Sheepshead:2"],
+            ["cy5", "Tannin Hole", "inshore", -1580, -1480, "pilings", "Gafftopsail Catfish:3,Black Drum:3,Redfish:2,Snook:2,Tarpon:1,Atlantic Croaker:2"],
+        ] },
+    tarpon: { size: [0.05, 0.55], fish: 7, spots: [
+            ["tb1", "Silver King Hole", "inshore", 1510, 1570, "daybeacon", "Tarpon:4,Snook:3,Jack Crevalle:3,Ladyfish:3,Redfish:2"],
+            ["tb2", "Grass Flat Bay", "inshore", 1330, 1810, "stakes", "Spotted Seatrout:5,Redfish:3,Flounder:2,Ladyfish:2,Pinfish:2"],
+            ["tb3", "Bridge Shadows", "inshore", 1600, 1840, "pilings", "Snook:4,Tarpon:3,Sheepshead:3,Mangrove Snapper:3,Black Drum:2"],
+            ["tb4", "Bay Mouth Rip", "openWater", 1650, 1630, "foam", "Spanish Mackerel:3,Bluefish:3,Little Tunny:2,Jack Crevalle:3,Ladyfish:3,Cobia:1"],
+            ["tb5", "Pass Light Shoal", "openWater", 1280, 1630, "daybeacon", "Tripletail:3,Cobia:2,Spanish Mackerel:2,Blue Runner:3,Tarpon:1"],
+        ] },
+    flats: { size: [0.1, 0.65], fish: 7, spots: [
+            ["tf1", "Bonefish Mud", "sand", 3600, 1100, "stakes", "Bonefish:5,Permit:2,Pompano:2,Whiting:2,Spotted Seatrout:1"],
+            ["tf2", "Permit Edge", "sand", 3380, 1330, "daybeacon", "Permit:4,Pompano:3,Bonefish:2,Jack Crevalle:2,Flounder:1"],
+            ["tf3", "Barracuda Cut", "inshore", 3640, 1330, "palmcay", "Great Barracuda:3,Jack Crevalle:3,Bonefish:1,Permit:1,Tarpon:1,Snook:1"],
+            ["tf4", "Sandbar Lagoon", "sand", 3350, 1090, "palmcay", "Pompano:4,Whiting:3,Flounder:3,Spanish Mackerel:2,Bluefish:2"],
+            ["tf5", "Turtle Grass Edge", "inshore", 3500, 1450, "stakes", "Spotted Seatrout:3,Redfish:2,Bonefish:3,Snook:2,Mangrove Snapper:3"],
+        ] },
+    lighthouse: { size: [0.1, 0.75], fish: 7, spots: [
+            ["lr1", "The Light", "reef", 950, -3200, "lighthouse", "Mutton Snapper:3,Yellowtail Snapper:3,Hogfish:2,Red Grouper:2,White Grunt:3,Great Barracuda:1"],
+            ["lr2", "Elkhorn Garden", "reef", 780, -3260, "rubble", "Yellowtail Snapper:4,Lane Snapper:3,Hogfish:3,White Grunt:3,Gray Triggerfish:3,Atlantic Spadefish:2"],
+            ["lr3", "Barracuda Alley", "reef", 1070, -3020, "whistle", "Great Barracuda:3,Mutton Snapper:3,Cubera Snapper:1,Black Grouper:1,Almaco Jack:2,Yellowtail Snapper:2"],
+            ["lr4", "Grouper Hole", "reef", 820, -2930, "rubble", "Red Grouper:3,Black Grouper:2,Gag Grouper:2,Scamp:2,Mutton Snapper:2,Hogfish:2"],
+            ["lr5", "Drop-Off Wall", "reef", 1010, -3320, "whistle", "Vermilion Snapper:3,Red Snapper:3,Scamp:2,Almaco Jack:3,Amberjack:2,Cubera Snapper:1"],
+        ] },
+    fort: { size: [0.15, 0.8], fish: 7, spots: [
+            ["fb1", "Fort Moat", "reef", -3470, -1100, "", "Sheepshead:3,Mangrove Snapper:3,Black Drum:2,Gray Triggerfish:2,Atlantic Spadefish:3,Hogfish:1"],
+            ["fb2", "Galleon Field", "wreck", -3300, -1130, "hulk", "Amberjack:3,Cobia:2,Gag Grouper:2,Great Barracuda:2,Atlantic Spadefish:3,Almaco Jack:2"],
+            ["fb3", "Steamer Wreck", "wreck", -3550, -930, "hulk", "Cobia:3,Amberjack:3,Red Snapper:2,Gag Grouper:2,Black Grouper:1,Gray Triggerfish:2"],
+            ["fb4", "Powder Reef", "reef", -3260, -880, "rubble", "Mutton Snapper:3,Hogfish:2,Red Grouper:3,Lane Snapper:3,Yellowtail Snapper:2,Gray Triggerfish:2"],
+            ["fb5", "Cannon Ledge", "wreck", -3420, -760, "mast", "Gag Grouper:3,Amberjack:2,Scamp:2,Red Snapper:3,Cobia:2,Almaco Jack:2"],
+        ] },
+    canyon: { size: [0.3, 1.0], fish: 8, spots: [
+            ["cn1", "Canyon Rim", "openWater", 2900, 3600, "fad", "Mahi-Mahi:3,Yellowfin Tuna:3,Blackfin Tuna:3,Wahoo:2,King Mackerel:2,Little Tunny:2"],
+            ["cn2", "The Chimney", "openWater", 3150, 3640, "wxbuoy", "Blue Marlin:2,Sailfish:3,Yellowfin Tuna:3,Wahoo:2,Mahi-Mahi:2"],
+            ["cn3", "Tuna Wall", "openWater", 3060, 3850, "foam", "Yellowfin Tuna:4,Blackfin Tuna:3,Wahoo:3,Almaco Jack:1,Mahi-Mahi:2"],
+            ["cn4", "Sailfish Slope", "openWater", 2840, 3820, "weed", "Sailfish:4,Mahi-Mahi:3,Wahoo:2,Blue Marlin:1,Little Tunny:2,Blackfin Tuna:2"],
+            ["cn5", "Rig Row", "wreck", 3260, 3820, "platform", "Amberjack:3,Cobia:3,Almaco Jack:3,Mahi-Mahi:2,Yellowfin Tuna:2,Great Barracuda:1"],
+        ] },
+};
+Object.keys(NEW_AREAS).forEach((rid) => {
+    const A = NEW_AREAS[rid], reg = REGIONS.find((r) => r.id === rid), tot = {};
+    A.spots.forEach((t) => {
+        REGION_SPOTS.push({ id: t[0], region: rid, name: t[1], type: t[2], x: t[3], z: t[4], fish: A.fish });
+        const rule = { pool: t[6], size: A.size, lv: reg.level };
+        if (t[5])
+            rule.lm = t[5];
+        rule.pool = sharkPoolAdd(rule.pool, t[2], Math.hypot(t[3] - SEA_ORIGIN.x, t[4] - SEA_ORIGIN.z), rule.lv, rule.size[1]);
+        GROUND_RULES[t[0]] = rule;
+        poolParse(rule.pool).forEach((e) => { tot[e.n] = (tot[e.n] || 0) + e.w; });
+    });
+    REGION_POOLS[rid] = { pool: Object.keys(tot).map((n) => n + ":" + Math.round(tot[n] * 10) / 10).join(","), size: A.size };
+});
+const REGION_MARKS = [
+    { id: "rm_cy_camp", name: "Fish Camp", lm: "stilthouse", x: -1500, z: -1700 }, { id: "rm_cy_floats", name: "Crab-Pot Floats", lm: "crabfloats", x: -1290, z: -1720 },
+    { id: "rm_cy_isle", name: "Egret Island", lm: "mangrove", x: -1470, z: -1560 },
+    { id: "rm_tb_bridge", name: "Bay Bridge Stumps", lm: "pilings", x: 1420, z: 1790 }, { id: "rm_tb_stakes", name: "Pass Stakes", lm: "stakes", x: 1560, z: 1700 },
+    { id: "rm_tf_cay", name: "Palm Cay", lm: "palmcay", x: 3570, z: 1270 }, { id: "rm_tf_drift", name: "Driftwood Cay", lm: "palmcay", x: 3300, z: 1400 },
+    { id: "rm_tf_stakes", name: "Poling Stakes", lm: "stakes", x: 3440, z: 1120 },
+    { id: "rm_lr_rock", name: "Elkhorn Rock", lm: "rubble", x: 850, z: -3230 }, { id: "rm_lr_buoy", name: "Reef Fairway Buoy", lm: "buoyrw", x: 780, z: -3010 },
+    { id: "rm_fb_fort", name: "Fort Bastion", lm: "fort", x: -3500, z: -1060 }, { id: "rm_fb_buoy", name: "Wreck Buoy", lm: "buoyrw", x: -3250, z: -980 },
+    { id: "rm_cn_wx", name: "Canyon Weather Buoy", lm: "wxbuoy", x: 3000, z: 3480 }, { id: "rm_cn_float", name: "Drift Float", lm: "fad", x: 2780, z: 3700 },
+];
 const SEA_GROUND_BY_ID = {};
 SEA_GROUNDS.forEach((g) => {
     const p = seaPoint(g.b, g.d);
@@ -7750,22 +7831,23 @@ function seaReachCap(qs, name) {
     return cap < 0 ? null : cap;
 }
 // Landmarks: every ground with a `lm` and every sea mark gets a landmark a short way off its centre (the fish are around the mark, not under it).
-const SEA_LM_SOLID = { stack: 7, mast: 4.5, platform: 17, tower: 6, pilings: 8, rubble: 9 }; // radius of the hull-blocking disc (feet); the rest float or are too small to hit
-const SEA_LM_NAMES = { spars: "Channel Spars", daybeacon: "Day Beacon", stakes: "Fish Stakes", crabfloats: "Crab-Pot Floats", rubble: "Rubble Mound", pilings: "Old Pilings", whistle: "Whistle Buoy", mast: "Wreck Mast", platform: "Oil Platform", stack: "Sea Stack", tower: "Skeleton Tower", weed: "Weed Line", foam: "Tide Rip", fad: "FAD Buoy", wxbuoy: "Weather Buoy", buoyrw: "Fairway Buoy" };
+const SEA_LM_SOLID = { stack: 7, mast: 4.5, platform: 17, tower: 6, pilings: 8, rubble: 9, lighthouse: 9, fort: 19, mangrove: 11, palmcay: 7, stilthouse: 8, hulk: 7 }; // radius of the hull-blocking disc (feet); the rest float or are too small to hit
+const SEA_LM_NAMES = { spars: "Channel Spars", daybeacon: "Day Beacon", stakes: "Fish Stakes", crabfloats: "Crab-Pot Floats", rubble: "Rubble Mound", pilings: "Old Pilings", whistle: "Whistle Buoy", mast: "Wreck Mast", platform: "Oil Platform", stack: "Sea Stack", tower: "Skeleton Tower", weed: "Weed Line", foam: "Tide Rip", fad: "FAD Buoy", wxbuoy: "Weather Buoy", buoyrw: "Fairway Buoy", lighthouse: "Lighthouse", fort: "Ruined Fort", mangrove: "Mangrove Islet", palmcay: "Palm Cay", stilthouse: "Fish Camp", hulk: "Wooden Wreck" };
 function seaHash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
     h = Math.imul(h, 16777619);
 } return (h >>> 0) / 4294967296; }
 const SEA_LM_AT = { heronflats: [34, 22], driftwoodcreek: [38, -14] }; // grounds that sit by an island: the mark goes on the open-water side
 const SEA_LANDMARKS = [];
-REMOTE_SPOT_DATA.forEach((sp) => {
-    const kind = seaRuleFor(sp.id).lm;
+REMOTE_SPOT_DATA.concat(REGION_SPOTS).forEach((sp) => {
+    const kind = seaRuleFor(sp.id, sp.region).lm;
     if (!kind)
         return;
     const a = seaHash(sp.id) * Math.PI * 2, off = 26 + seaHash(sp.id + "r") * 14, at = SEA_LM_AT[sp.id] || [Math.cos(a) * off, Math.sin(a) * off];
     SEA_LANDMARKS.push({ id: "lm_" + sp.id, spot: sp.id, name: sp.name, kind, x: Math.round(sp.x + at[0]), z: Math.round(sp.z + at[1]), r: SEA_LM_SOLID[kind] || 0 });
 });
 SEA_MARKS.forEach((m) => { SEA_LANDMARKS.push({ id: m.id, spot: null, name: m.name, kind: m.lm, x: m.x, z: m.z, r: SEA_LM_SOLID[m.lm] || 0 }); });
+REGION_MARKS.forEach((m) => { SEA_LANDMARKS.push({ id: m.id, spot: null, name: m.name, kind: m.lm, x: m.x, z: m.z, r: SEA_LM_SOLID[m.lm] || 0 }); });
 // ---------- The seabed: how deep the water is ----------
 // Home waters (inside BATHY_HOME_R of the marina) are the old flat 14 ft sound. Beyond that the sea falls away with distance, reaching 100 ft out on
 // the shelf and several hundred feet in the deep blue water, and every ground then shapes the bottom under itself: flats and shoals rise to a few feet,
@@ -7780,6 +7862,7 @@ function bathyBase(d) {
 const BATHY_NAMED = {
     bluehole: 520, bigdrop: 780, theedge: 240, faredge: 650, blackwater: 820, marlinalley: 520, tunahole: 420, streamline: 380, northrip: 300, sargasso2: 230,
     seamount: 95, marlinbank: 120, deeprig: 140, diamondrig: 85, tower: 70, tarpon: 12,
+    cn1: 380, cn2: 620, cn3: 520, cn4: 450, cn5: 300, // The Canyon: the rim, the chimney, the tuna wall, the sailfish slope, the rig
     bk1: 340, bk2: 105, bk3: 82, bk4: 430, // Blue Water Banks: the Blue Hole, Amberjack Wall, Coral Pinnacle, Deep Edge
 };
 function bathyShaped(sp) { return Math.hypot(sp.x, sp.z) >= BATHY_HOME_R; } // (grounds inside the home sound keep their own fixed depths)
@@ -8146,7 +8229,7 @@ function seaChartDraw(ctx, W, H, cam, d, o) {
         ctx.setLineDash([6, 6]);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(x, y, 900 * s, 0, Math.PI * 2);
+        ctx.arc(x, y, (r.rad || 900) * s, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
         if (big) {
@@ -8657,7 +8740,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             land: st.seaLand || null,
             spots: (st.fishSpots || []).map((sp) => ({ id: sp.id, name: sp.name, type: sp.type, x: sp.x, z: sp.z, found: !!(u.spotsFound && u.spotsFound[sp.id]), lv: sp.lv })),
             marks: SEA_LANDMARKS.map((l) => ({ id: l.id, name: l.name, kind: l.kind, x: l.x, z: l.z, seen: !!(u.marksSeen && u.marksSeen[l.id]), spot: l.spot })),
-            regions: REGIONS.filter((r) => !r.home).map((r) => ({ id: r.id, name: r.name, cx: r.cx, cz: r.cz, open: !!(u.quest && travelOpen(u.quest, r.id)) })),
+            regions: REGIONS.filter((r) => !r.home).map((r) => ({ id: r.id, name: r.name, cx: r.cx, cz: r.cz, rad: r.rad || 900, open: !!(u.quest && travelOpen(u.quest, r.id)) })),
             traps: ((u.quest && u.quest.traps && u.quest.traps.set) || []).map((t) => ({ id: t.id, kind: t.kind, x: t.x, z: t.z, ground: t.ground })),
             boat: st.nav || null, wp: st.wp || null, home: { x: 46, z: -23 },
         };
@@ -14316,6 +14399,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
         const LMM = {
             wood: lmMat(0x6b5a45), dark: lmMat(0x3f362c), rust: lmMat(0x8a4a2a), steel: lmMat(0x8a949a), white: lmMat(0xe8e6de), red: lmMat(0xc0392b), green: lmMat(0x2e8b57),
             yellow: lmMat(0xe6b422), orange: lmMat(0xf08a24), rock: lmMat(0x5d6063), rockDk: lmMat(0x3d4144), guano: lmMat(0xe9e6dc), black: lmMat(0x1c1c1c), concrete: lmMat(0x9a9a92),
+            sand: lmMat(0xe0d09c), mud: lmMat(0x5b5744), leaf: lmMat(0x2f7a3c, { side: THREE.DoubleSide }), leafDk: lmMat(0x23572f), trunk: lmMat(0x6a4f36), stone: lmMat(0xbdb29a), stoneDk: lmMat(0x8d846f),
+            glass: lmMat(0xdfeaf0, { transparent: true, opacity: 0.5 }), tin: lmMat(0x9aa3a8), plank: lmMat(0x8a6d4a), barnacle: lmMat(0x4a4a3c),
             weedA: lmMat(0x7d6d2b, { side: THREE.DoubleSide }), weedB: lmMat(0x5f6a2c, { side: THREE.DoubleSide }),
             rip: new THREE.MeshBasicMaterial({ color: 0x0f6a70, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }),
             foam: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
@@ -14472,6 +14557,124 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 add(cyl(1.3, 1.3, 2.6, 8), LMM.white, 0, 43.2, 0);
                 add(cyl(1.6, 0.1, 1.4, 8), LMM.red, 0, 45.2, 0);
                 light(0, 43.2, 0, "white", 5, 0.3, 1.4);
+            }
+            else if (kind === "lighthouse") { // a tall banded light on a rock islet, with the keeper's house
+                add(cyl(7.6, 5.4, 3.4, 9), LMM.rock, 0, 0.4, 0);
+                add(cyl(5.4, 4.6, 1.2, 9), LMM.rockDk, 0.6, 2.4, -0.4);
+                for (let i = 0; i < 6; i++) {
+                    const rb = 3.1 - i * 0.2, rt = rb - 0.2;
+                    add(cyl(rb, rt, 5.6, 12), i % 2 ? LMM.red : LMM.white, 0, 5.2 + i * 5.6, 0);
+                }
+                add(cyl(3.5, 3.5, 0.5, 12), LMM.steel, 0, 5.2 + 6 * 5.6 - 2.4, 0);
+                for (let k = 0; k < 10; k++) {
+                    const a = k * Math.PI / 5;
+                    add(cyl(0.07, 0.07, 1.1, 3), LMM.steel, Math.cos(a) * 3.3, 5.2 + 6 * 5.6 - 1.8, Math.sin(a) * 3.3);
+                }
+                add(cyl(1.9, 1.9, 3.4, 10), LMM.glass, 0, 5.2 + 6 * 5.6 - 0.2, 0);
+                add(new THREE.ConeGeometry(2.5, 2.2, 10), LMM.red, 0, 5.2 + 6 * 5.6 + 2.5, 0);
+                add(new THREE.SphereGeometry(0.4, 6, 5), LMM.steel, 0, 5.2 + 6 * 5.6 + 3.9, 0);
+                add(box(5, 3.2, 3.8), LMM.white, 4.4, 4.5, 2.6, 0, 0.3, 0);
+                add(box(5.6, 0.6, 4.4), LMM.red, 4.4, 6.4, 2.6, 0, 0.3, 0);
+                light(0, 5.2 + 6 * 5.6 - 0.2, 0, "white", 6, 0.3, 2.2);
+            }
+            else if (kind === "fort") { // a ruined stone fort on a sandy islet: walls with gaps, round bastions, a keep and a flag
+                add(cyl(19, 16.5, 2.6, 14), LMM.sand, 0, 0.2, 0);
+                const H = 10, wallH = 5.2, wy = 1.5 + wallH / 2;
+                add(box(2 * H + 3, wallH, 1.7), LMM.stone, 0, wy, -H);
+                add(box(1.7, wallH, 2 * H + 3), LMM.stone, H, wy, 0);
+                add(box(1.7, wallH - 1.4, 2 * H + 3), LMM.stoneDk, -H, wy - 0.7, 0);
+                add(box(H - 3.4, wallH, 1.7), LMM.stone, -H / 2 - 1.7, wy, H);
+                add(box(H - 3.4, wallH - 2.2, 1.7), LMM.stoneDk, H / 2 + 1.7, wy - 1.1, H); // the south wall has a gate gap and a broken end
+                for (let i = -3; i <= 3; i++) {
+                    if (i % 2 === 0)
+                        continue;
+                    add(box(1.4, 1.1, 1.8), LMM.stone, i * 3.1, 1.5 + wallH + 0.5, -H);
+                }
+                for (let i = -3; i <= 3; i++) {
+                    if (i % 2 === 0)
+                        continue;
+                    add(box(1.8, 1.1, 1.4), LMM.stone, H, 1.5 + wallH + 0.5, i * 3.1);
+                }
+                [[-1, -1, 1], [1, -1, 1], [1, 1, 0.75], [-1, 1, 0.6]].forEach(([sx, sz, k]) => { const h = 8.2 * k; add(cyl(3.4, 3.0, h, 9), LMM.stone, sx * (H + 0.4), 1.5 + h / 2, sz * (H + 0.4)); if (k >= 1)
+                    add(new THREE.ConeGeometry(3.4, 2.4, 9), LMM.stoneDk, sx * (H + 0.4), 1.5 + h + 1.1, sz * (H + 0.4)); });
+                add(box(6.5, 4.4, 6.5), LMM.stoneDk, -1.5, 3.7, -2.5);
+                add(box(7.1, 0.5, 7.1), LMM.stone, -1.5, 6.2, -2.5);
+                add(cyl(0.14, 0.14, 9, 4), LMM.wood, -1.5, 10.5, -2.5);
+                add(box(2.4, 1.4, 0.07), LMM.red, -0.3, 13, -2.5);
+                [-1, 1].forEach((k) => { add(cyl(0.42, 0.55, 2.1, 6), LMM.black, k * 4, 3.2, H - 0.6, 0, 0, Math.PI / 2 * 0).rotation.x = Math.PI / 2 - 0.2; });
+                for (let i = 0; i < 6; i++) {
+                    const a = rnd() * Math.PI * 2, r = 9 + rnd() * 7;
+                    add(new THREE.SphereGeometry(0.9 + rnd() * 0.8, 6, 5), LMM.leaf, Math.cos(a) * r, 2 + rnd() * 0.5, Math.sin(a) * r).scale.y = 0.7;
+                }
+                add(box(3.4, 1.6, 2.4), LMM.stone, H + 5.2, 0.5, 5, 0.1, 0.5, 0.2);
+                add(box(2.6, 1.2, 2), LMM.stoneDk, -H - 5, 0.3, -3.5, 0.0, 1.1, -0.15); // blocks fallen into the shallows
+            }
+            else if (kind === "mangrove") { // a low mud islet with mangroves on their prop roots
+                add(cyl(9, 7, 1.6, 9), LMM.mud, 0, -0.1, 0);
+                const n = 6 + Math.floor(rnd() * 3);
+                for (let i = 0; i < n; i++) {
+                    const a = rnd() * Math.PI * 2, r = rnd() * 5.5, x = Math.cos(a) * r, z = Math.sin(a) * r, h = 2.3 + rnd() * 1.8;
+                    add(cyl(0.4, 0.28, h, 5), LMM.trunk, x, 0.5 + h / 2, z);
+                    const c = add(new THREE.SphereGeometry(2.1 + rnd() * 1.3, 7, 5), rnd() < 0.5 ? LMM.leaf : LMM.leafDk, x, 0.9 + h, z);
+                    c.scale.y = 0.72;
+                    for (let k = 0; k < 4; k++) {
+                        const b = k * Math.PI / 2 + rnd();
+                        add(cyl(0.16, 0.05, 2.5, 4), LMM.trunk, x + Math.cos(b) * 0.9, 1.1, z + Math.sin(b) * 0.9, Math.sin(b) * 0.55, 0, -Math.cos(b) * 0.55);
+                    }
+                }
+                for (let k = 0; k < 3; k++) {
+                    const a = rnd() * Math.PI * 2;
+                    add(new THREE.SphereGeometry(0.32, 5, 4), LMM.white, Math.cos(a) * 4, 4.8 + rnd(), Math.sin(a) * 4);
+                } // egrets in the tops
+            }
+            else if (kind === "palmcay") { // a small sand cay with leaning palms and a driftwood log
+                add(cyl(6.6, 5, 1.1, 10), LMM.sand, 0, 0.0, 0);
+                add(new THREE.ConeGeometry(3.4, 1.3, 8), LMM.sand, 1, 0.7, -0.6);
+                const np = 3 + Math.floor(rnd() * 2);
+                for (let i = 0; i < np; i++) {
+                    const a = i * 2.2 + rnd(), r = 1.5 + rnd() * 2.4, x = Math.cos(a) * r, z = Math.sin(a) * r, h = 6.5 + rnd() * 3.4, lean = (rnd() - 0.5) * 0.3;
+                    add(cyl(0.36, 0.22, h, 5), LMM.trunk, x + lean * h * 0.5, 0.6 + h / 2, z, 0, 0, -lean);
+                    const tx = x + lean * h, ty = 0.6 + h;
+                    for (let f = 0; f < 7; f++) {
+                        const b = f * Math.PI * 2 / 7 + rnd() * 0.3;
+                        add(box(4.4, 0.12, 1.1), LMM.leaf, tx + Math.cos(b) * 2.1, ty - 0.2, z + Math.sin(b) * 2.1, 0, -b, -0.42);
+                    }
+                }
+                add(cyl(0.3, 0.3, 4.2, 5), LMM.wood, 3.6, 0.7, 2.6, 0, 0.8, Math.PI / 2);
+            }
+            else if (kind === "stilthouse") { // a fish camp on stilts: a tin-roofed shack, a long dock, crab pots and a lantern
+                for (let i = 0; i < 6; i++)
+                    add(cyl(0.38, 0.32, 6.6, 5), LMM.wood, (i % 3 - 1) * 3.8, 2.4, (i < 3 ? -2.3 : 2.3));
+                add(box(10, 0.4, 6.4), LMM.plank, 0, 5.6, 0);
+                add(box(5.4, 3.2, 4.2), LMM.wood, -1.5, 7.4, 0);
+                add(box(6.4, 0.3, 5.2), LMM.tin, -1.5, 9.2, 0, 0, 0, 0.12);
+                add(box(1.2, 2.0, 0.1), LMM.dark, -1.5, 6.9, 2.2);
+                add(box(9, 0.3, 1.5), LMM.plank, 9.4, 5.5, 1.2);
+                for (let i = 0; i < 4; i++)
+                    add(cyl(0.28, 0.24, 6.2, 5), LMM.wood, 5.4 + i * 3.2, 2.2, 1.2 + (i % 2) * 0.1);
+                for (let i = 0; i < 3; i++)
+                    add(box(1.1, 0.9, 1.1), i % 2 ? LMM.orange : LMM.white, 2.6 + i * 1.3, 6.3, -2.0);
+                add(cyl(0.12, 0.12, 2.8, 4), LMM.steel, 4.2, 7.2, 2.6);
+                light(4.2, 8.8, 2.6, "amber", 4, 0.8, 0.8);
+            }
+            else if (kind === "hulk") { // the ribs and bow post of an old wooden ship, half sunk
+                add(box(14, 0.5, 0.6), LMM.dark, 0, 0.1, 0);
+                for (let i = -5; i <= 5; i++) {
+                    for (const sd of [-1, 1]) {
+                        const h = 2.9 - Math.abs(i) * 0.22 + (rnd() - 0.5) * 0.9;
+                        if (h < 0.7)
+                            continue;
+                        add(cyl(0.17, 0.12, h, 4), LMM.dark, i * 1.25, 0.3 + h / 2, sd * (1.7 - Math.abs(i) * 0.1), sd * 0.34, 0, 0);
+                    }
+                }
+                add(cyl(0.34, 0.22, 6.2, 5), LMM.dark, 7.4, 3.0, 0, 0, 0, -0.32);
+                add(cyl(0.28, 0.18, 4.4, 5), LMM.wood, -2.4, 2.4, 0.4, 0.05, 0, 0.1);
+                for (let k = 0; k < 4; k++)
+                    add(box(2.4, 1.0, 0.14), LMM.plank, -4 + k * 2.6, 0.7, k % 2 ? 1.5 : -1.5, k % 2 ? -0.34 : 0.34, 0, 0);
+                for (let i = -2; i <= 2; i++)
+                    add(box(0.22, 0.22, 3.3), LMM.dark, i * 2.5, 1.6, 0);
+                for (let k = 0; k < 5; k++)
+                    add(new THREE.SphereGeometry(0.4 + rnd() * 0.3, 5, 4), LMM.barnacle, (rnd() - 0.5) * 10, 0.1, (rnd() - 0.5) * 3);
             }
             else if (kind === "weed") { // a mat line of sargassum, drifting in a streak
                 const a = rnd() * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
@@ -18173,8 +18376,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     setUiTension(Math.round(fs.tension));
                     setUiBoatXZ({ x: Math.round(boatPos.x), z: Math.round(boatPos.z) });
                     setUiRegion(regionIdAt(boatPos.x, boatPos.z));
-                    if (storyOnArrive(quest, regionIdAt(boatPos.x, boatPos.z)))
-                        questSave(quest);
+                    {
+                        const rid = regionIdAt(boatPos.x, boatPos.z), fresh = storyOnArrive(quest, rid);
+                        if (fresh) {
+                            const rg = REGIONS.find((r) => r.id === rid);
+                            if (rg && !rg.home) {
+                                const g = awardXp(30 + 6 * (rg.level || 1));
+                                marineShowToast("🧭 New waters discovered: " + rg.name + " · +" + g.gained + " XP", "#ffd36b", 6);
+                                questPush();
+                            }
+                            questSave(quest);
+                        }
+                    }
                     storyPoll();
                     if (gearNow.flags.spotHint) {
                         let hintSpot = null, hintD = 520;
@@ -20607,7 +20820,7 @@ function CharterLife() {
                     BUILD.demo && React.createElement(React.Fragment, null,
                         " This demo covers levels 1 to ",
                         BUILD.demoMaxLevel,
-                        " at the Marina and Sandy Shoals. The full game opens the rest of the coast and the late-game homes."),
+                        " across the Marina and seven far-off areas (the backcountry creeks, Tarpon Bay, the flats, the shoals, the jetty, the lighthouse reef and the old fort). The full game adds the deep Blue Water Banks, The Canyon and the late-game homes."),
                     React.createElement("br", null),
                     "Drive with the throttle lever and steer by dragging left or right, use the ring button for commands, and talk to the dock folks for jobs."),
                 React.createElement("button", { className: "cl-btn", onClick: () => setShowAbout(false) }, "Back"))) : confirmNew ? (React.createElement(React.Fragment, null,
