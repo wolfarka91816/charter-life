@@ -49,8 +49,8 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.37", // shown on the title screen and badges (bump it when a batch of changes ships)
-    build: "2 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
+    version: "0.38", // shown on the title screen and badges (bump it when a batch of changes ships)
+    build: "4 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "cypress", "tarpon", "shoals", "flats", "jetty", "lighthouse", "fort"], // regions the demo can reach (Blue Water Banks and The Canyon, the far endgame, show "Full game")
 };
@@ -3694,12 +3694,27 @@ function pathPoint(path, segs, len, f) {
 // (so it can be tested on its own); the game loop just feeds it catches and the UI reads it. Saved in localStorage (best effort).
 const QUEST_SAVE_KEY = BUILD.demo ? "deepwater.demo.save.v1" : BUILD.dev ? "deepwater.save.v1" : "deepwater.standard.save.v1"; // every build keeps its own save, so a demo or a dev run never touches a real one
 const QUEST_GIVERS = [
-    { id: "marlow", name: "Captain Marlow", role: "Dockmaster", where: "on the dock", pool: ["species", "weight", "any"],
+    { id: "marlow", name: "Captain Marlow", role: "Dockmaster", where: "on the dock", pool: ["species", "weight", "any", "sell"],
         say: { offer: "Morning. I've got customers asking for something particular. Think you can land it?", active: "Still at it? Fish don't count until they're on your line, so go get 'em.", ready: "Well, would you look at that. Fine work, let's settle up.", done: "That's all I need today. Come see me tomorrow." } },
-    { id: "dana", name: "Dana Reyes", role: "Charter booker", where: "by the houses", pool: ["any", "zone", "remote"],
+    { id: "dana", name: "Dana Reyes", role: "Charter booker", where: "by the houses", pool: ["any", "zone", "remote", "haul"],
         say: { offer: "I've got charter guests who want fish on the table tonight. Can you help?", active: "The guests are getting hungry. How's the fishing?", ready: "That's exactly what I needed. Here's your cut.", done: "We're all set today. Check back tomorrow, there's always another booking." } },
     { id: "pete", name: "Old Pete", role: "Retired guide", where: "down by the beach", pool: ["remote", "weight", "species"],
         say: { offer: "The close-in water's picked over. Real fish are out in the blue. Want a challenge?", active: "Don't hug the shore. Go find the birds.", ready: "Ha! Knew you had it in you. Take this.", done: "Enough for today. Rest up, the sea'll still be there tomorrow." } },
+    // the harbors (v38): each has a person with a daily job for fishing in their own area
+    { id: "wren", name: "Wren Okafor", role: "Trading post", where: "Shoals Landing", region: "shoals", port: "shoalsLanding", pool: ["region", "species", "haul", "ground", "sell"],
+        say: { offer: "Orders keep coming and the shelf is bare. Can you fill one?", active: "Tide's turning, so now is the time to fish the bars.", ready: "That is exactly what I asked for. Here is your share.", done: "No more orders today. The book is closed until morning." } },
+    { id: "bram", name: "Bram Kowalski", role: "Mason and diver", where: "Jetty Cove", region: "jetty", port: "jettyCove", pool: ["region", "species", "weight", "ground"],
+        say: { offer: "The jetty cooks and the fish know it. Got a job if you want it.", active: "Watch the swell on the rocks. Fish tight to the stone.", ready: "Now that is a rock fish. Take your pay.", done: "That is plenty for one day. Come back when the tide is right." } },
+    { id: "mags", name: "Mags Thibodeaux", role: "Fish camp", where: "Cypress Landing", region: "cypress", port: "cypressPort", pool: ["region", "species", "release", "haul", "ground"],
+        say: { offer: "Supper does not catch itself. Something for the pot, captain?", active: "Mind the mud on the falling tide, and watch for the herons.", ready: "Now we are cooking. Here is what I owe you.", done: "The pot is full. See you in the morning." } },
+    { id: "hector", name: "Hector Villanueva", role: "Tarpon guide", where: "Bay Point", region: "tarpon", port: "tarponPort", pool: ["region", "species", "release", "ground"],
+        say: { offer: "The pass is on the move. I have a job for somebody who can read it.", active: "Stand still, watch the water. The pass always shows you.", ready: "That is a good day's work. Here you go.", done: "Bay is quiet now. Tomorrow, same time." } },
+    { id: "kai", name: "Kailani Ahn", role: "Poling guide", where: "Palm Cay Landing", region: "flats", port: "flatsPort", pool: ["region", "species", "release", "ground"],
+        say: { offer: "The flats are glassy this morning. I have a request that needs a light touch.", active: "Slow and quiet. If you can see them, they can see you.", ready: "Light hands. Here is your cut.", done: "The wind is up. Nothing more until tomorrow." } },
+    { id: "odell", name: "Odell Pruitt", role: "Lamp keeper", where: "Keeper's Dock", region: "lighthouse", port: "lighthousePort", pool: ["region", "species", "haul", "weight"],
+        say: { offer: "The lamp needs oil and I need fish. One of those I can buy.", active: "Keep an eye on the light. When it turns, the bite turns.", ready: "That will do nicely. The reef is generous.", done: "Lamp is lit and the pantry is full. Come back tomorrow." } },
+    { id: "vance", name: "Dr. Eleanor Vance", role: "Fort historian", where: "Sally Port", region: "fort", port: "fortPort", pool: ["region", "species", "ground", "weight"],
+        say: { offer: "I could use field notes from the wrecks, if you are willing.", active: "Go gently around the wrecks. Everything down there is a record.", ready: "Thank you. This goes straight into the survey.", done: "That is all for today. The archive needs time to catch up." } },
 ];
 const QUEST_ZONE_TEXT = { reef: "the reefs", wreck: "the wrecks", inshore: "the flats", openWater: "open water", sand: "the sandy shoals", rocks: "the jetty rocks" };
 function questXpForLevel(level) { return PROG_CUM[Math.max(1, Math.min(level, PROG_MAX_LEVEL + 1))]; } // total XP needed to reach a level (see the progression section)
@@ -3719,13 +3734,29 @@ function questRng(seedText) {
     let a = h >>> 0;
     return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
-function questGenerate(giver, dayKey, level, speciesInfo, zones) {
+function questGenerate(giver, dayKey, level, speciesInfo, zones, ctx) {
     const rnd = questRng(dayKey + "|" + giver.id);
     const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
     const between = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
     const bump = Math.floor((level - 1) / 4); // bigger asks as the player levels up
-    const type = pick(giver.pool);
+    const reg = giver.region ? REGIONS.find((r) => r.id === giver.region) : null, rname = reg ? reg.name : "";
+    let type = pick(giver.pool), spp = speciesInfo;
+    if (reg) { // a harbor giver only asks for what their own water holds
+        const rp = REGION_POOLS[reg.id], names = rp ? poolParse(rp.pool).map((e) => e.n) : [], sub = speciesInfo.filter((s) => names.indexOf(s.name) >= 0);
+        if (sub.length)
+            spp = sub;
+    }
+    const unfound = reg ? REGION_SPOTS.filter((s) => s.region === reg.id && !(ctx && ctx.found && ctx.found[s.id])).length : 0;
+    if (type === "ground" && unfound < 1)
+        type = "region";
+    if (type === "haul" && level < TRAP_KINDS.crab.level)
+        type = reg ? "region" : "any";
+    if (type === "weight" && !spp.some((s) => s.hi >= 8))
+        type = "species";
     const m = { id: dayKey + ":" + giver.id, giver: giver.id, type, target: 1, progress: 0, status: "offered", carried: false };
+    if (reg)
+        m.region = reg.id;
+    const at = reg ? " at " + rname : "";
     let points = 1;
     if (type === "any") {
         m.target = between(3, 5) + bump;
@@ -3734,20 +3765,20 @@ function questGenerate(giver, dayKey, level, speciesInfo, zones) {
         m.desc = "Land " + m.target + " fish of any kind.";
     }
     else if (type === "species") {
-        const sp = pick(speciesInfo);
+        const sp = pick(spp);
         m.species = sp.name;
         m.target = (sp.hi >= 40 ? between(1, 2) : between(2, 3)) + (bump > 0 && sp.hi < 40 ? 1 : 0);
         points = m.target * (2 + sp.hi / 40);
         m.title = sp.name + " Order";
-        m.desc = "Land " + m.target + " × " + sp.name + ".";
+        m.desc = "Land " + m.target + " × " + sp.name + at + ".";
     }
     else if (type === "weight") {
-        const sp = pick(speciesInfo.filter((s) => s.hi >= 8));
+        const sp = pick(spp.filter((s) => s.hi >= 8)), rp = reg ? REGION_POOLS[reg.id] : null, f = rp ? rp.size[0] + (rp.size[1] - rp.size[0]) * 0.6 : 0.5 + rnd() * 0.1;
         m.species = sp.name;
-        m.minWeight = Math.round(sp.lo + (sp.hi - sp.lo) * (0.5 + rnd() * 0.1));
+        m.minWeight = Math.round(sp.lo + (sp.hi - sp.lo) * f);
         points = 3 + (m.minWeight / sp.hi) * 3 + sp.hi / 60;
         m.title = "Trophy " + sp.name;
-        m.desc = "Land a " + sp.name + " of " + m.minWeight + " lb or more.";
+        m.desc = "Land a " + sp.name + " of " + m.minWeight + " lb or more" + at + ".";
     }
     else if (type === "zone") {
         m.zone = pick(zones || HOME_SPOT_TYPES);
@@ -3755,6 +3786,36 @@ function questGenerate(giver, dayKey, level, speciesInfo, zones) {
         points = m.target * 1.3;
         m.title = "Work " + QUEST_ZONE_TEXT[m.zone];
         m.desc = "Land " + m.target + " fish from " + QUEST_ZONE_TEXT[m.zone] + ".";
+    }
+    else if (type === "region") {
+        m.target = between(3, 5) + bump;
+        points = m.target * 1.4;
+        m.title = rname + " Run";
+        m.desc = "Land " + m.target + " fish" + at + ".";
+    }
+    else if (type === "ground") {
+        m.target = Math.min(unfound, between(1, 2));
+        points = m.target * 3.5;
+        m.title = "New Water";
+        m.desc = "Find " + m.target + " new fishing " + (m.target === 1 ? "ground" : "grounds") + at + ". Your sonar and a slow drift will show them.";
+    }
+    else if (type === "haul") {
+        m.target = between(1, 2) + (bump > 1 ? 1 : 0);
+        points = m.target * 2.4;
+        m.title = "Pot Check";
+        m.desc = "Haul " + m.target + " " + (m.target === 1 ? "trap" : "traps") + ". Set them from your boat, leave them to soak, then come back.";
+    }
+    else if (type === "release") {
+        m.target = between(1, 2);
+        points = m.target * 3;
+        m.title = "Let Them Go";
+        m.desc = "Release " + m.target + " fish. Protected fish and fish outside the legal size count.";
+    }
+    else if (type === "sell") {
+        m.target = between(2, 4) + bump;
+        points = m.target * 0.9;
+        m.title = "Market Day";
+        m.desc = "Sell " + m.target + " fish at the shop.";
     }
     else { // remote: out at the rich grounds, away from the marina's home waters
         m.target = between(2, 4) + bump;
@@ -3779,6 +3840,7 @@ const STORY_CHAPTERS = [
     { n: 3, title: "The Long Jetty", blurb: "Stone, lighthouse light, and a rival who fishes everything he can sell." },
     { n: 4, title: "Blue Water", blurb: "The big water north, a stranded rival, and a house with a captain's name on the deed." },
     { n: 5, title: "Old Silver", blurb: "One tarpon, forty years of tags, and the last page of the log." },
+    { n: 6, title: "Ruth's Other Pages", blurb: "A keeper's box, a fort full of tagged fish, and the edge of the shelf Ruth never reached." },
 ];
 // Who is who. look = the same fields as the captain's look (skin, hair, hairColor, beard, build, top/bottom/extra) plus acc, the accessories worn
 // (cap, shades, glasses, headset, pipe, headwrap). The 3D townsfolk and the portraits are both drawn from this, so they always match.
@@ -3791,10 +3853,18 @@ const STORY_CAST = {
     wren: { name: "Wren Okafor", role: "Trading post, Shoals Landing", age: 1, brow: "thin", acc: "headwrap", accColor: 0xe0762a, look: { body: "f", skin: "s7", hair: "bun", hairColor: "black", beard: "none", build: "slim", top: { id: "top.fishing", color: 0x7cc9b0 }, bottom: { id: "bot.board", color: 0x1f8a8a } } },
     imani: { name: "Dr. Imani Brooks", role: "Marine biologist", age: 0, brow: "thin", glasses: { style: "specs", color: 0x1f2a33 }, look: { body: "f", skin: "s5", hair: "afro", hairColor: "dark", beard: "none", build: "avg", top: { id: "top.hoodie", color: 0x1f8a8a }, bottom: { id: "bot.jeans", color: 0x3d5f86 } } },
     ruth: { name: "Captain Ruth Calloway", role: "Legend of Halyard Point", age: 2, brow: "med", hat: { style: "captain", color: 0x1d3557 }, look: { body: "f", skin: "s2", hair: "braid", hairColor: "grey", beard: "none", build: "avg", top: { id: "top.calloway", color: 0x7a5a30, trim: 0x1c1f22 }, bottom: { id: "bot.dock", color: 0x38414a } } },
+    mags: { name: "Mags Thibodeaux", role: "Fish camp, Cypress Landing", age: 1, brow: "med", hat: { style: "cap", color: 0xb05a2a }, look: { body: "f", skin: "s4", hair: "ponytail", hairColor: "auburn", beard: "none", build: "stocky", top: { id: "top.flannel", color: 0xa84a3a, trim: 0x2f2f2f }, bottom: { id: "bot.bibs", color: 0x6f6a3a } } },
+    hector: { name: "Hector Villanueva", role: "Tarpon guide, Bay Point", age: 1, brow: "thick", glasses: { style: "shades", color: 0x23303a }, look: { skin: "s4", hair: "short", hairColor: "black", beard: "stubble", build: "slim", top: { id: "top.fishing", color: 0x4aa8c8 }, bottom: { id: "bot.shorts", color: 0xc8b98a } } },
+    kai: { name: "Kailani Ahn", role: "Poling guide, Palm Cay", age: 0, brow: "thin", hat: { style: "sunhat", color: 0xe3c97a }, look: { body: "f", skin: "s3", hair: "braid", hairColor: "dark", beard: "none", build: "slim", top: { id: "top.tank", color: 0xf2f0e6 }, bottom: { id: "bot.board", color: 0x2f8aa8 } } },
+    odell: { name: "Odell Pruitt", role: "Lamp keeper, Keeper's Dock", age: 2, brow: "thick", acc: "pipe", look: { skin: "s6", hair: "bald", hairColor: "white", beard: "full", build: "stocky", top: { id: "top.coat", color: 0x2a3a52 }, bottom: { id: "bot.trousers", color: 0x38414a } } },
+    vance: { name: "Dr. Eleanor Vance", role: "Fort historian and diver", age: 1, brow: "thin", glasses: { style: "specs", color: 0x6a4a2a }, look: { body: "f", skin: "s2", hair: "bun", hairColor: "grey", beard: "none", build: "avg", top: { id: "top.blouse", color: 0x8aa89a }, bottom: { id: "bot.trousers", color: 0x6b5a3a } } },
+    bram: { name: "Bram Kowalski", role: "Mason and jetty diver", age: 1, brow: "thick", hat: { style: "cap", color: 0x555b60 }, look: { skin: "s1", hair: "buzz", hairColor: "blond", beard: "stubble", build: "stocky", top: { id: "top.slicker", color: 0xe0b020 }, bottom: { id: "bot.jeans", color: 0x3d5f86 } } },
 };
-const STORY_REGION_NAMES = { shoals: "Sandy Shoals", jetty: "Jetty Rocks", banks: "Blue Water Banks", marina: "the marina" };
+const STORY_REGION_NAMES = (() => { const o = { marina: "the marina" }; REGIONS.forEach((r) => { if (r.id !== "marina")
+    o[r.id] = r.name; }); return o; })();
 // How each step works. need = what must be true before it starts; goal = what to do (a list: every item must be met).
 // goal items: catch {n, species?}  weight {species, min}  variety {n}  missions {n}  sold {n}  spots {n}  arrive {region}  own {gear}  home {id}  lifetime {n}
+//             catchIn {region, n, species?}  release {n}  haul {n}  trapset {n}  mark {id}  spotsIn {region, n}  line {id}   (the last seven are v38)
 const STORY_STEPS = [
     // ---------------- Chapter 1: Fresh Off the Dock ----------------
     { id: "1.1", ch: 1, title: "Keys to the Tideline", who: "marlow", how: "talk", need: { level: 1 },
@@ -4037,6 +4107,41 @@ const STORY_STEPS = [
             ["marlow", "Halyard Point Marina has a new legend. Welcome home, Captain.", "proud"],
             ["narr", "The story of Ruth Calloway and Old Silver is complete. Thank you for playing Chapter 5. There's still a whole ocean to fish."],
         ], reward: { xp: 4000, money: 6000, wardrobe: "top.silver", flag: "ch5" } },
+    // ---------------- Chapter 6: Ruth's Other Pages ----------------
+    { id: "6.1", ch: 6, title: "The Keeper's Box", who: "odell", how: "radio", need: { level: 30, lines: ["lighthouse"] },
+        intro: [
+            ["narr", "Radio static, then a slow voice from Keeper's Dock."],
+            ["odell", "Captain. Odell. That box in the lamp room has sat there thirty years, and tonight the latch finally gave.", "neutral"],
+            ["odell", "There is a page inside in Ruth's hand. It says to look for the Almaco jacks on the drop-off wall, because that is where she tied her best knot. Bring me three and I will read you the rest.", "neutral"],
+        ],
+        goal: [{ type: "catchIn", region: "lighthouse", species: "Almaco Jack", n: 3 }], obj: "Land 3 Almaco Jack at Lighthouse Reef",
+        outro: [
+            ["odell", "Good fish. Here is her page.", "happy"],
+            ["narr", "Ruth's handwriting, slanting hard to the right: 'If you are reading this, you are further along than I was. The reef taught me patience. The fort taught me nerve. The edge is for whoever is brave enough.'", "neutral", "p6a"],
+        ], reward: { xp: 2500, money: 3000 } },
+    { id: "6.2", ch: 6, title: "Salt and Stone", who: "vance", how: "radio", need: { level: 32, lines: ["fort"] },
+        intro: [
+            ["vance", "Captain, it is Eleanor Vance at Sally Port. I have been through the archive again with Ruth's notes beside me.", "happy"],
+            ["vance", "She did not only fish the powder reef. She tagged things down there. Cobia and amberjack, off the steamer wreck. If you can land two of each, I can match your fish against her tag numbers.", "neutral"],
+        ],
+        goal: [{ type: "catchIn", region: "fort", species: "Cobia", n: 2 }, { type: "catchIn", region: "fort", species: "Amberjack", n: 2 }], obj: "Land 2 Cobia and 2 Amberjack at Fort Bastion",
+        outro: [
+            ["vance", "Three of those fish carry her old tags. Forty years, and they are still out there.", "happy"],
+            ["narr", "A second page, water-stained: 'Some fish remember. I tag them so that I can. I never kept a tag number from the edge. I never made it far enough.'", "neutral", "p6b"],
+        ], reward: { xp: 3000, money: 3500 } },
+    { id: "6.3", ch: 6, title: "The Edge", who: "ruth", how: "radio", need: { level: 35 },
+        intro: [
+            ["narr", "The radio crackles, and the voice that comes through is steady and unhurried."],
+            ["ruth", "Captain. I hear you have been reading my pages. Good. I left them for somebody who would.", "happy"],
+            ["ruth", "The Canyon. Where the shelf drops away. I never made it past the rim, and I always told myself next year.", "sad"],
+            ["ruth", "Sail out there. Land a sailfish and let it go. That is all I ever wanted to see: one tagged, one released, in water I could not reach.", "neutral"],
+        ],
+        goal: [{ type: "arrive", region: "canyon" }, { type: "catchIn", region: "canyon", species: "Sailfish", n: 1 }, { type: "release", n: 1 }], obj: "Sail to The Canyon, land a Sailfish and release it",
+        outro: [
+            ["ruth", "I watched you on the chart all the way out. A sail, tail-walking at the edge of the shelf. I could not have asked for more.", "proud"],
+            ["narr", "The last page in the logbook is blank until now. Three words are written across it, in fresh ink: 'Fish on. Always.'", "neutral", "p6c"],
+            ["marlow", "Halyard Point has two legends now, Captain.", "proud"],
+        ], reward: { xp: 5000, money: 6000, flag: "ch6" } },
 ];
 const STORY_DEMO_END = [
     ["marlow", "That's as far as this demo goes, Captain.", "happy"],
@@ -4047,7 +4152,7 @@ const STORY_DEMO_END = [
 // qs.story = { i: index of the current step, st: waiting | offer | active | ready | demoend | done, base: counters when the step began,
 //              n / w / nAll: fish landed since it began (by species / heaviest by species / total), arrived: regions visited,
 //              flags: choices and chapter marks, pages: logbook pages found, met: cast members who have spoken to you, seen: demo ending shown }
-function storyFresh() { return { i: 0, st: "waiting", base: null, n: {}, w: {}, nAll: 0, arrived: { marina: true }, flags: {}, pages: {}, met: {}, seen: false }; }
+function storyFresh() { return { i: 0, st: "waiting", base: null, n: {}, w: {}, nAll: 0, rg: {}, arrived: { marina: true }, flags: {}, pages: {}, met: {}, seen: false }; }
 function storySanitize(s) {
     const d = storyFresh();
     if (!s || typeof s !== "object")
@@ -4058,13 +4163,16 @@ function storySanitize(s) {
     out.st = ["waiting", "offer", "active", "ready", "demoend", "done"].indexOf(s.st) >= 0 ? s.st : "waiting";
     if (out.i >= STORY_STEPS.length)
         out.st = "done";
-    out.base = s.base && typeof s.base === "object" ? { missions: num(s.base.missions), spots: num(s.base.spots), sold: num(s.base.sold) } : null;
+    out.base = s.base && typeof s.base === "object" ? { missions: num(s.base.missions), spots: num(s.base.spots), sold: num(s.base.sold), released: num(s.base.released), trapsSet: num(s.base.trapsSet), hauls: num(s.base.hauls) } : null;
     out.n = {};
     Object.keys(obj(s.n)).forEach((k) => { if (Number.isFinite(s.n[k]))
         out.n[k] = s.n[k]; });
     out.w = {};
     Object.keys(obj(s.w)).forEach((k) => { if (Number.isFinite(s.w[k]))
         out.w[k] = s.w[k]; });
+    out.rg = {};
+    Object.keys(obj(s.rg)).forEach((k) => { if (Number.isFinite(s.rg[k]))
+        out.rg[k] = s.rg[k]; });
     out.nAll = Math.max(0, Math.floor(num(s.nAll)));
     out.arrived = { marina: true };
     Object.keys(obj(s.arrived)).forEach((k) => { if (s.arrived[k] && REGIONS.some((r) => r.id === k))
@@ -4080,17 +4188,22 @@ function storySanitize(s) {
         out.met[k] = true; });
     out.seen = !!s.seen;
     if (out.st === "active" && !out.base)
-        out.base = { missions: 0, spots: 0, sold: 0 };
+        out.base = { missions: 0, spots: 0, sold: 0, released: 0, trapsSet: 0, hauls: 0 };
     return out;
 }
 function storyCur(qs) { return qs.story && qs.story.i < STORY_STEPS.length ? STORY_STEPS[qs.story.i] : null; }
 function storyCapped(step) { return !!BUILD.demo && step.ch > STORY_DEMO_CHAPTERS; }
-function storySnap(qs) { return { missions: qs.stats.missionsDone || 0, spots: Object.keys(qs.stats.spotsFound || {}).length, sold: qs.stats.fishSold || 0 }; }
-function storyCondLine(qs, c) {
-    const S = qs.story, base = S.base || { missions: 0, spots: 0, sold: 0 }, cap = (have, need) => Math.min(have, need) + " / " + need;
+function storySnap(qs) { return { missions: qs.stats.missionsDone || 0, spots: Object.keys(qs.stats.spotsFound || {}).length, sold: qs.stats.fishSold || 0, released: qs.stats.released || 0, trapsSet: qs.stats.trapsSet || 0, hauls: qs.traps && qs.traps.log ? qs.traps.log.hauls || 0 : 0 }; }
+function storyCondLine(qs, c, S0) {
+    const S = S0 || qs.story, base = Object.assign({ missions: 0, spots: 0, sold: 0, released: 0, trapsSet: 0, hauls: 0 }, S.base || {}), cap = (have, need) => Math.min(have, need) + " / " + need;
+    const rn = (id) => STORY_REGION_NAMES[id] || id, arrived = qs.story.arrived;
     if (c.type === "catch") {
         const have = c.species ? S.n[c.species] || 0 : S.nAll;
         return { text: "Land " + c.n + " " + (c.species ? c.species : "fish"), have: cap(have, c.n), met: have >= c.n };
+    }
+    if (c.type === "catchIn") {
+        const have = (S.rg || {})[c.species ? c.region + ":" + c.species : c.region] || 0;
+        return { text: "Land " + c.n + " " + (c.species || "fish") + " at " + rn(c.region), have: cap(have, c.n), met: have >= c.n };
     }
     if (c.type === "weight") {
         const have = S.w[c.species] || 0;
@@ -4112,9 +4225,33 @@ function storyCondLine(qs, c) {
         const have = Object.keys(qs.stats.spotsFound || {}).length - base.spots;
         return { text: "Find " + c.n + " fishing spots", have: cap(have, c.n), met: have >= c.n };
     }
+    if (c.type === "spotsIn") {
+        const have = Object.keys(qs.stats.spotsFound || {}).filter((id) => REGION_SPOTS.some((sp) => sp.id === id && sp.region === c.region)).length;
+        return { text: "Find " + c.n + " fishing grounds at " + rn(c.region), have: cap(have, c.n), met: have >= c.n };
+    }
     if (c.type === "arrive") {
-        const met = !!S.arrived[c.region];
-        return { text: "Sail to " + (STORY_REGION_NAMES[c.region] || c.region), have: met ? "done" : "not yet", met };
+        const met = !!arrived[c.region];
+        return { text: "Sail to " + rn(c.region), have: met ? "done" : "not yet", met };
+    }
+    if (c.type === "release") {
+        const have = (qs.stats.released || 0) - base.released;
+        return { text: "Release " + c.n + " fish", have: cap(have, c.n), met: have >= c.n };
+    }
+    if (c.type === "haul") {
+        const have = (qs.traps && qs.traps.log ? qs.traps.log.hauls || 0 : 0) - base.hauls;
+        return { text: "Haul " + c.n + " " + (c.n === 1 ? "trap" : "traps"), have: cap(have, c.n), met: have >= c.n };
+    }
+    if (c.type === "trapset") {
+        const have = (qs.stats.trapsSet || 0) - base.trapsSet;
+        return { text: "Set " + c.n + " " + (c.n === 1 ? "trap" : "traps"), have: cap(have, c.n), met: have >= c.n };
+    }
+    if (c.type === "mark") {
+        const lm = SEA_LANDMARKS.find((l) => l.id === c.id), met = !!(qs.stats.marksSeen && qs.stats.marksSeen[c.id]);
+        return { text: "Find " + (lm ? lm.name : c.id), have: met ? "found" : "not yet", met };
+    }
+    if (c.type === "line") {
+        const ln = qlLine(c.id), met = !!(qs.lines && qs.lines[c.id] && qs.lines[c.id].st === "done");
+        return { text: "Finish " + (ln ? ln.title : c.id), have: met ? "done" : "not yet", met };
     }
     if (c.type === "own") {
         const it = gearItem(c.gear), met = !!qs.gear.owned[c.gear];
@@ -4135,6 +4272,7 @@ function storyNeedLines(qs, step) {
     const lines = [], lvl = questLevelForXp(qs.xp), n = step.need || {};
     if (n.level)
         lines.push({ text: "Reach level " + n.level, have: "now " + lvl, met: lvl >= n.level });
+    (n.lines || []).forEach((id) => { const ln = qlLine(id), met = !!(qs.lines && qs.lines[id] && qs.lines[id].st === "done"); lines.push({ text: "Finish " + (ln ? ln.title : id), have: met ? "done" : "not yet", met }); });
     return lines;
 }
 function storyEnter(qs) {
@@ -4142,6 +4280,7 @@ function storyEnter(qs) {
     S.n = {};
     S.w = {};
     S.nAll = 0;
+    S.rg = {};
     S.base = storySnap(qs);
 }
 function storyBegin(qs) {
@@ -4263,6 +4402,7 @@ function storyFinish(qs) {
     S.n = {};
     S.w = {};
     S.nAll = 0;
+    S.rg = {};
     return { step, reward: { xp: r.xp || 0, money: r.money || 0 }, wardrobe, chapterDone, storyDone: S.st === "done" };
 }
 function storyOnCatch(qs, c) {
@@ -4273,6 +4413,11 @@ function storyOnCatch(qs, c) {
     S.n[c.species] = (S.n[c.species] || 0) + 1;
     if (!(S.w[c.species] >= c.weight))
         S.w[c.species] = Math.round(c.weight * 10) / 10;
+    if (c.region) {
+        S.rg = S.rg || {};
+        S.rg[c.region] = (S.rg[c.region] || 0) + 1;
+        S.rg[c.region + ":" + c.species] = (S.rg[c.region + ":" + c.species] || 0) + 1;
+    }
 }
 function storyOnArrive(qs, regionId) { if (qs.story && !qs.story.arrived[regionId]) {
     qs.story.arrived[regionId] = true;
@@ -4284,7 +4429,7 @@ function storyCastName(id) { return STORY_CAST[id] ? STORY_CAST[id].name : ""; }
 function storyHud(qs) {
     const S = qs.story, step = storyCur(qs);
     if (S.st === "done" || !step)
-        return { chapter: 5, title: "The story so far is told", obj: "Keep fishing: there's a whole ocean left", where: "", lines: [], state: "done" };
+        return { chapter: STORY_CHAPTERS.length, title: "The story so far is told", obj: "Keep fishing: there's a whole ocean left", where: "", lines: [], state: "done" };
     const ch = STORY_CHAPTERS[step.ch - 1];
     if (S.st === "demoend")
         return { chapter: step.ch, title: "More in the full game", obj: "The rest of Ruth's story is in the full game", where: "", lines: [], state: "demoend" };
@@ -4310,14 +4455,337 @@ function storyHud(qs) {
     return { chapter: step.ch, chapterTitle: ch.title, title: step.title, obj, where, lines, state: S.st };
 }
 // ---------- end of the story section ----------
+// ---------- Quest lines (v38): a small story at each harbor ----------
+// Each area with a harbor has a person who needs a few jobs done. A line is 3 steps; each step is talked over at that harbor (intro), done anywhere in the area (goal),
+// and handed in at the harbor (outro). They use the same scenes, goal checks and save style as the main story, but run side by side (qs.lines[id]).
+// qs.lines[id] = { i: step, st: offer | active | ready | done, base, n, w, nAll, rg: fish landed since the step began (rg = by region and region:species) }
+const QUEST_LINES = [
+    { id: "shoals", region: "shoals", port: "shoalsLanding", who: "wren", title: "Wren's Tide Book", prize: "ext.buff",
+        blurb: "Wren keeps the tides, the bars and the pompano runs in a battered book. She wants it finished before the season turns.",
+        steps: [
+            { id: "shoals.1", title: "Pompano Run", obj: "Land 4 Pompano at Sandy Shoals",
+                intro: [["wren", "Pompano. That is what the whole coast wants this month, and what I cannot get enough of.", "neutral"], ["wren", "Fish the bars on the incoming tide. Bring me four good ones and I will write your name in my book.", "happy"]],
+                goal: [{ type: "catchIn", region: "shoals", species: "Pompano", n: 4 }],
+                outro: [["wren", "Silver and sweet. You fish like somebody who listens to the water.", "happy"]] },
+            { id: "shoals.2", title: "Mapping the Bars", obj: "Find 2 fishing grounds at Sandy Shoals",
+                intro: [["wren", "My book has the tide tables but not the bars. They shift, so nobody trusts an old chart.", "neutral"], ["wren", "Run the shoals and find me two grounds worth writing down. If your sonar blinks, mark it.", "neutral"]],
+                goal: [{ type: "spotsIn", region: "shoals", n: 2 }],
+                outro: [["wren", "Two new pages. Now the book is worth carrying.", "happy"]] },
+            { id: "shoals.3", title: "Crab Cakes", obj: "Set 2 traps and haul 2 traps",
+                intro: [["wren", "Last job, and it is for my stomach. Blue crabs, from your own pots.", "happy"], ["wren", "Set a couple of traps off the sand, leave them to soak, then haul them. The tide does the rest.", "neutral"]],
+                goal: [{ type: "trapset", n: 2 }, { type: "haul", n: 2 }],
+                outro: [["wren", "Crab cakes tonight, and the book is done. Take this. A buff keeps the sun off your neck.", "proud"]] },
+        ] },
+    { id: "cypress", region: "cypress", port: "cypressPort", who: "mags", title: "Mags and the Fish Camp", prize: "bot.bibs",
+        blurb: "Mags runs the stilt camp on Black Water Creek and cooks for anybody who brings her something worth cooking.",
+        steps: [
+            { id: "cypress.1", title: "Camp Supper", obj: "Land 2 Redfish at Cypress Backcountry",
+                intro: [["mags", "You found the camp. Most folks find the mud first.", "happy"], ["mags", "Supper is at dark and the pot is empty. Two redfish from the creeks and you eat free.", "neutral"]],
+                goal: [{ type: "catchIn", region: "cypress", species: "Redfish", n: 2 }],
+                outro: [["mags", "Look at those spots. That's a good fish. Sit down, captain.", "happy"]] },
+            { id: "cypress.2", title: "Crab-Pot Floats", obj: "Find the Crab-Pot Floats, set 1 trap and haul 1 trap",
+                intro: [["mags", "My pots are out by the floats, east of the camp. The tannin hides them till you are right on top.", "neutral"], ["mags", "Find the floats, then set one of your own and haul it. I want to see how you work a pot.", "neutral"]],
+                goal: [{ type: "mark", id: "rm_cy_floats" }, { type: "trapset", n: 1 }, { type: "haul", n: 1 }],
+                outro: [["mags", "Good pot. Clean haul. You can set traps on my water any day.", "happy"]] },
+            { id: "cypress.3", title: "The Snook Slot", obj: "Land 3 Snook and release 2 fish",
+                intro: [["mags", "Snook have a slot. Too small or too big, they go back. My granddad taught me that and the camp has lived on it.", "neutral"], ["mags", "Land three snook, and show me you can let two fish go.", "neutral"]],
+                goal: [{ type: "catchIn", region: "cypress", species: "Snook", n: 3 }, { type: "release", n: 2 }],
+                outro: [["mags", "That is the camp's whole rule: take what the water offers, give back what it needs. Here, a pair of bibs. Cypress mud ruins everything else.", "proud"]] },
+        ] },
+    { id: "tarpon", region: "tarpon", port: "tarponPort", who: "hector", title: "Hector's Silver Kings", prize: "ext.tacklevest",
+        blurb: "Hector guides the pass at Bay Point and he is sure a big silver one is hiding under the old bridge.",
+        steps: [
+            { id: "tarpon.1", title: "Read the Pass", obj: "Find the Pass Stakes and land 3 fish at Tarpon Bay",
+                intro: [["hector", "The pass tells you everything if you stand still. Tide, bait, birds.", "neutral"], ["hector", "Find the Pass Stakes first. They mark the cut. Then fish the bay and show me three.", "happy"]],
+                goal: [{ type: "mark", id: "rm_tb_stakes" }, { type: "catchIn", region: "tarpon", n: 3 }],
+                outro: [["hector", "Now you see it. The cut is a doorway, and everything comes through it.", "happy"]] },
+            { id: "tarpon.2", title: "Bridge Shadows", obj: "Land 2 Snook and 2 Sheepshead at Tarpon Bay",
+                intro: [["hector", "Under the old bridge the shade hides snook, and the pilings hide sheepshead. Two of each.", "neutral"], ["hector", "Watch your line. The pilings eat tackle for breakfast.", "happy"]],
+                goal: [{ type: "catchIn", region: "tarpon", species: "Snook", n: 2 }, { type: "catchIn", region: "tarpon", species: "Sheepshead", n: 2 }],
+                outro: [["hector", "And you kept all your leader. That is more than I can say for me.", "happy"]] },
+            { id: "tarpon.3", title: "Let Her Go", obj: "Land a Tarpon at Tarpon Bay and release it",
+                intro: [["hector", "Tarpon are catch and release only here, and I would not have it any other way.", "neutral"], ["hector", "There is a big one under the Silver King Hole. Land her, let her go, and tell me the tale.", "proud"]],
+                goal: [{ type: "catchIn", region: "tarpon", species: "Tarpon", n: 1 }, { type: "release", n: 1 }],
+                outro: [["hector", "She goes back to the bay and you go back with the story. Here, a tackle vest. It has a pocket for every lie you will tell.", "proud"]] },
+        ] },
+    { id: "flats", region: "flats", port: "flatsPort", who: "kai", title: "Kai on the Flats", prize: "top.fishing",
+        blurb: "Kai poles the shallow flats of Palm Cay and is looking for somebody who can fish quietly.",
+        steps: [
+            { id: "flats.1", title: "Wade Before You Pole", obj: "Land 3 Pompano at Turquoise Flats",
+                intro: [["kai", "Out here the water is two feet deep and clear as a window. Fish see you before you see them.", "neutral"], ["kai", "Start easy. Three pompano off the sandbars, and no splashing.", "happy"]],
+                goal: [{ type: "catchIn", region: "flats", species: "Pompano", n: 3 }],
+                outro: [["kai", "You were quiet. I am impressed.", "happy"]] },
+            { id: "flats.2", title: "The Gray Ghost", obj: "Land a Bonefish at Turquoise Flats and release it",
+                intro: [["kai", "Bonefish. The gray ghost. One flash of tail and she is gone.", "neutral"], ["kai", "Catch one on the mud flats and let her go. They are catch and release, and they only get one chance at a long life.", "neutral"]],
+                goal: [{ type: "catchIn", region: "flats", species: "Bonefish", n: 1 }, { type: "release", n: 1 }],
+                outro: [["kai", "That is my favourite fish in the world. Thank you for letting her go.", "proud"]] },
+            { id: "flats.3", title: "Barracuda Cut", obj: "Find Palm Cay and land 2 Great Barracuda",
+                intro: [["kai", "The cut by the cay is where barracuda sit and stare. Teeth like a hardware store.", "happy"], ["kai", "Find the cay, then bring up two. Use wire. I mean it.", "neutral"]],
+                goal: [{ type: "mark", id: "rm_tf_cay" }, { type: "catchIn", region: "flats", species: "Great Barracuda", n: 2 }],
+                outro: [["kai", "Still got all your fingers. Good. Take this shirt. It is cut for hot flats and cold hands.", "proud"]] },
+        ] },
+    { id: "jetty", region: "jetty", port: "jettyCove", who: "bram", title: "Bram's Jetty Repairs", prize: "top.slicker",
+        blurb: "Bram has patched the long jetty for twenty years and wants someone who knows how to fish stone.",
+        steps: [
+            { id: "jetty.1", title: "Rock Hoppers", obj: "Land 3 Tautog at Jetty Rocks",
+                intro: [["bram", "Tautog live in the cracks I just repaired, and they bite like they own the place.", "happy"], ["bram", "Three of them. Heavy tackle. They will break you off in the boulders if you let them.", "neutral"]],
+                goal: [{ type: "catchIn", region: "jetty", species: "Tautog", n: 3 }],
+                outro: [["bram", "Good. The jetty is holding, and so are you.", "happy"]] },
+            { id: "jetty.2", title: "What Lies Between the Boulders", obj: "Find 3 fishing grounds at Jetty Rocks",
+                intro: [["bram", "The old charts say the boulder fields are one big lump. They are not. There are holes between them.", "neutral"], ["bram", "Find me three grounds. Anywhere the sonar shows a drop.", "neutral"]],
+                goal: [{ type: "spotsIn", region: "jetty", n: 3 }],
+                outro: [["bram", "That is a map I can use. I will pin it up in the cove.", "happy"]] },
+            { id: "jetty.3", title: "Sheepshead Season", obj: "Land 4 Sheepshead and 2 Black Sea Bass at Jetty Rocks",
+                intro: [["bram", "Sheepshead are in. They steal bait like pickpockets, so you will have to be quicker.", "happy"], ["bram", "Four sheepshead and two sea bass. Then you are a Jetty Cove regular.", "neutral"]],
+                goal: [{ type: "catchIn", region: "jetty", species: "Sheepshead", n: 4 }, { type: "catchIn", region: "jetty", species: "Black Sea Bass", n: 2 }],
+                outro: [["bram", "That is a regular's haul. Here, a slicker. The spray off the jetty is no joke.", "proud"]] },
+        ] },
+    { id: "lighthouse", region: "lighthouse", port: "lighthousePort", who: "odell", title: "Odell's Lamp Oil", prize: "top.coat",
+        blurb: "Odell has kept the reef light for thirty years, and he knew Ruth Calloway when she was the best hand on the coast.",
+        steps: [
+            { id: "lighthouse.1", title: "Reef Supper", obj: "Land 4 Yellowtail Snapper at Lighthouse Reef",
+                intro: [["odell", "The reef feeds me, and I feed the light. Yellowtail, four of them.", "neutral"], ["odell", "You have the look of Ruth Calloway's captain. She would have said the same.", "happy"]],
+                goal: [{ type: "catchIn", region: "lighthouse", species: "Yellowtail Snapper", n: 4 }],
+                outro: [["odell", "That is how she fished. Quick hands, quiet boat.", "happy"]] },
+            { id: "lighthouse.2", title: "Dark Nights", obj: "Find The Light and land 3 Mutton Snapper at Lighthouse Reef",
+                intro: [["odell", "Ruth used to anchor under the light on dark nights, before the new lamp. Mutton snapper on the turn of the tide.", "neutral"], ["odell", "Find the light, drop anchor, and fish the way she did.", "neutral"]],
+                goal: [{ type: "mark", id: "lm_lr1" }, { type: "catchIn", region: "lighthouse", species: "Mutton Snapper", n: 3 }],
+                outro: [["odell", "You have her patience. I did not think I would see it again.", "sad"]] },
+            { id: "lighthouse.3", title: "The Keeper's Box", obj: "Land 2 Red Grouper and haul 2 traps at Lighthouse Reef",
+                intro: [["odell", "There is a box in the lamp room with her name on it. I have never opened it. It is not mine.", "sad"], ["odell", "Grouper from the hole, and a couple of pots hauled off the reef. That is the rent I charge to hand over a dead woman's box.", "neutral"]],
+                goal: [{ type: "catchIn", region: "lighthouse", species: "Red Grouper", n: 2 }, { type: "haul", n: 2 }],
+                outro: [["odell", "Fair enough. The box is yours when the time comes. I will call you on the radio when it is. Take my old coat. The lamp room is cold.", "proud"]] },
+        ] },
+    { id: "fort", region: "fort", port: "fortPort", who: "vance", title: "Dr. Vance's Survey", prize: "bot.trousers",
+        blurb: "Dr. Vance is mapping the wrecks around Fort Bastion, and she needs somebody who can tell a reef from a ruin.",
+        steps: [
+            { id: "fort.1", title: "Moat Samples", obj: "Land 3 Atlantic Spadefish at Fort Bastion",
+                intro: [["vance", "The moat is two hundred years old and teeming. I want to know what is living in it.", "happy"], ["vance", "Three spadefish, for the survey. Do not keep them. I only need the count.", "neutral"]],
+                goal: [{ type: "catchIn", region: "fort", species: "Atlantic Spadefish", n: 3 }],
+                outro: [["vance", "Wonderful. Spadefish only live where the structure is sound.", "happy"]] },
+            { id: "fort.2", title: "Wrecks on the Chart", obj: "Find 3 fishing grounds at Fort Bastion",
+                intro: [["vance", "Two galleons, a steamer, and a powder magazine. At least that is what the records say.", "neutral"], ["vance", "Run the area with your sonar and find me three grounds. Ruth did this once, but her notes are gone.", "neutral"]],
+                goal: [{ type: "spotsIn", region: "fort", n: 3 }],
+                outro: [["vance", "That matches nothing in the archive. Which is the best news I have had all year.", "happy"]] },
+            { id: "fort.3", title: "Powder Reef", obj: "Land 2 Mutton Snapper and 2 Gag Grouper at Fort Bastion",
+                intro: [["vance", "The powder reef is where the fort's last magazine went down. The fish there are the oldest I know of.", "neutral"], ["vance", "Two mutton snapper and two gag. Gently. Ruth's notes say she fished here every spring.", "neutral"]],
+                goal: [{ type: "catchIn", region: "fort", species: "Mutton Snapper", n: 2 }, { type: "catchIn", region: "fort", species: "Gag Grouper", n: 2 }],
+                outro: [["vance", "She did. I have her last entry now, thanks to you. Take these. Archive trousers, built for kneeling in the sand.", "proud"]] },
+        ] },
+];
+function qlLine(id) { return QUEST_LINES.find((l) => l.id === id) || null; }
+function qlPort(line) { return PORTS.find((p) => p.id === line.port) || null; }
+function qlReward(line, k) {
+    const r = REGIONS.find((x) => x.id === line.region), lv = (r && r.level) || 1, last = k === line.steps.length - 1;
+    return { xp: Math.round(progNeed(lv) * (last ? 0.9 : 0.4)), money: Math.round(lv * (last ? 90 : 40)) };
+}
+function qlFreshState() { return { i: 0, st: "offer", base: null, n: {}, w: {}, nAll: 0, rg: {} }; }
+function qlSanitize(o) {
+    const out = {};
+    if (!o || typeof o !== "object")
+        return out;
+    const num = (v) => (Number.isFinite(v) ? v : 0);
+    QUEST_LINES.forEach((line) => {
+        const s = o[line.id];
+        if (!s || typeof s !== "object")
+            return;
+        const L = qlFreshState();
+        L.i = Math.max(0, Math.min(line.steps.length, Math.floor(num(s.i))));
+        L.st = ["offer", "active", "ready", "done"].indexOf(s.st) >= 0 ? s.st : "offer";
+        if (L.i >= line.steps.length)
+            L.st = "done";
+        L.base = s.base && typeof s.base === "object" ? { missions: num(s.base.missions), spots: num(s.base.spots), sold: num(s.base.sold), released: num(s.base.released), trapsSet: num(s.base.trapsSet), hauls: num(s.base.hauls) } : null;
+        ["n", "w", "rg"].forEach((k) => { if (s[k] && typeof s[k] === "object")
+            Object.keys(s[k]).forEach((q) => { if (Number.isFinite(s[k][q]))
+                L[k][q] = s[k][q]; }); });
+        L.nAll = Math.max(0, Math.floor(num(s.nAll)));
+        if ((L.st === "active" || L.st === "ready") && !L.base)
+            L.base = storySnap({ stats: { missionsDone: 0, spotsFound: {}, fishSold: 0 }, traps: null });
+        out[line.id] = L;
+    });
+    return out;
+}
+function qlCur(qs, line) { const L = qs.lines[line.id]; return L && L.i < line.steps.length ? line.steps[L.i] : null; }
+function qlGoalLines(qs, line, L) { const step = line.steps[L.i]; return step ? (step.goal || []).map((c) => storyCondLine(qs, c, L)) : []; }
+function qlEnter(qs, L) { L.n = {}; L.w = {}; L.nAll = 0; L.rg = {}; L.base = storySnap(qs); }
+// Moves every line along after anything changed. Events: { type: "offer" | "ready", line, step }
+function qlTick(qs) {
+    const ev = [];
+    if (!qs.lines)
+        qs.lines = {};
+    QUEST_LINES.forEach((line) => {
+        let L = qs.lines[line.id];
+        if (!L) {
+            if (!qs.story.arrived[line.region])
+                return;
+            L = qs.lines[line.id] = qlFreshState();
+            ev.push({ type: "offer", line, step: line.steps[0], first: true });
+            return;
+        }
+        if (L.st === "active") {
+            const step = line.steps[L.i];
+            if (step && (step.goal || []).every((c) => storyCondLine(qs, c, L).met)) {
+                L.st = "ready";
+                ev.push({ type: "ready", line, step });
+            }
+        }
+    });
+    return ev;
+}
+function qlPending(qs, regionId) {
+    for (let i = 0; i < QUEST_LINES.length; i++) {
+        const line = QUEST_LINES[i], L = qs.lines && qs.lines[line.id];
+        if (!L || line.region !== regionId)
+            continue;
+        const step = line.steps[L.i];
+        if (!step)
+            continue;
+        if (L.st === "offer")
+            return { kind: "intro", line, step, who: line.who, how: "talk", lines: step.intro };
+        if (L.st === "ready")
+            return { kind: "outro", line, step, who: line.who, how: "talk", lines: step.outro };
+    }
+    return null;
+}
+function qlApplyScene(qs, lineId, kind, played) {
+    const line = qlLine(lineId), L = line && qs.lines[lineId];
+    let finish = null;
+    if (!line || !L)
+        return { finish: null, events: [] };
+    storyScenePlayed(qs, played);
+    if (kind === "intro" && L.st === "offer") {
+        L.st = "active";
+        qlEnter(qs, L);
+    }
+    else if (kind === "outro" && L.st === "ready") {
+        const k = L.i, step = line.steps[k], r = qlReward(line, k);
+        qs.money += r.money;
+        L.i++;
+        const lineDone = L.i >= line.steps.length;
+        let wardrobe = null;
+        if (lineDone) {
+            L.st = "done";
+            if (line.prize && wardrobeItem(line.prize)) {
+                qs.wardrobe.owned[line.prize] = true;
+                wardrobe = wardrobeItem(line.prize);
+            }
+        }
+        else
+            L.st = "offer";
+        if (L.st !== "active") {
+            L.base = null;
+            L.n = {};
+            L.w = {};
+            L.nAll = 0;
+            L.rg = {};
+        }
+        finish = { line, step, reward: r, lineDone, wardrobe };
+    }
+    return { finish, events: qlTick(qs) };
+}
+function qlOnCatch(qs, c) {
+    if (!qs.lines)
+        return;
+    QUEST_LINES.forEach((line) => {
+        const L = qs.lines[line.id];
+        if (!L || L.st !== "active")
+            return;
+        L.nAll++;
+        L.n[c.species] = (L.n[c.species] || 0) + 1;
+        if (!(L.w[c.species] >= c.weight))
+            L.w[c.species] = Math.round(c.weight * 10) / 10;
+        if (c.region) {
+            L.rg[c.region] = (L.rg[c.region] || 0) + 1;
+            L.rg[c.region + ":" + c.species] = (L.rg[c.region + ":" + c.species] || 0) + 1;
+        }
+    });
+}
+function qlDoneCount(qs) { return QUEST_LINES.filter((l) => qs.lines && qs.lines[l.id] && qs.lines[l.id].st === "done").length; }
+// What the journal shows for a line: { id, title, who, region, port, state: locked | offer | active | ready | done, stepNo, total, obj, where, lines, pin }
+function qlInfo(qs, line) {
+    const L = qs.lines && qs.lines[line.id], r = REGIONS.find((x) => x.id === line.region), port = qlPort(line), who = STORY_CAST[line.who] ? STORY_CAST[line.who].name : "";
+    const base = { id: line.id, title: line.title, blurb: line.blurb, who, whoId: line.who, region: line.region, regionName: r ? r.name : line.region, portName: port ? port.name : "", total: line.steps.length, pinHarbor: port ? { x: port.x, z: port.z, name: port.name } : null, pinArea: r ? { x: r.cx !== undefined ? r.cx : r.x, z: r.cz !== undefined ? r.cz : r.z, name: r.name } : null };
+    if (!L)
+        return { ...base, state: "locked", stepNo: 0, obj: "Sail to " + base.regionName, where: r && r.level ? "Needs level " + r.level : "", lines: [], pin: base.pinArea };
+    const step = line.steps[L.i];
+    if (L.st === "done" || !step)
+        return { ...base, state: "done", stepNo: line.steps.length, obj: "Finished", where: "", lines: [], pin: null };
+    const out = { ...base, state: L.st, stepNo: L.i + 1, stepTitle: step.title, obj: step.obj, where: "", lines: [], pin: null };
+    if (L.st === "offer") {
+        out.where = "Talk to " + who + " at " + base.portName;
+        out.pin = base.pinHarbor;
+    }
+    else if (L.st === "active") {
+        out.lines = qlGoalLines(qs, line, L);
+        out.pin = base.pinArea;
+    }
+    else {
+        out.where = "Report back to " + who + " at " + base.portName;
+        out.pin = base.pinHarbor;
+    }
+    return out;
+}
+function qlAvailableAt(qs, regionId) { return !!qlPending(qs, regionId); }
+// ---------- end of quest lines ----------
+// ---------- Tracking (v38): which quest the HUD follows, and where the chart pin goes ----------
+// qs.track = "" (the main story) | "line:<id>" | "mission:<giver id>". Returns one shape for all three:
+// { key, kind: story | line | job, head, title, obj, where, lines: [{ text, have, met }], state, pin: { x, z, name } | null }
+function questRegionPin(id) { const r = REGIONS.find((x) => x.id === id); return r && !r.home ? { x: r.cx !== undefined ? r.cx : r.x, z: r.cz !== undefined ? r.cz : r.z, name: r.name } : null; }
+function questTrackInfo(qs) {
+    const key = qs.track || "";
+    if (key.indexOf("line:") === 0) {
+        const line = qlLine(key.slice(5)), L = line && qs.lines && qs.lines[line.id];
+        if (line && L && L.st !== "done") {
+            const i = qlInfo(qs, line);
+            return { key, kind: "line", head: "📜 " + line.title.toUpperCase() + " · STEP " + i.stepNo + " OF " + i.total, title: i.stepTitle || line.title, obj: i.obj, where: i.where, lines: i.lines, state: i.state, pin: i.pin };
+        }
+    }
+    else if (key.indexOf("mission:") === 0) {
+        const m = qs.missions.find((x) => x.giver === key.slice(8)), g = m && QUEST_GIVERS.find((x) => x.id === m.giver);
+        if (m && g && m.status !== "done") {
+            const port = g.port ? PORTS.find((p) => p.id === g.port) : null;
+            let where = "", pin = null;
+            if (m.status === "offered") {
+                where = "Talk to " + g.name + " " + (g.port ? "at " + g.where : g.where);
+                pin = port ? { x: port.x, z: port.z, name: port.name } : null;
+            }
+            else if (m.status === "ready") {
+                where = "Hand it in to " + g.name + " " + (g.port ? "at " + g.where : g.where);
+                pin = port ? { x: port.x, z: port.z, name: port.name } : null;
+            }
+            else if (m.region)
+                pin = questRegionPin(m.region);
+            return { key, kind: "job", head: "📋 DAILY JOB · " + g.name.toUpperCase(), title: m.title, obj: m.desc, where, lines: m.status === "active" ? [{ text: m.title, have: m.progress + " / " + m.target, met: false }] : [], state: m.status, pin };
+        }
+    }
+    const h = storyHud(qs);
+    let pin = null;
+    const cur = storyCur(qs);
+    if (cur && qs.story.st === "active") {
+        const g = (cur.goal || []).find((c) => c.type === "arrive" && !qs.story.arrived[c.region]);
+        if (g)
+            pin = questRegionPin(g.region);
+        else {
+            const c2 = (cur.goal || []).find((c) => c.type === "catchIn" && !storyCondLine(qs, c).met);
+            if (c2)
+                pin = questRegionPin(c2.region);
+        }
+    }
+    return { key: "", kind: "story", head: h.state === "done" ? "★ STORY" : "★ CHAPTER " + h.chapter, title: h.title, obj: h.obj, where: h.where, lines: h.lines, state: h.state, pin };
+}
+// ---------- end of tracking ----------
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }, traps: trapsFresh() };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0, released: 0, trapsSet: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), lines: {}, track: "", boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }, traps: trapsFresh() };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
     if (qs.day === key && qs.missions.length === QUEST_GIVERS.length)
         return false;
-    const level = questLevelForXp(qs.xp), old = qs.missions || [];
+    const level = questLevelForXp(qs.xp), old = qs.missions || [], ctx = { found: qs.stats.spotsFound };
+    if (qs.day === key) { // the same day with new givers (an update): keep every job already taken, add the missing ones
+        qs.missions = QUEST_GIVERS.map((g) => old.find((m) => m.giver === g.id) || questGenerate(g, key, level, questSpeciesPool(qs, speciesInfo), questOpenZones(qs), ctx));
+        return true;
+    }
     qs.day = key;
     progTouchDay(qs, key);
     qs.missions = QUEST_GIVERS.map((g) => {
@@ -4326,7 +4794,7 @@ function questEnsureDay(qs, speciesInfo) {
             prev.carried = true;
             return prev;
         } // a finished job from yesterday can still be turned in
-        return questGenerate(g, key, level, questSpeciesPool(qs, speciesInfo), questOpenZones(qs));
+        return questGenerate(g, key, level, questSpeciesPool(qs, speciesInfo), questOpenZones(qs), ctx);
     });
     return true;
 }
@@ -4337,7 +4805,7 @@ function questLoad(speciesInfo) {
         if (raw) {
             const p = JSON.parse(raw);
             if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught) {
-                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), traps: trapsSanitize(p.traps), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), boats: boatsSanitize(p.boats) };
+                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), traps: trapsSanitize(p.traps), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), lines: qlSanitize(p.lines), track: typeof p.track === "string" ? p.track : "", boats: boatsSanitize(p.boats) };
                 if (!p.skiffRule && (p.xp > 0 || p.stats.totalCaught > 0 || (p.story && p.story.i > 0)))
                     qs.story.flags.skiff = true; // a save from before the dock start already has the skiff
                 qs.skiffRule = 1;
@@ -4374,8 +4842,10 @@ function questOnCatch(qs, c) {
     qs.missions.forEach((m) => {
         if (m.status !== "active")
             return;
+        if (m.region && c.region !== m.region)
+            return; // a harbor job counts only what is landed in its own water
         let hit = false;
-        if (m.type === "any")
+        if (m.type === "any" || m.type === "region")
             hit = true;
         else if (m.type === "species")
             hit = c.species === m.species;
@@ -4396,6 +4866,23 @@ function questOnCatch(qs, c) {
     });
     return { moved, ready, flags };
 }
+// Something other than a catch happened: kind = haul (a trap hauled) | release (a fish let go) | sold (fish sold) | find (a fishing ground found, info.region)
+function questOnEvent(qs, kind, n, info) {
+    const type = { haul: "haul", release: "release", sold: "sell", find: "ground" }[kind], moved = [], ready = [];
+    qs.missions.forEach((m) => {
+        if (m.status !== "active" || m.type !== type)
+            return;
+        if (type === "ground" && m.region && !(info && info.region === m.region))
+            return;
+        m.progress = Math.min(m.target, m.progress + (n || 1));
+        moved.push(m);
+        if (m.progress >= m.target) {
+            m.status = "ready";
+            ready.push(m);
+        }
+    });
+    return { moved, ready };
+}
 function questTurnIn(qs, id, speciesInfo) {
     const idx = qs.missions.findIndex((x) => x.id === id);
     const m = qs.missions[idx];
@@ -4408,7 +4895,7 @@ function questTurnIn(qs, id, speciesInfo) {
     qs.stats.missionsDone++;
     if (m.carried) { // yesterday's job: the giver now has today's offer
         const g = QUEST_GIVERS.find((x) => x.id === m.giver);
-        qs.missions[idx] = questGenerate(g, qs.day, questLevelForXp(qs.xp), questSpeciesPool(qs, speciesInfo), questOpenZones(qs));
+        qs.missions[idx] = questGenerate(g, qs.day, questLevelForXp(qs.xp), questSpeciesPool(qs, speciesInfo), questOpenZones(qs), { found: qs.stats.spotsFound });
     }
     else
         m.status = "done";
@@ -8334,6 +8821,32 @@ function seaChartDraw(ctx, W, H, cam, d, o) {
             ctx.fillText((t.kind === "lobster" ? "Lobster trap" : "Crab pot"), x + 8, y + 3);
         }
     });
+    // the tracked quest: a green diamond with a ring
+    if (d.pin) {
+        const x = sx(d.pin.x), y = sy(d.pin.z), r = big ? 7 : 5;
+        ctx.strokeStyle = "rgba(127,230,168,0.75)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#7fe6a8";
+        ctx.strokeStyle = "#0a2736";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(x, y - r);
+        ctx.lineTo(x + r, y);
+        ctx.lineTo(x, y + r);
+        ctx.lineTo(x - r, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (big) {
+            ctx.fillStyle = "rgba(240,246,248,0.97)";
+            ctx.font = "700 10px system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText("📍 " + d.pin.name, x + r + 7, y + 3);
+        }
+    }
     // the course
     if (d.wp && d.boat) {
         const bx = sx(d.boat.x), by = sy(d.boat.z), wx = sx(d.wp.x), wy = sy(d.wp.z);
@@ -8742,6 +9255,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             marks: SEA_LANDMARKS.map((l) => ({ id: l.id, name: l.name, kind: l.kind, x: l.x, z: l.z, seen: !!(u.marksSeen && u.marksSeen[l.id]), spot: l.spot })),
             regions: REGIONS.filter((r) => !r.home).map((r) => ({ id: r.id, name: r.name, cx: r.cx, cz: r.cz, rad: r.rad || 900, open: !!(u.quest && travelOpen(u.quest, r.id)) })),
             traps: ((u.quest && u.quest.traps && u.quest.traps.set) || []).map((t) => ({ id: t.id, kind: t.kind, x: t.x, z: t.z, ground: t.ground })),
+            pin: u.quest ? questTrackInfo(u.quest).pin : null,
             boat: st.nav || null, wp: st.wp || null, home: { x: 46, z: -23 },
         };
     });
@@ -8752,7 +9266,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiNearGiver, setUiNearGiver] = useState(null); // id of a quest giver within talking range, or null
     const [uiProgressOpen, setUiProgressOpen] = useState(false); // level / perks screen
     const [uiMissionsOpen, setUiMissionsOpen] = useState(false); // daily missions overview panel
-    const [uiStoryOpen, setUiStoryOpen] = useState(false); // the story journal (chapters, logbook pages, people met)
+    const [uiStoryOpen, setUiStoryOpen] = useState(false); // the quest journal (story chapters, area stories, daily jobs)
+    const [uiJTab, setUiJTab] = useState("story"); // which tab of the journal: story | lines | jobs
     const [uiStoryScene, setUiStoryScene] = useState(null); // the scene being played: { id, kind, who, how, lines }
     const [uiSpotHint, setUiSpotHint] = useState(""); // radar hint toward the nearest unexplored fishing ground (top-tier sonar only)
     const [uiRackOpen, setUiRackOpen] = useState(false); // the boat tackle rack tray (swap rigs and gear while fishing)
@@ -14367,6 +14882,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     spotsFound[sp.id] = true;
                     setUiSpotsFound({ ...spotsFound });
                     quest.stats.spotsFound[sp.id] = true;
+                    {
+                        const evp = [];
+                        questNoteEvent("find", 1, { region: (REGION_SPOTS.find((x) => x.id === sp.id) || {}).region }, evp);
+                        if (evp.length)
+                            setTimeout(() => marineShowToast(evp.join(" · "), "#7fe6a8", 4), 2800);
+                    }
                     const xpRes = sp.home ? null : awardXp(sp.xp); // the home grounds are known from the start; only remote ones pay
                     questSave(quest);
                     questPush();
@@ -14385,7 +14906,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
         } // a new game starts with the look made in the creator
         stateRef.current.quest = quest;
         homeSyncScenery(); // owned homes fly their pennant instead of the FOR SALE sign
-        let questDialogGiver = null;
+        let questDialogGiver = null, harborDialog = null; // (harborDialog: the daily job being talked over from the boat at a far harbor)
         let storyScene = null, storyRadioTimer = 0, storySceneId = 0; // the scene on screen (mirrors uiStoryScene), seconds of quiet before a radio call comes in
         function questPush() { setUiQuest(JSON.parse(JSON.stringify(quest))); }
         questPush();
@@ -14850,8 +15371,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 stateRef.current.carriedItems.push({ type: "fish", speciesName: c.name, weight: c.weight, id: Math.random().toString(36).slice(2) });
                 marineShowToast(c.level === "ok" ? "🧊 Kept the " + c.name : "⚠️ Kept an illegal " + c.name + ": a game warden could fine you", c.level === "ok" ? "#7fe6a8" : "#ffb84d", c.level === "ok" ? 3 : 5);
             }
-            else
+            else {
                 marineShowToast("🌊 Released the " + c.name + " (" + c.weight.toFixed(c.weight < 10 ? 1 : 0) + " lb)", "#8fd9e6", 3);
+                quest.stats.released = (quest.stats.released || 0) + 1;
+                questNoteEvent("release", 1);
+            }
             setUiCatch((u) => (u && u.reg ? { ...u, reg: { ...u.reg, pending: false, kept: !!keep } } : u));
             if (fishingState.mode === "result")
                 fishingState.resultTimer = Math.min(fishingState.resultTimer, 1.5);
@@ -14909,7 +15433,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const r = questOnCatch(quest, c);
             lastCatchFlags = r.flags;
             storyOnCatch(quest, c);
-            const storyEv = storyTick(quest);
+            qlOnCatch(quest, c);
+            const storyEv = storyTick(quest), qlEv = qlTick(quest);
             const info = questSpeciesInfo.find((s) => s.name === c.species) || { lo: 1, hi: 2, pull: 20 };
             const xpRes = awardXp(progCatchXp(info, c.weight, r.flags, questLevelForXp(quest.xp)));
             questSave(quest);
@@ -14946,9 +15471,68 @@ function DeepWaterPrototype({ onExit, newLook }) {
             }
             if (storyEv.length)
                 storyHandle({ finish: null, events: storyEv }, parts);
+            if (qlEv.length)
+                qlHandle({ finish: null, events: qlEv }, parts);
             if (parts.length)
                 marineShowToast(parts.join(" · "), col, secs);
             return xpRes.gained;
+        }
+        function questNoteEvent(kind, n, info, sink) {
+            const r = questOnEvent(quest, kind, n, info), parts = sink || [];
+            if (r.ready.length)
+                parts.push("📋 Mission ready: " + r.ready[0].title + " — go back to " + questGiverName(r.ready[0].giver));
+            else if (r.moved.length)
+                parts.push("📋 " + r.moved[0].title + ": " + r.moved[0].progress + " / " + r.moved[0].target);
+            const storyEv = storyTick(quest), qlEv = qlTick(quest);
+            if (storyEv.length)
+                storyHandle({ finish: null, events: storyEv }, parts);
+            if (qlEv.length)
+                qlHandle({ finish: null, events: qlEv }, parts);
+            questSave(quest);
+            questPush();
+            if (!sink && parts.length)
+                marineShowToast(parts.join(" · "), "#7fe6a8", 5);
+        }
+        // A step of a harbor quest line has moved (a job offered or ready) or been handed in: toast it and pay the XP through the normal level-up path.
+        function qlHandle(res, sink) {
+            const msgs = [];
+            let secs = 5;
+            const f = res.finish;
+            if (f) {
+                const xr = f.reward.xp ? awardXp(f.reward.xp) : { gained: 0, rewards: [] };
+                let t = "📜 " + f.step.title + " done · +" + xr.gained + " XP · +$" + f.reward.money;
+                if (f.lineDone) {
+                    t += " · ★ " + f.line.title + " finished!";
+                    secs = 8;
+                }
+                if (f.wardrobe) {
+                    t += " · 👔 New outfit: " + f.wardrobe.name;
+                    secs = 8;
+                }
+                if (xr.rewards.length) {
+                    t += " · " + progLevelUpText(xr);
+                    secs = Math.max(secs, 7);
+                }
+                const note = gearUnlockNote();
+                if (note)
+                    t += " · " + note;
+                msgs.push(t);
+            }
+            (res.events || []).forEach((e) => {
+                const port = qlPort(e.line), pn = port ? port.name : "";
+                if (e.type === "offer")
+                    msgs.push("📜 New job at " + pn + ": talk to " + storyCastName(e.line.who) + " (" + e.line.title + ")");
+                else if (e.type === "ready")
+                    msgs.push("📜 " + e.step.title + " done! Report back to " + storyCastName(e.line.who) + " at " + pn);
+            });
+            questSave(quest);
+            questPush();
+            if (!msgs.length)
+                return;
+            if (sink)
+                sink.push(...msgs);
+            else
+                marineShowToast(msgs.join(" · "), "#7fe6a8", secs);
         }
         // ---------- Story: scenes, rewards and the pace of the main storyline ----------
         function storyOpenScene(p) {
@@ -15012,6 +15596,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const ev = storyTick(quest);
             if (ev.length)
                 storyHandle({ finish: null, events: ev });
+            const qev = qlTick(quest);
+            if (qev.length)
+                qlHandle({ finish: null, events: qev });
             const p = storyScene ? null : storyPending(quest);
             if (p && p.how === "radio") {
                 const calm = (fishingState.mode === "idle" || fishingState.mode === "waiting") && !travelAnim && !dockAnim && !questDialogGiver && !shopOpen && !homeOpen && (ashoreMode || Math.abs(boatSpeed) < 1.5);
@@ -15193,6 +15780,12 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     questPush();
                     setUiSell(sellList());
                     marineShowToast("💰 Sold " + sl.n + " fish for $" + sl.total, "#ffd36b", 4);
+                    {
+                        const evp = [];
+                        questNoteEvent("sold", sl.n, null, evp);
+                        if (evp.length)
+                            setTimeout(() => marineShowToast(evp.join(" · "), "#7fe6a8", 4), 2600);
+                    }
                 }
             }
             else if (a.type === "homebuy" || a.type === "homestore" || a.type === "hometake" || a.type === "homerest") {
@@ -15333,8 +15926,50 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 const sc = storyScene;
                 storyScene = null;
                 setUiStoryScene(null);
-                if (sc)
+                if (sc && sc.line)
+                    qlHandle(qlApplyScene(quest, sc.line.id, sc.kind, a.played || []));
+                else if (sc)
                     storyHandle(storyApplyScene(quest, sc.kind, a.flags || [], a.played || []));
+            }
+            else if (a.type === "track") { // choose which quest the HUD card and the chart pin follow ("" = the main story)
+                quest.track = typeof a.key === "string" ? a.key : "";
+                questSave(quest);
+                questPush();
+                const T = questTrackInfo(quest);
+                marineShowToast(quest.track ? "📍 Tracking: " + T.title : "📍 Tracking the main story", "#7fe6a8", 2.5);
+            }
+            else if (a.type === "testline") { // testing: open every area story, finish the current steps, or start them over
+                if (a.op === "unlock")
+                    QUEST_LINES.forEach((l) => { quest.story.arrived[l.region] = true; });
+                else if (a.op === "reset") {
+                    quest.lines = {};
+                    quest.track = "";
+                }
+                else if (a.op === "skip")
+                    QUEST_LINES.forEach((l) => { const L = quest.lines[l.id]; if (!L || L.st === "done")
+                        return; for (let g = 0; g < 4 && quest.lines[l.id].st !== "done"; g++) {
+                        if (quest.lines[l.id].st === "offer")
+                            qlApplyScene(quest, l.id, "intro", []);
+                        quest.lines[l.id].st = "ready";
+                        qlHandle(qlApplyScene(quest, l.id, "outro", []));
+                    } });
+                qlHandle({ finish: null, events: qlTick(quest) });
+                questSave(quest);
+                questPush();
+            }
+            else if (a.type === "lineopen") { // talk to the person with a quest line at this harbor (the harbor button)
+                const lp = qlPending(quest, a.region);
+                if (lp && portNearAt(boatPos.x, boatPos.z))
+                    storyOpenScene(lp);
+                else
+                    marineShowToast("Nobody here has anything for you yet", "#ffb84d", 2);
+            }
+            else if (a.type === "harbortalk") { // the harbor's daily job, from the boat
+                const gv = QUEST_GIVERS.find((g) => g.id === a.giver);
+                if (gv && gv.port && portNearAt(boatPos.x, boatPos.z)) {
+                    harborDialog = gv.id;
+                    setUiQuestDialog(gv.id);
+                }
             }
             else if (a.type === "storyplay") { // answer a radio call from the journal or the HUD
                 const sp = storyPending(quest);
@@ -16408,9 +17043,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
             T.set.push(tr);
             T.own[kind]--;
             T.bait--;
+            quest.stats.trapsSet = (quest.stats.trapsSet || 0) + 1;
             trapSync();
             questSave(quest);
             questPush();
+            questNoteEvent("trapset", 1);
             const cage = trapBuildCage(kind, null);
             cage.position.set(p.x, 1.6, p.z);
             scene.add(cage);
@@ -16509,6 +17146,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const xp = awardXp(6 + nKeep * 3);
             questSave(quest);
             questPush();
+            questNoteEvent("haul", 1);
             H.illegal = ill;
             H.phase = "card";
             setUiTrapHaul({ id: tr.id, kind: tr.kind, name: TRAP_KINDS[tr.kind].name, ground: tr.ground, soak: trapWaitText(H.res.soak), keep: Object.keys(keep).map((k) => keep[k]), release: Object.keys(rel).map((k) => rel[k]), illegalN: ill.length, value: Math.round(value), xp: xp.gained, bait: quest.traps.bait, kept: false, empty: H.rows.length === 0 });
@@ -17252,7 +17890,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             catchPending = { name: sp.name, weight: fs.weight, level: reg.level };
                             fs.resultTimer = 18;
                         } // the player decides: keep or release (a protected fish simply goes back)
-                        const gotXp = questRecordCatch({ species: sp.name, weight: fs.weight, spotType: hf && hf.spot ? hf.spot.type : sp.zone, home: hf && hf.spot ? hf.spot.home : true });
+                        const gotXp = questRecordCatch({ species: sp.name, weight: fs.weight, spotType: hf && hf.spot ? hf.spot.type : sp.zone, home: hf && hf.spot ? hf.spot.home : true, region: regionIdAt(boatPos.x, boatPos.z) });
+                        if (reg && reg.level === "protected") {
+                            quest.stats.released = (quest.stats.released || 0) + 1;
+                            questNoteEvent("release", 1);
+                        }
                         fs.resultText += ` · +${gotXp} XP`;
                         const wr = fs.weightRoll;
                         setUiCatch({
@@ -17432,7 +18074,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     const pk = np ? np.id + (Math.abs(boatSpeed) > DOCK_MAX_SPEED ? ":fast" : ":near") : "none";
                     if (pk !== prevPortUi) {
                         prevPortUi = pk;
-                        setUiPort(np ? { id: np.id, name: np.name, shop: np.shop, kind: np.kind, fast: pk.endsWith(":fast") } : null);
+                        setUiPort(np ? { id: np.id, name: np.name, shop: np.shop, kind: np.kind, region: np.region, fast: pk.endsWith(":fast") } : null);
                     }
                 }
                 if (walkMode !== prevWalkMode) {
@@ -18144,6 +18786,17 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         prevNearShop = false;
                         setUiNearShop(false);
                     }
+                    if (stateRef.current.questCloseRequested) {
+                        stateRef.current.questCloseRequested = false;
+                        if (harborDialog) {
+                            harborDialog = null;
+                            setUiQuestDialog(null);
+                        }
+                    }
+                    if (harborDialog && !portNearAt(boatPos.x, boatPos.z)) {
+                        harborDialog = null;
+                        setUiQuestDialog(null);
+                    } // sailed out of range
                 }
                 if (!ashoreMode && (questDialogGiver || prevNearGiver || prevQuestDialog)) { // stepped back onto the boat: close any conversation
                     questDialogGiver = null;
@@ -18598,7 +19251,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     React.createElement("button", { onClick: () => setUiShowSonar((v) => !v), "aria-pressed": uiShowSonar, "aria-label": "Sonar", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiShowSonar ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiShowSonar ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83D\uDCE1"),
                     React.createElement("button", { onClick: () => setUiMiniOn((v) => !v), "aria-pressed": uiMiniOn, "aria-label": "Mini-map", style: { flex: "0 0 auto", cursor: "pointer", padding: "2px 7px", borderRadius: 5, border: "1px solid " + (uiMiniOn ? "#8fd97a" : "rgba(255,255,255,0.2)"), background: uiMiniOn ? "rgba(143,217,122,0.15)" : "transparent", color: "inherit", fontSize: 13 } }, "\uD83E\uDDED")),
                 tapPrompt && React.createElement("div", { style: { fontSize: 11, marginTop: 5, color: "#ffb84d", borderRadius: 4, ...(uiNearGiver && hintOn("talk") ? HINT_GLOW : {}) } }, tapPrompt),
-                TOUCH_UI && !uiHudOpen && uiQuest && hintLvlOk && !uiHintsOff && !tapPrompt && (() => { const h = storyHud(uiQuest); return h && h.obj && h.state !== "done" && h.state !== "demoend" ? React.createElement("div", { "data-hint": "objective", style: { fontSize: 11, marginTop: 5, color: "#f0d9a8", lineHeight: 1.3, animation: "hintBreathe 3.2s ease-in-out infinite" } },
+                TOUCH_UI && !uiHudOpen && uiQuest && hintLvlOk && !uiHintsOff && !tapPrompt && (() => { const h = questTrackInfo(uiQuest); return h && h.obj && h.state !== "done" && h.state !== "demoend" ? React.createElement("div", { "data-hint": "objective", style: { fontSize: 11, marginTop: 5, color: "#f0d9a8", lineHeight: 1.3, animation: "hintBreathe 3.2s ease-in-out infinite" } },
                     "\uD83C\uDFAF ",
                     h.obj,
                     h.where ? " · " + h.where : "") : null; })())),
@@ -18639,6 +19292,23 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             " ready to turn in")));
                 })(),
                 uiQuest && (() => {
+                    const T = questTrackInfo(uiQuest);
+                    if (T.kind !== "story") { // a quest line or a daily job is being tracked
+                        const todo2 = T.lines.find((l) => !l.met), near = T.pin ? { dx: T.pin.x - uiBoatXZ.x, dz: T.pin.z - uiBoatXZ.z } : null;
+                        return (React.createElement("div", { onClick: () => { setUiJTab(T.kind === "line" ? "lines" : "jobs"); setUiStoryOpen(true); }, style: { marginTop: 6, cursor: "pointer", pointerEvents: "auto", padding: "5px 7px", borderRadius: 4, background: "rgba(111,214,232,0.08)", border: "1px solid rgba(111,214,232,0.4)" } },
+                            React.createElement("div", { style: { fontSize: 9, letterSpacing: 1.2, color: "#6fd6e8" } }, T.head),
+                            React.createElement("div", { style: { fontSize: 11, marginTop: 1 } }, T.obj),
+                            T.where && React.createElement("div", { style: { fontSize: 10, opacity: 0.8 } }, T.where),
+                            todo2 && T.state === "active" && React.createElement("div", { style: { fontSize: 10, color: "#6fd6e8" } },
+                                todo2.text,
+                                " \u00B7 ",
+                                todo2.have),
+                            near && React.createElement("div", { style: { fontSize: 10, color: "#7fe6a8" } },
+                                "\uD83D\uDCCD ",
+                                T.pin.name,
+                                ": ",
+                                Math.hypot(near.dx, near.dz) < 150 ? "here" : compassFrom(near.dx, near.dz) + " · " + seaDistText(Math.hypot(near.dx, near.dz)))));
+                    }
                     const h = storyHud(uiQuest), pend = storyPending(uiQuest), call = pend && pend.how === "radio", todo = h.lines.find((l) => !l.met);
                     return (React.createElement("div", { onClick: () => { if (call)
                             stateRef.current.questAction = { type: "storyplay" };
@@ -18729,11 +19399,26 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 sonarSpec.showsBaitfish || (uiQuest && playStats(uiQuest).flags.baitfish) ? " · bait + game" : " · game only"),
             uiSpotHint && React.createElement("div", { style: { fontSize: 9, color: "#7fe6a8", marginTop: 2 } }, uiSpotHint)),
         uiNetEquipped && uiWalkMode && !uiWheelOpen && (React.createElement("button", { onClick: () => { stateRef.current.netThrowButtonRequested = true; }, style: { position: "absolute", bottom: 150, left: "50%", transform: "translateX(-50%)", fontSize: 13, padding: "8px 18px", borderRadius: 6, cursor: "pointer", border: "1px solid #8fd97a", background: "rgba(14,31,40,0.9)", color: "#8fd97a", fontWeight: 600, zIndex: 60 } }, "\uD83E\uDD45 Throw Net")),
-        !uiAshoreMode && uiPort && uiDock === "none" && uiMode !== "bite" && uiMode !== "fighting" && !uiWheelOpen && !uiShopOpen && !uiHomeOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiTravelOpen && !uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
+        !uiAshoreMode && uiPort && uiDock === "none" && !uiStoryScene && !uiQuestDialog && uiMode !== "bite" && uiMode !== "fighting" && !uiWheelOpen && !uiShopOpen && !uiHomeOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && !uiTravelOpen && !uiCoolerOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
             React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } },
                 "\u2693 ",
                 uiPort.name),
-            React.createElement("button", { disabled: uiPort.fast, onClick: () => { stateRef.current.portServicesRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: uiPort.fast ? "default" : "pointer", border: "1px solid " + (uiPort.fast ? "rgba(255,255,255,0.3)" : "#ffb84d"), background: "rgba(14,31,40,0.92)", color: uiPort.fast ? "rgba(255,255,255,0.5)" : "#ffb84d", fontWeight: 600 } }, uiPort.fast ? "Slow down for services" : uiPort.kind === "home" ? (uiQuest && uiQuest.homes && uiQuest.homes.owned[uiPort.id] ? "🏡 Go home" : "🏡 View the house for sale") : "🏪 Harbor services"))),
+            React.createElement("button", { disabled: uiPort.fast, onClick: () => { stateRef.current.portServicesRequested = true; }, style: { fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: uiPort.fast ? "default" : "pointer", border: "1px solid " + (uiPort.fast ? "rgba(255,255,255,0.3)" : "#ffb84d"), background: "rgba(14,31,40,0.92)", color: uiPort.fast ? "rgba(255,255,255,0.5)" : "#ffb84d", fontWeight: 600 } }, uiPort.fast ? "Slow down for services" : uiPort.kind === "home" ? (uiQuest && uiQuest.homes && uiQuest.homes.owned[uiPort.id] ? "🏡 Go home" : "🏡 View the house for sale") : "🏪 Harbor services"),
+            (() => {
+                if (!uiQuest || uiPort.fast || uiPort.kind === "home")
+                    return null;
+                const lp = qlPending(uiQuest, uiPort.region), gv = QUEST_GIVERS.find((g) => g.port === uiPort.id), gm = gv ? uiQuest.missions.find((m) => m.giver === gv.id) : null;
+                const bs = (c) => ({ fontSize: 13, padding: "9px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid " + c, background: "rgba(14,31,40,0.92)", color: c });
+                return (React.createElement(React.Fragment, null,
+                    lp && React.createElement("button", { style: bs("#7fe6a8"), onClick: () => { stateRef.current.questAction = { type: "lineopen", region: uiPort.region }; } },
+                        "\u2605 ",
+                        lp.kind === "intro" ? "Talk to " : "Report to ",
+                        STORY_CAST[lp.who].name),
+                    gv && gm && React.createElement("button", { style: bs("#8fd9e6"), onClick: () => { stateRef.current.questAction = { type: "harbortalk", giver: gv.id }; } },
+                        "\uD83D\uDCAC ",
+                        gv.name,
+                        gm.status === "ready" ? " · reward ready" : gm.status === "offered" ? " · job today" : gm.status === "active" ? " · job in progress" : "")));
+            })())),
         !uiAshoreMode && uiDock !== "none" && !uiWheelOpen && !uiShopOpen && !uiGearOpen && !uiWardrobeOpen && !uiBoatYardOpen && !uiProgressOpen && !uiStoryOpen && !uiMissionsOpen && (React.createElement("div", { style: { position: "absolute", bottom: 205, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 60 } },
             uiDock === "docked" && React.createElement("div", { style: { fontSize: 11, color: "#eaf3f5", background: "rgba(14,31,40,0.85)", borderRadius: 5, padding: "3px 9px" } }, TOUCH_UI ? "Tied up" : React.createElement(React.Fragment, null,
                 "Tied up \u00B7 ",
@@ -18750,10 +19435,18 @@ function DeepWaterPrototype({ onExit, newLook }) {
         uiStoryScene && uiQuest && (React.createElement(StoryScene, { key: uiStoryScene.id, scene: uiStoryScene, qs: uiQuest, onDone: (flags, played) => { stateRef.current.questAction = { type: "storydone", flags, played }; } })),
         uiStoryOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 560, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-                React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\u2605 The Story"),
+                React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCD6 Quest Journal"),
                 React.createElement("button", { onClick: () => setUiStoryOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
-            React.createElement(StoryPanel, { qs: uiQuest, send: (a) => { stateRef.current.questAction = a; if (a.type === "storyplay" || a.op === "replay")
-                    setUiStoryOpen(false); }, showTesting: BUILD.dev }))),
+            React.createElement(JournalTabs, { qs: uiQuest, tab: uiJTab, setTab: setUiJTab }),
+            (() => {
+                const send = (a) => { stateRef.current.questAction = a; if (a.type === "storyplay" || a.op === "replay")
+                    setUiStoryOpen(false); };
+                if (uiJTab === "lines")
+                    return React.createElement(LinesPanel, { qs: uiQuest, send: send, showTesting: BUILD.dev });
+                if (uiJTab === "jobs")
+                    return React.createElement(JobsPanel, { qs: uiQuest, send: send, showTesting: BUILD.dev });
+                return React.createElement(StoryPanel, { qs: uiQuest, send: send, showTesting: BUILD.dev });
+            })())),
         uiQuestDialog && uiQuest && (() => {
             const g = QUEST_GIVERS.find((x) => x.id === uiQuestDialog);
             const m = uiQuest.missions.find((x) => x.giver === uiQuestDialog);
@@ -18863,32 +19556,6 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f0c674" } }, "\u2B50 Captain's Progress"),
                 React.createElement("button", { onClick: () => setUiProgressOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
             React.createElement(ProgressPanel, { qs: uiQuest, send: (a) => { stateRef.current.questAction = a; }, showTesting: BUILD.dev }))),
-        uiMissionsOpen && uiQuest && (() => {
-            const lvl = questLevelForXp(uiQuest.xp);
-            return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
-                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
-                    React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCCB Daily Missions"),
-                    React.createElement("button", { onClick: () => setUiMissionsOpen(false), style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
-                React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 12 } },
-                    "Level ",
-                    lvl,
-                    " \u00B7 ",
-                    uiQuest.xp,
-                    " XP \u00B7 $",
-                    uiQuest.money,
-                    " \u00B7 ",
-                    uiQuest.stats.totalCaught,
-                    " fish landed \u00B7 ",
-                    uiQuest.stats.missionsDone,
-                    " missions done. New missions every day (",
-                    uiQuest.day,
-                    "). Talk to the person to accept, then come back to collect."),
-                uiQuest.missions.map((m) => {
-                    const g = QUEST_GIVERS.find((x) => x.id === m.giver);
-                    return React.createElement(MissionCard, { key: m.id, m: m, giverName: g ? g.name + " · " + g.role + ", " + g.where : "" });
-                }),
-                React.createElement("button", { onClick: () => { stateRef.current.questAction = { type: "nextday" }; }, style: { marginTop: 10, fontSize: 11, padding: "6px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,184,77,0.4)", background: "rgba(255,184,77,0.08)", color: "#ffb84d" } }, "Skip to next day (testing)")));
-        })(),
         React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 700, background: "#04101a", opacity: uiTravel.show ? 1 : 0, transition: "opacity 1s ease", pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#eaf3f5" } },
             React.createElement("div", { style: { fontSize: 44 } }, uiTravel.icon),
             React.createElement("div", { style: { fontSize: 20, fontWeight: 700, marginTop: 8, color: "#7fe6a8" } },
@@ -19058,8 +19725,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "👁", label: uiFirstPerson ? "Exit 1st" : "1st Person", active: uiFirstPerson, enabled: uiWalkMode, why: "Walk on deck for first-person", run: rq("fpToggleRequested") },
                         { icon: "💡", label: "Hints", active: !uiHintsOff, enabled: true, keepOpen: true, run: hintsFlip },
                         { icon: "⭐", label: "Progress", enabled: true, run: () => setUiProgressOpen(true) },
-                        { icon: "★", label: "Story", enabled: true, run: () => setUiStoryOpen(true) },
-                        { icon: "📋", label: "Missions", enabled: true, run: () => setUiMissionsOpen(true) },
+                        { icon: "★", label: "Story", enabled: true, run: () => { setUiJTab("story"); setUiStoryOpen(true); } },
+                        { icon: "📋", label: "Journal", enabled: true, run: () => { setUiJTab(uiQuest && uiQuest.track ? (uiQuest.track.indexOf("line:") === 0 ? "lines" : "jobs") : "jobs"); setUiStoryOpen(true); } },
                         { icon: "🧭", label: "Chart", enabled: true, run: () => setUiChartOpen(true) },
                         { icon: "🗺️", label: "Fishing Spots", enabled: true, run: () => setUiSpotsOpen(true) },
                         { icon: "◎", label: "Mini-map", active: uiMiniOn, enabled: true, keepOpen: true, run: () => setUiMiniOn((v) => !v) },
@@ -20623,6 +21290,102 @@ function StoryScene({ scene, qs, onDone }) {
                     React.createElement("span", null, isChoice ? "" : shown >= text.length ? "tap to continue ▼" : ""))))));
 }
 // The journal: what you are doing now, the chapters, the logbook pages found, and everyone you have met.
+// ---------- Quest journal tabs (v38): area stories and daily jobs, beside the main story ----------
+function JournalTabs({ qs, tab, setTab }) {
+    const lineAttn = QUEST_LINES.filter((l) => { const L = qs.lines && qs.lines[l.id]; return L && (L.st === "offer" || L.st === "ready"); }).length;
+    const jobAttn = qs.missions.filter((m) => m.status === "ready").length;
+    const tabs = [["story", "★ Story", 0], ["lines", "📜 Area stories", lineAttn], ["jobs", "📋 Daily jobs", jobAttn]];
+    return (React.createElement("div", { style: { maxWidth: 560, margin: "0 auto 12px", display: "flex", gap: 6 } }, tabs.map(([id, label, n]) => (React.createElement("button", { key: id, onClick: () => setTab(id), style: { flex: 1, fontSize: 12, padding: "8px 4px", borderRadius: 6, cursor: "pointer", border: "1px solid " + (tab === id ? "#ffb84d" : "rgba(255,255,255,0.2)"), background: tab === id ? "rgba(255,184,77,0.14)" : "rgba(255,255,255,0.04)", color: tab === id ? "#ffb84d" : "#eaf3f5", fontWeight: tab === id ? 700 : 400 } },
+        label,
+        n > 0 && React.createElement("span", { style: { marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 8, background: "#7fe6a8", color: "#04101a", fontWeight: 700 } }, n))))));
+}
+function TrackButton({ qs, k, send }) {
+    const on = (qs.track || "") === k;
+    return React.createElement("button", { onClick: () => send({ type: "track", key: on ? "" : k }), style: { fontSize: 11, padding: "4px 10px", borderRadius: 5, cursor: "pointer", border: "1px solid " + (on ? "#7fe6a8" : "rgba(255,255,255,0.3)"), background: on ? "rgba(127,230,168,0.15)" : "rgba(255,255,255,0.05)", color: on ? "#7fe6a8" : "#eaf3f5", whiteSpace: "nowrap" } }, on ? "📍 Tracking" : "📍 Track");
+}
+function LinesPanel({ qs, send, showTesting }) {
+    const card = { padding: "10px 12px", marginBottom: 8, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" };
+    const lvl = questLevelForXp(qs.xp), order = REGIONS.map((r) => r.id);
+    const lines = QUEST_LINES.slice().sort((a, b) => order.indexOf(a.region) - order.indexOf(b.region));
+    const chip = { locked: ["Not found yet", "#8a9aa0"], offer: ["New: talk to them", "#ffb84d"], active: ["In progress", "#6fd6e8"], ready: ["Ready: report back", "#7fe6a8"], done: ["Finished", "#8a9aa0"] };
+    return (React.createElement("div", { style: { maxWidth: 560, margin: "0 auto" } },
+        React.createElement("div", { style: { fontSize: 11, opacity: 0.7, marginBottom: 10 } },
+            "Every harbor has somebody who needs a hand. Their story starts the first time you sail there; talk to them at the harbor (the \u2605 button), do the job anywhere in their water, and report back. ",
+            qlDoneCount(qs),
+            " of ",
+            QUEST_LINES.length,
+            " finished."),
+        lines.map((line) => {
+            const i = qlInfo(qs, line), c = chip[i.state], cast = STORY_CAST[line.who], r = REGIONS.find((x) => x.id === line.region), locked = i.state === "locked", demoLocked = BUILD.demo && BUILD.demoRegions.indexOf(line.region) < 0;
+            return (React.createElement("div", { key: line.id, style: { ...card, opacity: locked || i.state === "done" ? 0.75 : 1, border: "1px solid " + (i.state === "ready" || i.state === "offer" ? "rgba(127,230,168,0.5)" : "rgba(255,255,255,0.1)") } },
+                React.createElement("div", { style: { display: "flex", gap: 10 } },
+                    React.createElement("div", { style: { flex: "0 0 auto", borderRadius: 8, overflow: "hidden", border: "2px solid " + (STORY_ACCENT[line.who] || "#ffb84d") } }, locked ? React.createElement("div", { style: { width: 52, height: 62, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5, fontSize: 20 } }, r ? r.icon : "?") : React.createElement(Portrait, { spec: storyPortraitSpec(line.who, qs), mood: "neutral", size: 52 })),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 8 } },
+                            React.createElement("div", { style: { fontSize: 14, fontWeight: 700 } }, line.title),
+                            React.createElement("div", { style: { fontSize: 10, color: c[1], whiteSpace: "nowrap" } }, demoLocked ? "🔒 Full game" : c[0])),
+                        React.createElement("div", { style: { fontSize: 10, opacity: 0.6 } }, locked ? i.regionName : cast.name + " · " + i.portName),
+                        React.createElement("div", { style: { fontSize: 12, opacity: 0.85, marginTop: 4 } }, locked ? "Sail to " + i.regionName + (r && r.level ? " (level " + r.level + ")" : "") + " to meet them." : line.blurb))),
+                !locked && i.state !== "done" && (React.createElement("div", { style: { marginTop: 8 } },
+                    React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.2, color: "#ffb84d" } },
+                        "STEP ",
+                        i.stepNo,
+                        " OF ",
+                        i.total,
+                        " \u00B7 ",
+                        i.stepTitle),
+                    React.createElement("div", { style: { fontSize: 12, marginTop: 2 } }, i.obj),
+                    i.where && React.createElement("div", { style: { fontSize: 12, color: "#6fd6e8", marginTop: 2 } }, i.where),
+                    i.lines.length > 0 && React.createElement("div", { style: { marginTop: 6, display: "flex", flexDirection: "column", gap: 3 } }, i.lines.map((l, k) => React.createElement("div", { key: k, style: { display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, color: l.met ? "#7fe6a8" : "#eaf3f5" } },
+                        React.createElement("span", null,
+                            l.met ? "✔ " : "○ ",
+                            l.text),
+                        React.createElement("span", { style: { opacity: 0.75, whiteSpace: "nowrap" } }, l.have)))),
+                    React.createElement("div", { style: { marginTop: 8 } },
+                        React.createElement(TrackButton, { qs: qs, k: "line:" + line.id, send: send })))),
+                i.state === "done" && wardrobeItem(line.prize) && React.createElement("div", { style: { fontSize: 11, marginTop: 6, color: "#7fe6a8" } },
+                    "\u2714 Reward: ",
+                    wardrobeItem(line.prize).name)));
+        }),
+        showTesting && (React.createElement("div", { style: { ...card, marginTop: 12, border: "1px dashed rgba(255,184,77,0.5)" } },
+            React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.4, color: "#ffb84d", textTransform: "uppercase" } }, "Testing"),
+            React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 } }, [["Unlock all lines", { type: "testline", op: "unlock" }], ["Finish current steps", { type: "testline", op: "skip" }], ["Reset lines", { type: "testline", op: "reset" }]].map(([label, a]) => (React.createElement("button", { key: label, onClick: () => send(a), style: { fontSize: 12, padding: "6px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,184,77,0.6)", background: "rgba(255,255,255,0.05)", color: "#ffb84d" } }, label))))))));
+}
+function JobsPanel({ qs, send, showTesting }) {
+    const lvl = questLevelForXp(qs.xp), shown = qs.missions.filter((m) => { const g = QUEST_GIVERS.find((x) => x.id === m.giver); return g && (!g.region || (qs.story && qs.story.arrived[g.region])); });
+    const groups = [{ name: "Marina", list: shown.filter((m) => !(QUEST_GIVERS.find((x) => x.id === m.giver) || {}).region) }].concat(REGIONS.filter((r) => !r.home).map((r) => ({ name: r.name, list: shown.filter((m) => m.region === r.id) }))).filter((g) => g.list.length);
+    const hidden = QUEST_GIVERS.length - shown.length;
+    return (React.createElement("div", { style: { maxWidth: 560, margin: "0 auto" } },
+        React.createElement("div", { style: { fontSize: 11, opacity: 0.65, marginBottom: 12 } },
+            "Level ",
+            lvl,
+            " \u00B7 ",
+            qs.xp,
+            " XP \u00B7 $",
+            qs.money,
+            " \u00B7 ",
+            qs.stats.totalCaught,
+            " fish landed \u00B7 ",
+            qs.stats.missionsDone,
+            " jobs done. New jobs every day (",
+            qs.day,
+            "). Talk to the person to accept (at the marina, or at the harbor with the \uD83D\uDCAC button), then come back to collect."),
+        groups.map((g) => (React.createElement("div", { key: g.name },
+            React.createElement("div", { style: { fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", opacity: 0.6, margin: "14px 0 8px" } }, g.name),
+            g.list.map((m) => {
+                const gv = QUEST_GIVERS.find((x) => x.id === m.giver);
+                return (React.createElement("div", { key: m.id },
+                    React.createElement(MissionCard, { m: m, giverName: gv ? gv.name + " · " + gv.role + ", " + gv.where : "" }),
+                    m.status !== "done" && React.createElement("div", { style: { margin: "-2px 0 10px", textAlign: "right" } },
+                        React.createElement(TrackButton, { qs: qs, k: "mission:" + m.giver, send: send }))));
+            })))),
+        hidden > 0 && React.createElement("div", { style: { fontSize: 11, opacity: 0.55, marginTop: 10 } },
+            hidden,
+            " more ",
+            hidden === 1 ? "person has" : "people have",
+            " daily jobs at harbors you have not sailed to yet."),
+        showTesting && React.createElement("button", { onClick: () => send({ type: "nextday" }), style: { marginTop: 10, fontSize: 11, padding: "6px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,184,77,0.4)", background: "rgba(255,184,77,0.08)", color: "#ffb84d" } }, "Skip to next day (testing)")));
+}
 function StoryPanel({ qs, send, showTesting }) {
     const S = qs.story, hud = storyHud(qs), pend = storyPending(qs), pages = storyPageList(qs);
     const firstIdx = (n) => STORY_STEPS.findIndex((st) => st.ch === n);
@@ -20633,7 +21396,9 @@ function StoryPanel({ qs, send, showTesting }) {
     return (React.createElement("div", { style: { maxWidth: 560, margin: "0 auto" } },
         React.createElement("div", { style: { ...card, border: "1px solid rgba(255,184,77,0.45)", background: "rgba(255,184,77,0.07)" } },
             React.createElement("div", { style: { fontSize: 10, letterSpacing: 1.4, color: "#ffb84d", textTransform: "uppercase" } }, hud.state === "done" ? "The story so far" : "Chapter " + hud.chapter + (hud.chapterTitle ? " · " + hud.chapterTitle : "")),
-            React.createElement("div", { style: { fontSize: 16, fontWeight: 700, marginTop: 3 } }, hud.title),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 } },
+                React.createElement("div", { style: { fontSize: 16, fontWeight: 700, marginTop: 3 } }, hud.title),
+                hud.state !== "done" && hud.state !== "demoend" && React.createElement(TrackButton, { qs: qs, k: "", send: send })),
             React.createElement("div", { style: { fontSize: 13, marginTop: 4, opacity: 0.92 } }, hud.obj),
             hud.where && React.createElement("div", { style: { fontSize: 12, marginTop: 3, color: "#6fd6e8" } }, hud.where),
             hud.lines.length > 0 && (React.createElement("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 4 } }, hud.lines.map((l, i) => (React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, color: l.met ? "#7fe6a8" : "#eaf3f5" } },
