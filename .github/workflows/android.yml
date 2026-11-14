@@ -1,0 +1,84 @@
+name: Build Android APK
+
+# Builds the game into an installable Android app (.apk) and posts it as a release.
+# Runs on every push to main, or by hand from the Actions tab (Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Gather the web files (with the game libraries, so it works offline)
+        working-directory: android-app
+        run: |
+          rm -rf www && mkdir -p www/vendor
+          cp ../index.html ../manifest.webmanifest ../icon-192.png ../icon-512.png ../icon-maskable-512.png ../apple-touch-icon.png www/
+          curl -fsSL --retry 4 -o www/vendor/three.min.js https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+          curl -fsSL --retry 4 -o www/vendor/react.production.min.js https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js
+          curl -fsSL --retry 4 -o www/vendor/react-dom.production.min.js https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js
+          ls -la www www/vendor
+
+      - name: Create the Android project
+        working-directory: android-app
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx cap sync android
+
+      - name: Icon, fullscreen and version
+        working-directory: android-app
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          VERSION_NAME: "0.38"
+        run: python3 patch_android.py
+
+      - name: Build the APK
+        working-directory: android-app/android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Sign the APK
+        working-directory: android-app
+        run: |
+          set -e
+          UNSIGNED=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks charterlife-demo.jks --ks-pass pass:charterlife --key-pass pass:charterlife --out "../CharterLife-demo.apk" aligned.apk
+          "$BT/apksigner" verify --print-certs "../CharterLife-demo.apk" | head -3
+          ls -la "../CharterLife-demo.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charter-life-demo-apk
+          path: CharterLife-demo.apk
+
+      - name: Publish as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create android-latest "CharterLife-demo.apk" \
+            --title "Charter Life Demo for Android (build ${{ github.run_number }})" \
+            --notes "Android app for the Charter Life demo, built from commit ${GITHUB_SHA::7}. Open this page on your phone, download CharterLife-demo.apk, and tap it to install (Android will ask you to allow installs from your browser the first time)."

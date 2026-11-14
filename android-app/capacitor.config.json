@@ -1,0 +1,12 @@
+{
+  "appId": "com.wolfarka.charterlife",
+  "appName": "Charter Life",
+  "webDir": "www",
+  "backgroundColor": "#08161c",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
