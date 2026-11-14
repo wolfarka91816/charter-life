@@ -10,6 +10,9 @@ GitHub builds it for you. Every push to `main` runs `.github/workflows/android.y
 (Capacitor), signs it, and publishes `CharterLife-demo.apk` to the **android-latest** release. Takes about 5 minutes.
 To build by hand: Actions tab > Build Android APK > Run workflow.
 
+Rewarded ads use Google's AdMob plugin with Google's **test** ad ids, so the ads you see are labelled "Test Ad" and earn nothing.
+To go live: make an AdMob account, then replace the test app id in `android-app/patch_android.py` and `AD_UNIT_ID` in the game file.
+
 The signing key `android-app/charterlife-demo.jks` is a demo-only key kept in the repo on purpose so every build is signed the same way
 and installs over the previous one without losing saves. It is not a secret and must not be reused for anything else.
 

@@ -49,7 +49,7 @@ const BUILD = {
     dev: false, // true in the dev build: testing shortcuts, Summon, debug bar, DEV badge
     demo: true, // true in the demo: level cap, limited regions, no homes, no test shortcuts, DEMO badge
     fullscreen: true, // true in the standalone web page: the game fills the window instead of a 640 px box
-    version: "0.38", // shown on the title screen and badges (bump it when a batch of changes ships)
+    version: "0.39", // shown on the title screen and badges (bump it when a batch of changes ships)
     build: "14 Nov 2026", // the build date: build.py stamps it, so every page says exactly which build it is
     demoMaxLevel: 12, // the demo stops levelling here
     demoRegions: ["marina", "cypress", "tarpon", "shoals", "flats", "jetty", "lighthouse", "fort"], // regions the demo can reach (Blue Water Banks and The Canyon, the far endgame, show "Full game")
@@ -4774,8 +4774,58 @@ function questTrackInfo(qs) {
     return { key: "", kind: "story", head: h.state === "done" ? "★ STORY" : "★ CHAPTER " + h.chapter, title: h.title, obj: h.obj, where: h.where, lines: h.lines, state: h.state, pin };
 }
 // ---------- end of tracking ----------
+// ===== Rewarded boosts: watch an optional ad, get a boost for the next few casts =====
+// quest.boost = { type, left } (left = casts still to go) or null. One boost at a time, no stacking.
+const BOOSTS = [
+    { id: "cash", icon: "\u{1F4B0}", name: "Cash boost", short: "fish sell for double", desc: "Every fish you land on your next casts sells for double at the shop.", casts: 8 },
+    { id: "xp", icon: "⭐", name: "XP boost", short: "double XP", desc: "Every catch on your next casts earns double XP.", casts: 8 },
+    { id: "fish", icon: "\u{1F3A3}", name: "Bonus fish", short: "a second fish with each catch", desc: "Each fish you land on your next casts brings a second fish aboard (only for fish with no keep-or-release rule).", casts: 8 },
+];
+function boostById(id) { return BOOSTS.find((b) => b.id === id) || null; }
+function boostSanitize(b) {
+    if (!b || typeof b !== "object" || !boostById(b.type))
+        return null;
+    const left = Math.floor(+b.left);
+    return left > 0 ? { type: b.type, left: Math.min(left, 20) } : null;
+}
+// The ad itself. In the Android app a native ad plugin (AdMob) shows a real video ad; anywhere else a clearly marked placeholder runs.
+// While testing, Google's own TEST ad unit is used. Swap AD_UNIT_ID (and set AD_TESTING false) once there is an AdMob account.
+const AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"; // Google's rewarded test ad unit
+const AD_TESTING = true;
+function adPlugin() { try {
+    const C = typeof window !== "undefined" && window.Capacitor;
+    if (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.AdMob)
+        return C.Plugins.AdMob;
+}
+catch (e) { /* no native bridge */ } return null; }
+function adNativeShow() {
+    const A = adPlugin();
+    if (!A)
+        return null;
+    return new Promise((resolve) => {
+        let earned = false, done = false;
+        const subs = [];
+        const finish = (r) => { if (done)
+            return; done = true; subs.forEach((h) => { try {
+            h.remove();
+        }
+        catch (e) { /* already gone */ } }); resolve(r); };
+        const on = (ev, fn) => { try {
+            Promise.resolve(A.addListener(ev, fn)).then((h) => subs.push(h)).catch(() => { });
+        }
+        catch (e) { /* ignore */ } };
+        on("onRewardedVideoAdReward", () => { earned = true; });
+        on("onRewardedVideoAdDismissed", () => finish({ ok: earned }));
+        on("onRewardedVideoAdFailedToShow", () => finish({ ok: false, err: "The ad could not be shown. Try again in a minute." }));
+        Promise.resolve().then(() => A.initialize({ initializeForTesting: AD_TESTING }))
+            .then(() => A.prepareRewardVideoAd({ adId: AD_UNIT_ID, isTesting: AD_TESTING }))
+            .then(() => A.showRewardVideoAd())
+            .catch(() => finish({ ok: false, err: "No ad is available right now. Try again in a minute." }));
+        setTimeout(() => finish({ ok: false, err: "The ad took too long to load. Try again in a minute." }), 90000);
+    });
+}
 function questFresh() {
-    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0, released: 0, trapsSet: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), lines: {}, track: "", boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }, traps: trapsFresh() };
+    return { v: 1, xp: 0, money: 0, dayOffset: 0, day: "", missions: [], perks: {}, stats: { totalCaught: 0, missionsDone: 0, caught: {}, biggest: {}, spotsFound: {}, marksSeen: {}, sightings: {}, playSeconds: 0, streak: 0, bestStreak: 0, lastDay: "", fishSold: 0, earned: 0, released: 0, trapsSet: 0, adsWatched: 0 }, gear: gearDefaults(), travel: { unlocked: {} }, homes: homesFresh(), look: lookFresh(), wardrobe: wardrobeFresh(), story: storyFresh(), lines: {}, track: "", boost: null, boats: boatsFresh(), skiffRule: 1, warden: { strikes: 0, checks: 0, clean: 0, fines: 0, seized: 0, day: "", sold: {} }, traps: trapsFresh() };
 }
 function questEnsureDay(qs, speciesInfo) {
     const key = questDayKey(qs.dayOffset);
@@ -4805,7 +4855,7 @@ function questLoad(speciesInfo) {
         if (raw) {
             const p = JSON.parse(raw);
             if (p && p.v === 1 && Number.isFinite(p.xp) && Number.isFinite(p.money) && Array.isArray(p.missions) && p.stats && p.stats.caught) {
-                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), traps: trapsSanitize(p.traps), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), lines: qlSanitize(p.lines), track: typeof p.track === "string" ? p.track : "", boats: boatsSanitize(p.boats) };
+                qs = { ...questFresh(), ...p, stats: { ...questFresh().stats, ...p.stats }, gear: gearSanitize(p.gear), perks: progSanitizePerks(p.perks), travel: travelSanitize(p.travel), homes: homesSanitize(p.homes), wardrobe: wardrobeSanitize(p.wardrobe), traps: trapsSanitize(p.traps), look: lookSanitize(p.look, wardrobeSanitize(p.wardrobe)), story: storySanitize(p.story), lines: qlSanitize(p.lines), track: typeof p.track === "string" ? p.track : "", boost: boostSanitize(p.boost), boats: boatsSanitize(p.boats) };
                 if (!p.skiffRule && (p.xp > 0 || p.stats.totalCaught > 0 || (p.story && p.story.i > 0)))
                     qs.story.flags.skiff = true; // a save from before the dock start already has the skiff
                 qs.skiffRule = 1;
@@ -9266,6 +9316,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
     const [uiNearGiver, setUiNearGiver] = useState(null); // id of a quest giver within talking range, or null
     const [uiProgressOpen, setUiProgressOpen] = useState(false); // level / perks screen
     const [uiMissionsOpen, setUiMissionsOpen] = useState(false); // daily missions overview panel
+    const [uiBoostOpen, setUiBoostOpen] = useState(false); // the boost panel (watch an ad for a boost)
+    const [uiAd, setUiAd] = useState(null); // the placeholder ad that is playing: { boost }
     const [uiStoryOpen, setUiStoryOpen] = useState(false); // the quest journal (story chapters, area stories, daily jobs)
     const [uiJTab, setUiJTab] = useState("story"); // which tab of the journal: story | lines | jobs
     const [uiStoryScene, setUiStoryScene] = useState(null); // the scene being played: { id, kind, who, how, lines }
@@ -15337,6 +15389,8 @@ function DeepWaterPrototype({ onExit, newLook }) {
             LMM.foam.opacity = 0.42 + 0.12 * Math.sin(seaLmClock * 0.5);
         }
         // ===== sea landmarks (end) =====
+        if (BUILD.dev)
+            window.__charter = { stateRef, get quest() { return quest; }, get fs() { return fishingState; }, get gamefish() { return gamefish; }, get ashorePos() { return ashorePos; }, get dockSpot() { return { x: dockX, z: Math.min(DOCK_FISH_Z1, DOCK_FISH_Z0 + 2) }; }, rc: (c) => questRecordCatch(c), sellList: () => sellList(), fightStart }; // testing handle (dev build only)
         // Pays out XP (with the streak and perk multipliers) and any level rewards.
         function awardXp(base) {
             const res = questAddXp(quest, base);
@@ -15368,7 +15422,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                 return;
             catchPending = null;
             if (keep) {
-                stateRef.current.carriedItems.push({ type: "fish", speciesName: c.name, weight: c.weight, id: Math.random().toString(36).slice(2) });
+                stateRef.current.carriedItems.push({ type: "fish", speciesName: c.name, weight: c.weight, bx: c.bx, id: Math.random().toString(36).slice(2) });
                 marineShowToast(c.level === "ok" ? "🧊 Kept the " + c.name : "⚠️ Kept an illegal " + c.name + ": a game warden could fine you", c.level === "ok" ? "#7fe6a8" : "#ffb84d", c.level === "ok" ? 3 : 5);
             }
             else {
@@ -15436,7 +15490,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             qlOnCatch(quest, c);
             const storyEv = storyTick(quest), qlEv = qlTick(quest);
             const info = questSpeciesInfo.find((s) => s.name === c.species) || { lo: 1, hi: 2, pull: 20 };
-            const xpRes = awardXp(progCatchXp(info, c.weight, r.flags, questLevelForXp(quest.xp)));
+            const xpRes = awardXp(progCatchXp(info, c.weight, r.flags, questLevelForXp(quest.xp)) * (c.boost === "xp" ? 2 : 1));
             questSave(quest);
             questPush();
             const parts = [];
@@ -15615,7 +15669,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
             const fish = sellFishAll();
             const by = {};
             let total = 0;
-            fish.forEach((f) => { const v = progSellValue(quest, f.speciesName, f.weight); total += v; by[f.speciesName] = by[f.speciesName] || { name: f.speciesName, n: 0, value: 0 }; by[f.speciesName].n++; by[f.speciesName].value += v; });
+            fish.forEach((f) => { const v = progSellValue(quest, f.speciesName, f.weight) * (f.bx || 1); total += v; by[f.speciesName] = by[f.speciesName] || { name: f.speciesName, n: 0, value: 0 }; by[f.speciesName].n++; by[f.speciesName].value += v; });
             return { n: fish.length, total, lines: Object.keys(by).map((k) => by[k]).sort((x, y) => y.value - x.value) };
         }
         // ---------- Homes: the live snapshot the panel shows, and the actions it sends ----------
@@ -15930,6 +15984,39 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     qlHandle(qlApplyScene(quest, sc.line.id, sc.kind, a.played || []));
                 else if (sc)
                     storyHandle(storyApplyScene(quest, sc.kind, a.flags || [], a.played || []));
+            }
+            else if (a.type === "adwatch") { // the player picked a boost and asked to watch an ad
+                const b = boostById(a.boost);
+                if (!b) { /* unknown boost */ }
+                else if (quest.boost)
+                    marineShowToast("A boost is already running (" + quest.boost.left + " casts left)", "#ffb84d", 3);
+                else {
+                    const nat = adNativeShow();
+                    if (nat) {
+                        marineShowToast("Loading the ad\u2026", "#8fd9e6", 3);
+                        nat.then((r) => { stateRef.current.questAction = r.ok ? { type: "adreward", boost: b.id } : { type: "adfail", msg: r.err || "Watch the whole ad to get the boost" }; });
+                    }
+                    else
+                        setUiAd({ boost: b.id });
+                }
+            }
+            else if (a.type === "adreward") { // the ad was watched to the end: switch the boost on
+                const b = boostById(a.boost);
+                if (b && !quest.boost) {
+                    quest.boost = { type: b.id, left: b.casts };
+                    quest.stats.adsWatched = (quest.stats.adsWatched || 0) + 1;
+                    questSave(quest);
+                    questPush();
+                    marineShowToast("\u{1F3AC} " + b.icon + " " + b.name + " on: " + b.short + " for your next " + b.casts + " casts", "#7fe6a8", 5);
+                }
+            }
+            else if (a.type === "adfail") {
+                marineShowToast(a.msg, "#ffb84d", 4);
+            }
+            else if (a.type === "testboost") { // testing (dev build): set or clear a boost
+                quest.boost = a.boost ? { type: a.boost, left: a.left || 8 } : null;
+                questSave(quest);
+                questPush();
             }
             else if (a.type === "track") { // choose which quest the HUD card and the chart pin follow ("" = the main story)
                 quest.track = typeof a.key === "string" ? a.key : "";
@@ -17631,6 +17718,15 @@ function DeepWaterPrototype({ onExit, newLook }) {
                     if (fs.castProgress >= 1) {
                         fs.mode = "dropping";
                         fs.dropProgress = 0;
+                        fs.castBoost = null; // a watched-ad boost covers this cast (and what it catches)
+                        if (quest.boost && quest.boost.left > 0) {
+                            const bi = boostById(quest.boost.type), left = quest.boost.left - 1;
+                            fs.castBoost = quest.boost.type;
+                            quest.boost = left > 0 ? { type: quest.boost.type, left } : null;
+                            questSave(quest);
+                            questPush();
+                            marineShowToast(bi.icon + " " + bi.name + (left > 0 ? ": " + left + " more cast" + (left === 1 ? "" : "s") : ": last boosted cast!"), "#ffd36b", 2.2);
+                        }
                         // The line goes out from the boat, or from the dock a few steps out over the water beside the player.
                         const cd = fs.castDir || { dx: 1, dz: 0 };
                         let reach = DOCK_CAST_REACH; // (past the finger docks if one is in the way)
@@ -17787,6 +17883,10 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         outcome = e;
                     else
                         fightEvent(e, hf); });
+                    if (BUILD.dev && stateRef.current.forceLand) {
+                        stateRef.current.forceLand = false;
+                        outcome = "landed";
+                    } // testing: land the fish now
                     // The reel ticks while it turns, the drag screams when it slips, and the rod buzzes in the hand when the load is high.
                     if (reeling) {
                         reelClickT -= dt;
@@ -17883,19 +17983,23 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         if (fs.weight > journal[sp.name].biggestWeight)
                             journal[sp.name].biggestWeight = fs.weight;
                         const reg = fishRegCheck(sp.name, fs.weight, wardenCtx());
+                        const bt = fs.castBoost || null, bx = bt === "cash" ? 2 : undefined, bonusFish = bt === "fish" && !reg;
                         catchPending = null;
-                        if (!reg)
-                            stateRef.current.carriedItems.push({ type: "fish", speciesName: sp.name, weight: fs.weight, id: Math.random().toString(36).slice(2) });
+                        if (!reg) {
+                            stateRef.current.carriedItems.push({ type: "fish", speciesName: sp.name, weight: fs.weight, bx, id: Math.random().toString(36).slice(2) });
+                            if (bonusFish)
+                                stateRef.current.carriedItems.push({ type: "fish", speciesName: sp.name, weight: Math.round(fs.weight * (0.55 + 0.4 * Math.random()) * 10) / 10, id: Math.random().toString(36).slice(2) });
+                        }
                         else if (reg.level !== "protected") {
-                            catchPending = { name: sp.name, weight: fs.weight, level: reg.level };
+                            catchPending = { name: sp.name, weight: fs.weight, level: reg.level, bx };
                             fs.resultTimer = 18;
                         } // the player decides: keep or release (a protected fish simply goes back)
-                        const gotXp = questRecordCatch({ species: sp.name, weight: fs.weight, spotType: hf && hf.spot ? hf.spot.type : sp.zone, home: hf && hf.spot ? hf.spot.home : true, region: regionIdAt(boatPos.x, boatPos.z) });
+                        const gotXp = questRecordCatch({ species: sp.name, weight: fs.weight, spotType: hf && hf.spot ? hf.spot.type : sp.zone, home: hf && hf.spot ? hf.spot.home : true, region: regionIdAt(boatPos.x, boatPos.z), boost: bt });
                         if (reg && reg.level === "protected") {
                             quest.stats.released = (quest.stats.released || 0) + 1;
                             questNoteEvent("release", 1);
                         }
-                        fs.resultText += ` · +${gotXp} XP`;
+                        fs.resultText += ` · +${gotXp} XP` + (bt === "xp" ? " (2\u00d7)" : bt === "cash" ? " · sells for 2\u00d7" : bonusFish ? " · +1 bonus fish" : "");
                         const wr = fs.weightRoll;
                         setUiCatch({
                             name: sp.name, weight: fs.weight, xp: gotXp, first: !!lastCatchFlags.first, best: !!lastCatchFlags.best,
@@ -19289,7 +19393,11 @@ function DeepWaterPrototype({ onExit, newLook }) {
                             readyN,
                             " mission",
                             readyN === 1 ? "" : "s",
-                            " ready to turn in")));
+                            " ready to turn in"),
+                        (() => {
+                            const bo = uiQuest.boost ? boostById(uiQuest.boost.type) : null;
+                            return (React.createElement("div", { onClick: (e) => { e.stopPropagation(); setUiBoostOpen(true); }, style: { fontSize: 11, marginTop: 4, padding: "3px 6px", borderRadius: 4, cursor: "pointer", color: bo ? "#ffd36b" : "#8fd9e6", background: bo ? "rgba(255,211,107,0.12)" : "rgba(111,214,232,0.08)", border: "1px solid " + (bo ? "rgba(255,211,107,0.5)" : "rgba(111,214,232,0.35)") } }, bo ? bo.icon + " " + bo.name + " · " + uiQuest.boost.left + " cast" + (uiQuest.boost.left === 1 ? "" : "s") + " left" : "🎬 Watch an ad for a boost"));
+                        })()));
                 })(),
                 uiQuest && (() => {
                     const T = questTrackInfo(uiQuest);
@@ -19433,6 +19541,9 @@ function DeepWaterPrototype({ onExit, newLook }) {
         uiMarineToast && TOUCH_UI && !uiHudOpen && (React.createElement("div", { onClick: () => setUiMarineToast(null), style: { position: "absolute", top: 58, left: 14, maxWidth: "calc(100% - 82px)", boxSizing: "border-box", ...panelStyle, padding: "6px 10px", border: `1px solid ${uiMarineToast.color}`, borderTop: `3px solid ${uiMarineToast.color}`, borderRadius: "0 0 6px 6px", color: uiMarineToast.color, fontSize: 11, lineHeight: 1.3, fontWeight: 600, zIndex: 62 } },
             React.createElement("div", { style: { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, uiMarineToast.text))),
         uiStoryScene && uiQuest && (React.createElement(StoryScene, { key: uiStoryScene.id, scene: uiStoryScene, qs: uiQuest, onDone: (flags, played) => { stateRef.current.questAction = { type: "storydone", flags, played }; } })),
+        uiBoostOpen && uiQuest && React.createElement(BoostPanel, { qs: uiQuest, onWatch: (id) => { setUiBoostOpen(false); stateRef.current.questAction = { type: "adwatch", boost: id }; }, onClose: () => setUiBoostOpen(false) }),
+        uiAd && React.createElement(AdPlaceholder, { boost: boostById(uiAd.boost), onDone: (ok) => { const id = uiAd.boost; setUiAd(null); if (ok)
+                stateRef.current.questAction = { type: "adreward", boost: id }; } }),
         uiStoryOpen && uiQuest && (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
             React.createElement("div", { style: { maxWidth: 560, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
                 React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffb84d" } }, "\uD83D\uDCD6 Quest Journal"),
@@ -19725,6 +19836,7 @@ function DeepWaterPrototype({ onExit, newLook }) {
                         { icon: "👁", label: uiFirstPerson ? "Exit 1st" : "1st Person", active: uiFirstPerson, enabled: uiWalkMode, why: "Walk on deck for first-person", run: rq("fpToggleRequested") },
                         { icon: "💡", label: "Hints", active: !uiHintsOff, enabled: true, keepOpen: true, run: hintsFlip },
                         { icon: "⭐", label: "Progress", enabled: true, run: () => setUiProgressOpen(true) },
+                        { icon: "🎬", label: "Boost", active: !!(uiQuest && uiQuest.boost), enabled: !!uiQuest, run: () => setUiBoostOpen(true) },
                         { icon: "★", label: "Story", enabled: true, run: () => { setUiJTab("story"); setUiStoryOpen(true); } },
                         { icon: "📋", label: "Journal", enabled: true, run: () => { setUiJTab(uiQuest && uiQuest.track ? (uiQuest.track.indexOf("line:") === 0 ? "lines" : "jobs") : "jobs"); setUiStoryOpen(true); } },
                         { icon: "🧭", label: "Chart", enabled: true, run: () => setUiChartOpen(true) },
@@ -21291,6 +21403,60 @@ function StoryScene({ scene, qs, onDone }) {
 }
 // The journal: what you are doing now, the chapters, the logbook pages found, and everyone you have met.
 // ---------- Quest journal tabs (v38): area stories and daily jobs, beside the main story ----------
+// The boost panel: pick what the next casts should earn, then watch an ad for it.
+function BoostPanel({ qs, onWatch, onClose }) {
+    const act = qs.boost ? boostById(qs.boost.type) : null;
+    const card = { padding: "10px 12px", borderRadius: 8, background: "rgba(111,214,232,0.07)", border: "1px solid rgba(111,214,232,0.3)" };
+    return (React.createElement("div", { style: { position: "absolute", inset: 0, background: "rgba(5,12,16,0.985)", zIndex: 450, overflowY: "auto", padding: 16 } },
+        React.createElement("div", { style: { maxWidth: 560, margin: "0 auto" } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+                React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#ffd36b" } }, "\uD83C\uDFAC Boosts"),
+                React.createElement("button", { onClick: onClose, style: { fontSize: 13, padding: "5px 12px", borderRadius: 5, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, "Close")),
+            React.createElement("div", { style: { fontSize: 13, opacity: 0.8, marginBottom: 12, lineHeight: 1.45 } },
+                "Watch a short ad if you like, and your next ",
+                BOOSTS[0].casts,
+                " casts earn more. It is always optional, and you play the same without it."),
+            act && (React.createElement("div", { style: { ...card, marginBottom: 12, background: "rgba(255,211,107,0.1)", border: "1px solid rgba(255,211,107,0.5)", color: "#ffd36b" } },
+                React.createElement("div", { style: { fontWeight: 700 } },
+                    act.icon,
+                    " ",
+                    act.name,
+                    " is running"),
+                React.createElement("div", { style: { fontSize: 12, marginTop: 2 } },
+                    qs.boost.left,
+                    " cast",
+                    qs.boost.left === 1 ? "" : "s",
+                    " left: ",
+                    act.short,
+                    ". Boosts do not stack, so the next one opens when this one is used up."))),
+            React.createElement("div", { style: { display: "grid", gap: 10 } }, BOOSTS.map((b) => (React.createElement("div", { key: b.id, style: { ...card, display: "flex", alignItems: "center", gap: 12, opacity: act ? 0.55 : 1 } },
+                React.createElement("div", { style: { fontSize: 28 } }, b.icon),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("div", { style: { fontWeight: 700 } }, b.name),
+                    React.createElement("div", { style: { fontSize: 12, opacity: 0.8, lineHeight: 1.4 } },
+                        b.desc,
+                        " Lasts ",
+                        b.casts,
+                        " casts.")),
+                React.createElement("button", { disabled: !!act, onClick: () => onWatch(b.id), style: { fontSize: 13, fontWeight: 700, padding: "8px 12px", borderRadius: 6, cursor: act ? "default" : "pointer", border: "1px solid rgba(255,211,107,0.6)", background: act ? "rgba(255,255,255,0.05)" : "rgba(255,211,107,0.18)", color: act ? "#8aa" : "#ffd36b", whiteSpace: "nowrap" } }, "\u25B6 Watch ad"))))),
+            React.createElement("div", { style: { fontSize: 11, opacity: 0.5, marginTop: 12 } },
+                "Ads watched: ",
+                qs.stats.adsWatched || 0,
+                adPlugin() ? "" : " · This version shows a placeholder ad. The Android app plays real ads."))));
+}
+// Stand-in ad for builds with no ad plugin (the browser, the demo site): a few seconds of countdown, then the boost.
+function AdPlaceholder({ boost, onDone }) {
+    const [left, setLeft] = useState(5);
+    useEffect(() => { if (left <= 0)
+        return undefined; const t = setTimeout(() => setLeft((v) => v - 1), 1000); return () => clearTimeout(t); }, [left]);
+    return (React.createElement("div", { style: { position: "absolute", inset: 0, zIndex: 700, background: "#06141b", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: 20, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 11, letterSpacing: 2, opacity: 0.6 } }, "PLACEHOLDER AD"),
+        React.createElement("div", { style: { width: "min(88vw, 360px)", aspectRatio: "16 / 9", borderRadius: 10, border: "1px dashed rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.55)", fontSize: 14, padding: 12 } }, "A real video ad plays here in the Android app"),
+        React.createElement("div", { style: { fontSize: 15 } }, left > 0 ? "Your " + boost.name + " unlocks in " + left + "…" : boost.icon + " " + boost.name + " is ready"),
+        React.createElement("div", { style: { display: "flex", gap: 10 } },
+            React.createElement("button", { onClick: () => onDone(false), style: { fontSize: 13, padding: "8px 14px", borderRadius: 6, cursor: "pointer", border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.06)", color: "#eaf3f5" } }, left > 0 ? "Close (no boost)" : "Close"),
+            left <= 0 && React.createElement("button", { onClick: () => onDone(true), style: { fontSize: 14, fontWeight: 700, padding: "8px 16px", borderRadius: 6, cursor: "pointer", border: "1px solid rgba(127,230,168,0.7)", background: "rgba(127,230,168,0.18)", color: "#7fe6a8" } }, "Claim boost"))));
+}
 function JournalTabs({ qs, tab, setTab }) {
     const lineAttn = QUEST_LINES.filter((l) => { const L = qs.lines && qs.lines[l.id]; return L && (L.st === "offer" || L.st === "ready"); }).length;
     const jobAttn = qs.missions.filter((m) => m.status === "ready").length;

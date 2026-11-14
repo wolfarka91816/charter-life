@@ -28,6 +28,15 @@ edit(A + "/res/values/styles.xml", fs)
 # dark launch background
 edit(A + "/res/values/ic_launcher_background.xml", lambda s: re.sub(r"#[0-9A-Fa-f]{6}", "#08161C", s))
 
+# ads: the AdMob plugin needs the app id in the manifest. This is Google's TEST app id; swap it for your own once you have an AdMob account
+# (and swap AD_UNIT_ID in the game file at the same time).
+AD_APP_ID = "ca-app-pub-3940256099942544~3347511713"
+def ads(s):
+    if "com.google.android.gms.ads.APPLICATION_ID" in s: return s
+    meta = '<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="%s" />' % AD_APP_ID
+    return s.replace("</application>", "    " + meta + "\n    </application>", 1)
+edit(A + "/AndroidManifest.xml", ads)
+
 # launcher icons from the game's own icon
 conv = shutil.which("magick") or shutil.which("convert")
 if conv:

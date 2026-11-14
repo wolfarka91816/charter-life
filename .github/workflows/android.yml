@@ -51,7 +51,7 @@ jobs:
         working-directory: android-app
         env:
           RUN_NUMBER: ${{ github.run_number }}
-          VERSION_NAME: "0.38"
+          VERSION_NAME: "0.39"
         run: python3 patch_android.py
 
       - name: Build the APK
